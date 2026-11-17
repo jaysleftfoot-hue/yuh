@@ -1,0 +1,10 @@
+import { packager } from '@electron/packager';
+import {mkdir,copyFile,writeFile} from 'node:fs/promises';
+await mkdir('dist/desktop-app',{recursive:true});
+await copyFile('desktop/main.cjs','dist/desktop-app/main.cjs');
+await copyFile('dist/Big-League-Bowling-PC/Big League Bowling.html','dist/desktop-app/game.html');
+await copyFile('node_modules/three/LICENSE','dist/desktop-app/THREE-LICENSE.txt');
+await writeFile('dist/desktop-app/package.json',JSON.stringify({name:'big-league-bowling',version:'0.2.0',main:'main.cjs',description:'Baseball arcade bowling',author:'Big League Bowling'}));
+const output=await packager({dir:'dist/desktop-app',out:'dist/windows',name:'Big League Bowling',platform:'win32',arch:'x64',electronVersion:'40.0.0',asar:true,overwrite:true,prune:false,download:{cacheRoot:'/tmp/electron-cache'},win32metadata:{CompanyName:'Big League Bowling',FileDescription:'Big League Bowling desktop game',ProductName:'Big League Bowling'},appVersion:'0.2.0'});
+await writeFile(`${output[0]}/START HERE.txt`,'BIG LEAGUE BOWLING — WINDOWS DESKTOP\r\n\r\nExtract the entire ZIP, then double-click Big League Bowling.exe.\r\nKeep the accompanying folders and files beside the executable.\r\nNo browser, Node, Python, or internet connection is needed.\r\nRequires 64-bit Windows 10/11 and WebGL-capable graphics.\r\nF11: fullscreen. Escape: leave fullscreen. Alt+F4: quit.\r\n\r\nThis is the current playable prototype packaged with Electron.\r\nIt uses the existing 3D game and simplified arcade physics.\r\nThe executable is unsigned.\r\n');
+console.log(output);

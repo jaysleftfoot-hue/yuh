@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Big League Bowling</title>
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+  <main>
+    <h1>BIG LEAGUE <span>BOWLING</span></h1>
+    <p>THE BALLPARK IS YOUR BOWLING ALLEY</p>
+    <label>Team <select id="team"></select></label>
+    <p id="stadium"></p>
+    <div class="play">
+      <canvas id="lane" width="400" height="720" aria-label="3D stadium bowling lane"></canvas>
+      <section aria-label="Game controls">
+        <p id="status" role="status" aria-live="polite">Frame 1 — ready</p>
+        <form id="controls">
+          <label>Starting position <input id="position" type="range" min="1" max="9" step=".1" value="5"><output for="position"></output></label>
+          <label>Aim <input id="aim" type="range" min="-1" max="1" step=".01" value="0"><output for="aim"></output></label>
+          <label>Power <input id="power" type="range" min="0" max="1" step=".01" value=".7"><output for="power"></output></label>
+          <label>Curve <input id="curve" type="range" min="-1" max="1" step=".01" value="0"><output for="curve"></output></label>
+          <button type="submit" id="bowl">LET IT RIP</button>
+        </form>
+        <p>Adjust position, aim, power, and curve, then press Bowl. Left/right arrows adjust aim when the lane is focused; Space bowls.</p>
+        <button id="restart" type="button">New game</button>
+        <p id="result" role="status" aria-live="polite"></p>
+      </section>
+    </div>
+    <div class="score-scroll"><table aria-label="Scorecard"><thead><tr id="score-head"></tr></thead><tbody><tr id="rolls"></tr><tr id="totals"></tr></tbody></table></div>
+  </main>
+  <script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

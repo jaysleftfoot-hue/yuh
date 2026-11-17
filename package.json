@@ -1,0 +1,21 @@
+{
+  "name": "baseball-bowling-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 3000 --bind 0.0.0.0",
+    "test": "node test/game.test.js",
+    "test:browser": "node test/browser.cjs",
+    "build:pc": "node scripts/package-pc.mjs",
+    "build:windows": "node scripts/package-pc.mjs && node scripts/package-desktop.mjs"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "@playwright/test": "^1.65.1",
+    "esbuild": "^0.28.2"
+  }
+}
