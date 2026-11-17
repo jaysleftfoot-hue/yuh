@@ -1,0 +1,3 @@
+55f6856e95fc2cd2920784a5d989e97e37af2baceaeceb2763ee24964c73dcf4  Big-League-Bowling-Native-Windows-x64.zip
+bfc3dd31bc40e33f4181965158f5adeeefb972464fdb0eea41fac94743893f00  Big-League-Bowling-source.zip
+dccf66bd453170c279e5bcf2d96152d2e5dac47b00f63a357c47734fb50e41f3  yuh-native-preservation.bundle
