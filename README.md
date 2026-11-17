@@ -1,5 +1,8 @@
 # Big League Bowling
 
+The current C++ desktop implementation is in [native/](native/README.md), including both modes, AI competition, powers, 64 ball unlocks and the stadium tour ending at Tropicana. Read [AGENTS.md](AGENTS.md) for the user's preservation requirement. The browser/Electron prototype below is retained as the earlier version.
+
+
 Run `npm install`, then `npm start`; open http://localhost:3000. Run `npm test` for nine rules/physics tests. `npm run test:browser` runs Chromium smoke coverage (expects `/usr/bin/chromium`).
 
 ## Current game

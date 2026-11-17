@@ -1,5 +1,15 @@
 # Codex handoff: Big League Bowling
 
+## Current native reconstruction
+Read `native/README.md` and `native/ART_DIRECTION.md` before continuing. The prior uncommitted C++ files were lost in a cloud refresh; the native work has been reconstructed from the conversation. It includes both modes, simulated AI, powers, save/load, 30 MLB team balls + 30 fun team designs + 4 Rays specials, and ten ordered stadium unlocks ending at Tropicana Field. The latest graphics pass includes concourse geometry, signage, lighting shader, animated ray mascot and compact HUD.
+
+Graphics remains priority #1, with substantial refinement still needed. The requested Zombies first-minute / full Polar Bowler video references remain unviewed due proxy errors; large uploaded MP4s exceeded the 32 MiB transfer cap. Do not claim video-matched mechanics.
+
+The user explicitly requested durable preservation after patches. Follow `AGENTS.md`: commit and push completed source/assets/tests/docs, then verify remote HEAD. `native/docs/VALIDATION.md` records current verification once complete. Keep caches and generated binaries out of source history. Windows packaging is reproducible with `native/build.py`; running the EXE on Windows remains unverified.
+
+## Original browser prototype handoff
+
+
 ## User goal
 Build a baseball-themed 3D arcade bowling game inspired by Elf Bowling, Zombie Bowlarama, Polar Bowler, and Shrek Bowling, with MLB teams and stadiums. Deliver a downloadable Windows desktop game. Continue development in another Codex session using this branch.
 
