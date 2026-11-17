@@ -21,4 +21,4 @@ The native files were reconstructed from the conversation after a cloud refresh 
 - Exact gameplay matching to the requested YouTube videos; neither clip has been viewed.
 - Finished art quality comparable to the supplied commercial-game references. This remains a procedural prototype.
 
-The source, assets, scripts, tests, art direction and this evidence are preserved in Git. Generated build downloads are preserved separately in a draft GitHub release. Future patches must follow the commit/push/remote-verification workflow in ../../AGENTS.md.
+The source, assets, scripts, tests, art direction and this evidence are preserved in Git. Generated build downloads are preserved separately on the artifact-only `backups/native-2026-11-17` Git branch. GitHub Release metadata access worked, but uploads.github.com rejected file uploads with HTTP 401; the empty draft was removed and the verified Git transport is used for these backup files. Future patches must follow the commit/push/remote-verification workflow in ../../AGENTS.md.
