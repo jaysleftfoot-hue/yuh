@@ -1,5 +1,5 @@
-# Painted arcade UI and three-phase bowling
+# Live pins and rival difficulty
 
-Source 09c098865c631903961c079000bf7b342a373680 on codex/big-league-bowling. Original painted rock/turf, slate and green action textures replace the navy dashboard across native menus/HUD. Stadium bowling now has separate Spot, Curve and Power confirmations; mascot retains the slingshot. Fixed lane dimensions/camera/speed unchanged.
+Source d53f86a6650d6c01e055da3893c57bd13c19d37a on codex/big-league-bowling. The HUD follows the active rack, and Rookie, Pro and All-Star are selectable in both modes.
 
-Run Big-League-Bowling-Setup.exe on Windows x64. Native rules, campaign, real mouse/keyboard UI flow, full AI matches and launch/impact visual checks passed on Linux. Windows installer and ZIP were cross-built and contents/hash checked; execution/installation on Windows remains unverified. SHA256SUMS.txt covers installer, portable ZIP, source archive and Git preservation bundle.
+Native rules, campaign, window smoke and input checks passed. The Windows installer was cross-built on Linux. Windows execution remains unverified.
