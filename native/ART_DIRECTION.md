@@ -36,3 +36,9 @@ Remaining art work: authored character meshes/textures, varied course layouts be
 ## Recovery record
 
 A cloud refresh removed the prior uncommitted native files. The native implementation was reconstructed from code and requirements recorded in the conversation, then rebuilt/tested. It is not a byte-identical filesystem restore. Preserve this reconstruction in the remote Git branch; record current verification in docs/VALIDATION.md. Source screenshots in docs/ are newly captured evidence, not recovered old files.
+
+## Lane proportions and HUD follow-up
+
+The rendered foul-line-to-head-pin distance now uses 60 feet / 41.5 inches (17.35 lane widths). The simulation still uses normalized arcade coordinates and existing shot timing; this is a presentation conversion, not a regulation physics rewrite. Rack depth is preserved after the head pin to avoid stretching the pin triangle. Characters remain stylized. Small scenery props retain their depth while the lane and enclosing scenery extend longitudinally. The following camera uses converted positions.
+
+Removed riveted panel borders and the right-side power tower. Powers are compact buttons above the shot bar; shot controls disappear during travel/reaction. Menu panels share the simpler treatment. The launch camera pitches down to keep the rider clear of the bottom controls.

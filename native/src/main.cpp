@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
     float time = 0, accum = 0, reaction = 0, chargeTime = 0, aiWait = .9f, celebration = 0;
     bool paused = false, charge = false, done = false, ok = false, awarded = false;
     std::string result = "WELCOME TO THE TOUR", reward;
-    Camera3D camera{{0, 3.0f, -6.2f}, {0, 1.7f, 23}, {0, 1, 0}, 57, CAMERA_PERSPECTIVE};
+    Camera3D camera{{0, 3.0f, -6.2f}, {0, 1.7f, 23}, {0, 1, 0}, 43, CAMERA_PERSPECTIVE};
     auto restart = [&]() {
         bool mode = match.mascot;
         match = Match{};
@@ -271,20 +271,21 @@ int main(int argc, char **argv) {
         art.skin = skin;
         art.mascot = match.mascot;
         const auto &view = match.lanes[match.player];
-        Vector3 desired{shot.position * .25f - 1.25f, match.mascot ? 3.5f : 2.8f,
-                        match.mascot ? -5.0f : -5.8f},
-            look{0, match.mascot ? .35f : 1.2f, 23};
+        Vector3 desired{shot.position * .25f - 1.25f, match.mascot ? 4.5f : 4.5f,
+                        match.mascot ? -9.0f : -9.0f},
+            look{0, -18.f, laneZ(23)};
         if (screen != 1) {
             desired = match.mascot ? Vector3{-3.2f, 4.5f, -5} : Vector3{-9, 7, -4};
             look = {0, 1, match.mascot ? 13.f : 19.f};
         } else if (state == 1 || state == 2) {
-            float z = std::min(view.ball.z, 24.f);
+            float z = laneZ(std::min(view.ball.z, 24.f));
             desired = {std::clamp((view.ball.x - 5) * .65f, -3.f, 3.f), match.mascot ? 3.1f : 2.0f,
                        z - (match.mascot ? 5.3f : 5.8f)};
             look = {std::clamp((view.ball.x - 5) * .3f, -1.5f, 1.5f), match.mascot ? 1.5f : .9f, z + 12};
         }
-        camera.position = Vector3Lerp(camera.position, desired, std::min(1.f, dt * 5));
-        camera.target = Vector3Lerp(camera.target, look, std::min(1.f, dt * 5));
+        camera.position =
+            Vector3Lerp(camera.position, desired, std::min(1.f, dt * (state == 1 ? 18 : 5)));
+        camera.target = Vector3Lerp(camera.target, look, std::min(1.f, dt * (state == 1 ? 18 : 5)));
         BeginTextureMode(scene);
         ClearBackground({45, 92, 129, 255});
         DrawRectangleGradientV(0, 0, W, 550, {17, 39, 75, 255}, {140, 182, 193, 255});
@@ -417,57 +418,38 @@ int main(int argc, char **argv) {
                                   int(280 + std::cos(i * 3.f) * phase * 240 + phase * phase * 90), 7, 5,
                                   i % 2 ? gold : aqua);
                 }
-            panel({18, 690, 1244, 94}, {13, 28, 47, 245});
             bool enabled = state == 0 && match.player == 0 && !paused;
-            slider("POSITION [A/D]", 39, 702, 160, shot.position, .55f, 9.45f, enabled);
-            slider("AIM [ARROWS]", 223, 702, 160, shot.aim, -1, 1, enabled);
-            slider("POWER", 407, 702, 160, shot.power, .1f, 1, enabled && !charge);
-            slider("CURVE [Q/E]", 591, 702, 160, shot.curve, -1, 1, enabled);
-            if (button({790, 706, 219, 48}, state == 3 ? "REMATCH" : "LET IT RIP!", true,
-                       enabled || state == 3)) {
-                if (state == 3)
-                    restart();
-                else
-                    launch();
-            }
-            if (button({1030, 706, 209, 48}, "CLUBHOUSE")) {
-                screen = 0;
-                paused = false;
-                charge = false;
-            }
-            const char *names[] = {"HEAVY BALL", "MAGNET", "BUMPERS"};
-            panel({1090, 236, 177, 235}, {30, 47, 60, 238});
-            title("DUGOUT TRICKS", 1102, 247, 14, gold);
-            for (int i = 0; i < 3; ++i) {
-                float y = 274 + i * 62.f;
-                bool available = enabled && match.stock[0][i] > 0;
-                if (button({1096, y, 165, 55}, "", match.equipped == Power(i + 1), available))
-                    match.equip(Power(i + 1));
-                Color hue = i == 0 ? Color{190, 85, 48, 255} : i == 1 ? Color{46, 174, 187, 255} : gold;
-                DrawCircleGradient(1116, int(y + 29), 20, available ? hue : Color{75, 82, 89, 255},
-                                   {5, 14, 27, 255});
-                if (i == 0) {
-                    DrawCircle(1113, int(y + 25), 3, ink);
-                    DrawCircle(1120, int(y + 26), 3, ink);
-                    DrawCircle(1116, int(y + 33), 3, ink);
+            if (state != 1 && state != 2) {
+                panel({24, 691, 1232, 66}, {10, 23, 37, 238});
+                slider("POSITION", 39, 702, 160, shot.position, .55f, 9.45f, enabled);
+                slider("AIM", 223, 702, 160, shot.aim, -1, 1, enabled);
+                slider("POWER", 407, 702, 160, shot.power, .1f, 1, enabled && !charge);
+                slider("SPIN", 591, 702, 160, shot.curve, -1, 1, enabled);
+                if (button({790, 706, 219, 48}, state == 3 ? "REMATCH" : "BOWL", true,
+                           enabled || state == 3)) {
+                    if (state == 3)
+                        restart();
+                    else
+                        launch();
                 }
-                if (i == 1) {
-                    DrawRing({1116, y + 28}, 7, 11, 0, 180, 18, cream);
-                    DrawRectangle(1105, int(y + 16), 4, 13, red);
-                    DrawRectangle(1123, int(y + 16), 4, 13, red);
+                if (button({1030, 706, 209, 48}, "CLUBHOUSE")) {
+                    screen = 0;
+                    paused = false;
+                    charge = false;
                 }
-                if (i == 2) {
-                    DrawRectangleRounded({1105, y + 17, 6, 24}, .5f, 5, cream);
-                    DrawRectangleRounded({1121, y + 17, 6, 24}, .5f, 5, cream);
-                }
-                text(names[i], 1143, y + 13, 12, cream);
-                text(std::to_string(i + 1) + "  /  " + std::to_string(match.stock[0][i]) + " left", 1143,
-                     y + 34, 12, gold);
             }
-            text(match.mascot ? "ARROWS steer in flight | SPACE boosts once"
-                              : "HOLD SPACE to time power, RELEASE to bowl",
-                 39, 761, 13, aqua);
-            text("ESC pause   F11 fullscreen   M sound", 795, 763, 12, cream);
+            if (state == 0) {
+                const char *names[] = {"1  HEAVY", "2  MAGNET", "3  BUMPERS"};
+                for (int i = 0; i < 3; ++i) {
+                    std::string label = std::string(names[i]) + "  " + std::to_string(match.stock[0][i]);
+                    if (button({28 + i * 140.f, 641, 130, 34}, label, match.equipped == Power(i + 1),
+                               enabled && match.stock[0][i] > 0))
+                        match.equip(Power(i + 1));
+                }
+            }
+            center(match.mascot ? "A / D  STEER     SPACE  BOOST"
+                                : "HOLD SPACE TO CHARGE  /  RELEASE TO BOWL",
+                   640, 770, 12, {166, 190, 207, 255});
         }
         uiBlocked = false;
         if (paused) {

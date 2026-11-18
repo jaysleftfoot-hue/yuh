@@ -20,31 +20,22 @@ inline void title(const std::string &s, float x, float y, float size, Color c) {
     text(s, x, y, size, c);
 }
 inline void panel(Rectangle r, Color c) {
-    DrawRectangleRounded({r.x + 3, r.y + 5, r.width, r.height}, .1f, 8, {0, 0, 0, 130});
-    DrawRectangleRounded(r, .1f, 8, c);
-    DrawRectangleRoundedLinesEx(r, .1f, 8, 3, {101, 126, 141, 220});
-    DrawLineEx({r.x + 12, r.y + 3}, {r.x + r.width - 12, r.y + 3}, 2, {168, 184, 188, 160});
-    DrawLineEx({r.x + 12, r.y + r.height - 3}, {r.x + r.width - 12, r.y + r.height - 3}, 2,
-               {3, 9, 19, 230});
-    for (float x : {r.x + 8, r.x + r.width - 8})
-        for (float y : {r.y + 8, r.y + r.height - 8}) {
-            DrawCircle(int(x), int(y), 2.3f, {89, 113, 127, 255});
-            DrawCircle(int(x), int(y), 1, {17, 31, 43, 255});
-        }
+    DrawRectangleRounded({r.x, r.y + 3, r.width, r.height}, .16f, 12, {0, 0, 0, 60});
+    DrawRectangleRounded(r, .16f, 12, c);
+    DrawRectangleRoundedLinesEx(r, .16f, 12, 1, {90, 133, 157, 100});
 }
 inline bool button(Rectangle r, const std::string &s, bool primary = false, bool enabled = true) {
     enabled = enabled && !uiBlocked;
     bool hover = enabled && CheckCollisionPointRec(GetMousePosition(), r);
-    Color base = primary ? red : Color{31, 55, 80, 255};
+    Color base = primary ? Color{25, 130, 151, 255} : Color{24, 43, 61, 255};
     if (hover)
         base = primary ? Color{245, 75, 65, 255} : Color{49, 80, 110, 255};
     if (!enabled)
         base = {55, 62, 70, 255};
-    DrawRectangleRounded({r.x, r.y + 5, r.width, r.height}, .2f, 8, {4, 9, 19, 255});
-    DrawRectangleRounded(r, .2f, 8, base);
-    DrawRectangleRoundedLinesEx(r, .2f, 8, 2, primary ? gold : Color{103, 136, 151, 255});
-    DrawRectangleRounded({r.x + 5, r.y + 3, r.width - 10, r.height * .38f}, .2f, 8, Fade(WHITE, .10f));
-    center(s, r.x + r.width / 2, r.y + (r.height - 20) / 2, 20, enabled ? cream : GRAY);
+    DrawRectangleRounded(r, .22f, 12, base);
+    DrawRectangleRoundedLinesEx(r, .22f, 12, 1, primary ? aqua : Color{67, 91, 109, 180});
+    center(s, r.x + r.width / 2, r.y + (r.height - 16) / 2, 16,
+           enabled ? cream : Color{140, 153, 164, 255});
     if (hover)
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
     return hover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);

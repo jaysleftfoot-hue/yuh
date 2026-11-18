@@ -4,6 +4,10 @@
 #include "raymath.h"
 #include "rlgl.h"
 #include "ui.hpp"
+inline constexpr float laneDepthScale = (720.f / 41.5f) * 10.f / 21.f;
+inline float laneZ(float z) {
+    return z <= 23.f ? 2.f + (z - 2.f) * laneDepthScale : 2.f + 21.f * laneDepthScale + (z - 23.f);
+}
 struct Art {
     Model cube{}, sphere{}, cylinder{}, pin{}, wing{}, tube{}, course{};
     Shader shader{};
@@ -11,7 +15,7 @@ struct Art {
     std::array<RenderTexture2D, 10> signs{};
     RenderTexture2D ad{};
     int arena = 0, skin = 0;
-    bool mascot = false;
+    bool mascot = false, stretched = false;
     // Continuous shaded tube and an irregular, inward-facing stadium grotto.
     Mesh tubeMesh() {
         Mesh m = GenMeshTorus(.30f, 1.0f, 24, 64);
@@ -164,13 +168,17 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
             m->materials[0].shader = shader;
     }
     void box(Vector3 p, Vector3 scale, Color c) {
+        if (stretched && scale.z < 4)
+            scale.z /= laneDepthScale;
         DrawModelEx(cube, p, {0, 1, 0}, 0, scale, c);
     }
     void orb(Vector3 p, Vector3 scale, Color c) {
+        if (stretched)
+            scale.z /= laneDepthScale;
         DrawModelEx(sphere, p, {0, 1, 0}, 0, scale, c);
     }
     void cyl(Vector3 p, float r, float h, Color c) {
-        DrawModelEx(cylinder, p, {0, 1, 0}, 0, {r, h, r}, c);
+        DrawModelEx(cylinder, p, {0, 1, 0}, 0, {r, h, stretched ? r / laneDepthScale : r}, c);
     }
     void beam(Vector3 a, Vector3 b, float r, Color c) {
         DrawCylinderEx(a, b, r, r, 8, c);
@@ -624,13 +632,19 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         for (int i = 0; i < 10; ++i)
             shadow[i] = {1000, 0, 1000};
         for (size_t i = 0; i < sim.pins.size(); ++i)
-            shadow[i] = {sim.pins[i].x - 5, 0, sim.pins[i].z};
+            shadow[i] = {sim.pins[i].x - 5, 0, laneZ(sim.pins[i].z)};
         SetShaderValueV(shader, GetShaderLocation(shader, "pinShadows"), shadow, SHADER_UNIFORM_VEC3,
                         10);
         Vector3 ballPos{(sim.hasBall ? sim.ball.x : shot.position) - 5, 0, sim.hasBall ? sim.ball.z : 2};
-        SetShaderValue(shader, GetShaderLocation(shader, "ballShadow"), &ballPos, SHADER_UNIFORM_VEC3);
+        Vector3 shadowBall{ballPos.x, 0, laneZ(ballPos.z)};
+        SetShaderValue(shader, GetShaderLocation(shader, "ballShadow"), &shadowBall,
+                       SHADER_UNIFORM_VEC3);
         SetShaderValue(shader, GetShaderLocation(shader, "sceneTime"), &time, SHADER_UNIFORM_FLOAT);
         BeginMode3D(cam);
+        rlPushMatrix();
+        rlTranslatef(0, 0, 2.f - 2.f * laneDepthScale);
+        rlScalef(1, 1, laneDepthScale);
+        stretched = true;
         material(0);
         box({0, -.7f, 15}, {95, 1, 95}, {17, 39, 43, 255});
         if (!mascot)
@@ -740,13 +754,18 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         } else {
             mascotScenery(time, team);
         }
-        for (const auto &p : sim.pins)
-            drawPin(p, team, time);
+        rlPopMatrix();
+        stretched = false;
+        for (const auto &p : sim.pins) {
+            auto visible = p;
+            visible.z = laneZ(p.z);
+            drawPin(visible, team, time);
+        }
         if (ballPos.z < 31) {
             if (mascot)
-                rider({ballPos.x, .57f, ballPos.z}, time, aim, sim.active ? sim.ball.vx : 0);
+                rider({ballPos.x, .57f, laneZ(ballPos.z)}, time, aim, sim.active ? sim.ball.vx : 0);
             else
-                bowlingBall({ballPos.x, sim.gutter ? .28f : .6f, ballPos.z},
+                bowlingBall({ballPos.x, sim.gutter ? .28f : .6f, laneZ(ballPos.z)},
                             sim.hasBall ? ballPos.z * 110 : time * 12, sim.hasBall ? sim.ball.r : .51f);
         }
         if (aim && mascot) {
@@ -763,7 +782,7 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
                 float t = i * .07f, x = shot.position - 5 + std::sin(shot.aim * .16f) * 22 * t +
                                         .5f * shot.curve * .85f * t * t;
                 if (std::abs(x) < 4.7f)
-                    orb({x, .07f, 2 + t * 22}, {.045f, .015f, .10f}, gold);
+                    orb({x, .07f, laneZ(2 + t * 22)}, {.045f, .015f, .10f}, gold);
             }
         EndMode3D();
     }

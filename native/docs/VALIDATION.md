@@ -33,3 +33,7 @@ The native files were reconstructed from the conversation after a cloud refresh 
 - Finished art quality comparable to the supplied commercial-game references. This remains a procedural prototype.
 
 The source, assets, scripts, tests, art direction and this evidence are preserved in Git. Generated build downloads are preserved separately on the artifact-only `backups/native-2026-11-17` Git branch. GitHub Release metadata access worked, but uploads.github.com rejected file uploads with HTTP 401; the empty draft was removed and the verified Git transport is used for these backup files. The November 18 graphics build has its own artifact backup on `backups/native-graphics-2026-11-18`. Future patches must follow the commit/push/remote-verification workflow in ../../AGENTS.md.
+
+## Lane/HUD follow-up
+
+Linux build and rules/campaign suites pass. Full graphical matches completed: traditional 37 rolls (115–119), mascot 41 rolls (72–35). Launch screenshots were regenerated after the camera framing correction. Windows was cross-built again; execution remains unverified. The `tropicana-in-motion.png` image above belongs to the earlier graphics pass; the two launch screenshots show the current lane/HUD.

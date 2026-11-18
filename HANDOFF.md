@@ -33,3 +33,5 @@ The user cannot download workspace or sandbox links in browser Codex. They provi
 
 ## Original workspace artifacts
 The original task workspace contains /workspace/baseball-bowling/dist/Big-League-Bowling-Windows-x64.zip (~132 MB), plus source and dependencies. Those files may not survive a move to another environment; source and lockfile here reproduce the build. Generated outputs and node_modules are intentionally excluded from Git.
+
+Latest follow-up: rendered lane proportions use the 60 ft / 41.5 in ratio, converted from normalized simulation coordinates. Shot timing/physics remain arcade-style. HUD has simpler panels/buttons, horizontal powers, and hides shot controls in motion. See ART_DIRECTION.md and VALIDATION.md for scope and checks. The prior artifact backup is the earlier graphics build; rebuild the latest Windows ZIP from source.
