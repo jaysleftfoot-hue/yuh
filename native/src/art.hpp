@@ -14,7 +14,7 @@ struct Art {
     std::array<Texture2D, 10> parkLogos{}, teamLogos{};
     std::string scoreboardKey;
     int arena = 0, skin = 0;
-    float slingPower=0;
+    float slingPower = 0;
     bool mascot = false, inSceneryTransform = false;
     // Continuous shaded tube and an irregular, inward-facing stadium grotto.
     Mesh tubeMesh() {
@@ -781,6 +781,23 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         // Low pin return keeps the stadium visible above the deck.
         box({0, .6f, 31 + extra}, {11, 1.2f, 1.2f}, {11, 28, 43, 255});
         box({0, 1.25f, 31 + extra}, {11.3f, .12f, 1.3f}, team);
+        // Continue the seating down both sidelines as lane length increases.
+        for (int side : {-1, 1})
+            for (float z = -8; z < extra + 28; z += 7.8f) {
+                for (int row = 0; row < 8; ++row) {
+                    float x = side * (43 + row * .7f), y = 4 + row * .8f;
+                    box({x, y / 2, z}, {1, y, 8}, {91, 103, 111, 255});
+                    for (int seat = 0; seat < 8; ++seat) {
+                        DrawCubeV({x, y, z - 3.4f + seat * .9f}, {.5f, .5f, .3f}, team);
+                        if (seat % 3) {
+                            DrawCubeV({x, y + .45f, z - 3.4f + seat * .9f}, {.35f, .5f, .25f},
+                                      {172, 180, 177, 255});
+                            DrawSphereEx({x, y + .83f, z - 3.4f + seat * .9f}, .15f, 4, 6,
+                                         {178, 138, 108, 255});
+                        }
+                    }
+                }
+            }
         for (int section = 0; section < 19; ++section) {
             float a = (-85 + section * 10) * DEG2RAD;
             float x = std::sin(a) * 43, z = 13 + extra + std::cos(a) * 30;
@@ -824,8 +841,8 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         box({boardX, boardY, 42 + extra}, {boardW + .7f, boardH + .7f, .8f}, boardPaint);
         sign(scoreboard.texture, {boardX, boardY, 41.5f + extra}, boardW, boardH);
         if (arena != 0) {
-            beam({boardX-boardW/2,boardY+boardH/2+1,42+extra},
-                 {boardX+boardW/2,boardY+boardH/2+1,42+extra},.12f,{110,126,137,255});
+            beam({boardX - boardW / 2, boardY + boardH / 2 + 1, 42 + extra},
+                 {boardX + boardW / 2, boardY + boardH / 2 + 1, 42 + extra}, .12f, {110, 126, 137, 255});
             logoSign(arena, {boardX, boardY + boardH / 2 + 3.4f, 41.55f + extra}, boardW - 1, 6.2f);
         }
         // Exposed steel legs and diagonal trusses keep the board a stadium structure.

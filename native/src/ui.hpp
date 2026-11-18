@@ -2,7 +2,7 @@
 #include "raylib.h"
 #include <algorithm>
 #include <string>
-inline Font uiFont{};
+inline Font uiFont{}, arcadeFont{};
 inline bool uiBlocked = false;
 inline const Color ink = {13, 24, 45, 255}, cream = {255, 241, 204, 255}, gold = {255, 194, 64, 255},
                    red = {216, 53, 57, 255}, aqua = {69, 223, 206, 255};
@@ -16,23 +16,72 @@ inline void center(const std::string &s, float x, float y, float size, Color c) 
     text(s, x - tw(s, size) / 2, y, size, c);
 }
 inline void title(const std::string &s, float x, float y, float size, Color c) {
-    text(s, x + 3, y + 4, size, {0, 0, 0, 160});
-    text(s, x, y, size, c);
+    for (int dx = -2; dx <= 2; dx += 2)
+        for (int dy = -2; dy <= 2; dy += 2)
+            DrawTextEx(arcadeFont, s.c_str(), {x + dx + 2, y + dy + 3}, size, 1, {15, 21, 20, 230});
+    DrawTextEx(arcadeFont, s.c_str(), {x, y}, size, 1, c);
 }
+// Irregular stitched leather, never a rounded application card.
 inline void panel(Rectangle r, Color c) {
-    DrawRectangleRec({r.x + 3, r.y + 5, r.width, r.height}, {0, 0, 0, 160});
-    DrawRectangleGradientV(r.x, r.y, r.width, r.height, ColorBrightness(c, .35f),
-                           ColorBrightness(c, -.45f));
-    DrawRectangleLinesEx(r, 3, {160, 153, 119, 255});
-    DrawRectangleLinesEx({r.x + 4, r.y + 4, r.width - 8, r.height - 8}, 1, {29, 32, 30, 255});
-    // Brushed metal grain and inset rivets, like a physical arcade cabinet.
-    for (int y = 8; y < r.height - 5; y += 7)
-        DrawLine(r.x + 6, r.y + y, r.x + r.width - 6, r.y + y, {0, 0, 0, 8});
-    for (float x : {r.x + 7, r.x + r.width - 7})
-        for (float y : {r.y + 7, r.y + r.height - 7}) {
-            DrawCircle(x, y, 3, {32, 34, 33, 255});
-            DrawCircle(x - 1, y - 1, 1, {225, 214, 162, 255});
-        }
+    Vector2 middle{r.x + r.width / 2, r.y + r.height / 2};
+    const int edges = 24;
+    Vector2 points[edges];
+    for (int i = 0; i < edges; ++i) {
+        float a = i * 2 * PI / edges;
+        float sx = std::cos(a), sy = std::sin(a);
+        float scale = 1 / std::max(std::abs(sx), std::abs(sy));
+        float wear = 1 - .025f * (i % 3);
+        points[i] = {middle.x + sx * scale * r.width * .5f * wear,
+                     middle.y + sy * scale * r.height * .5f * wear};
+    }
+    for (int i = 0; i < edges; ++i) {
+        auto a = points[i], b = points[(i + 1) % edges];
+        DrawTriangle(middle, b, a, c);
+        DrawLineEx(a, b, 3, {116, 106, 75, 255});
+        Vector2 aa{middle.x + (a.x - middle.x) * .96f, middle.y + (a.y - middle.y) * .88f};
+        Vector2 bb{middle.x + (b.x - middle.x) * .96f, middle.y + (b.y - middle.y) * .88f};
+        DrawLineEx(aa, bb, 1, {183, 164, 119, 170});
+    }
+    for (int i = 0; i < 55; ++i) {
+        float x = r.x + 10 + std::fmod(i * 73.f, std::max(1.f, r.width - 20)),
+              y = r.y + 8 + std::fmod(i * 31.f, std::max(1.f, r.height - 16));
+        DrawLine(x, y, x + 3, y + 1, {0, 0, 0, 30});
+    }
+}
+inline void baseballHud() {
+    // Interlocking leather pads and crossed bats frame the scene below the scores.
+    for (int i = 0; i < 26; ++i) {
+        float x = i * 50.f;
+        DrawEllipse(x + 25, 87 + (i % 3) * 4, 36, 24, {43, 29, 18, 255});
+        DrawEllipse(x + 24, 82 + (i % 3) * 4, 32, 20, {(unsigned char)(111 + i % 3 * 12), 72, 37, 255});
+        DrawLineEx({x + 2, 75}, {x + 35, 94}, 2, {172, 127, 70, 255});
+    }
+    DrawLineEx({558, 128}, {720, 65}, 12, {53, 33, 19, 255});
+    DrawLineEx({560, 125}, {718, 62}, 7, {213, 170, 91, 255});
+    DrawLineEx({561, 63}, {718, 128}, 12, {53, 33, 19, 255});
+    DrawLineEx({563, 60}, {716, 125}, 7, {213, 170, 91, 255});
+    DrawTriangle({640, 160}, {699, 83}, {581, 83}, {36, 52, 48, 255});
+    DrawTriangleLines({640, 160}, {699, 83}, {581, 83}, gold);
+    for (int row = 0; row < 4; ++row)
+        for (int col = 0; col <= row; ++col)
+            DrawCircle(640 + (col - row * .5f) * 19, 139 - row * 15, 5, {150, 242, 77, 255});
+    panel({8, 130, 145, 566}, {49, 64, 70, 255});
+    title("POWER UPS", 14, 274, 30, gold);
+    // Original baseball character portraits, framed like collectible player cards.
+    for (int side = 0; side < 2; ++side) {
+        float x = side ? 1206 : 80;
+        panel({x - 68, 128, 136, 138}, {54, 70, 76, 255});
+        DrawCircleGradient(x, 194, 51, {224, 183, 130, 255}, {126, 77, 44, 255});
+        DrawEllipse(x, 162, 51, 21, side ? Color{116, 37, 39, 255} : Color{16, 53, 88, 255});
+        DrawEllipse(x - 12, 176, 54, 8, side ? red : aqua);
+        DrawCircle(x - 18, 194, 9, cream);
+        DrawCircle(x + 18, 194, 9, cream);
+        DrawCircle(x - 16, 196, 4, ink);
+        DrawCircle(x + 20, 196, 4, ink);
+        DrawEllipse(x, 217, 25, 10, {75, 39, 27, 255});
+        DrawRectangle(x - 17, 210, 34, 7, cream);
+        title(side ? "RIVAL" : "YOU", x - 28, 236, 23, cream);
+    }
 }
 inline void arcadeMeter(float x, float y, float power, Color c) {
     panel({x - 24, y - 140, 48, 174}, {57, 58, 48, 255});
@@ -46,36 +95,17 @@ inline void arcadeMeter(float x, float y, float power, Color c) {
 inline bool button(Rectangle r, const std::string &s, bool primary = false, bool enabled = true) {
     enabled = enabled && !uiBlocked;
     bool hover = enabled && CheckCollisionPointRec(GetMousePosition(), r);
-    Color base = primary ? Color{25, 130, 151, 255} : Color{24, 43, 61, 255};
-    if (hover)
-        base = primary ? Color{245, 75, 65, 255} : Color{49, 80, 110, 255};
-    if (!enabled)
-        base = {55, 62, 70, 255};
-    panel(r, base);
-    DrawLineEx({r.x + 9, r.y + 5}, {r.x + r.width - 9, r.y + 5}, 2, primary ? gold : cream);
-    center(s, r.x + r.width / 2, r.y + (r.height - 16) / 2, 16,
-           enabled ? cream : Color{140, 153, 164, 255});
+    float size = std::min(32.f, (r.width - 12) /
+                                    std::max(1.f, MeasureTextEx(arcadeFont, s.c_str(), 32, 1).x) * 32);
+    float width = MeasureTextEx(arcadeFont, s.c_str(), size, 1).x;
+    title(s, r.x + (r.width - width) / 2, r.y + (r.height - size) / 2, size,
+          enabled ? (hover ? WHITE : (primary ? gold : Color{150, 242, 77, 255})) : GRAY);
     if (hover)
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
     return hover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
 }
-inline void slider(const char *label, float x, float y, float width, float &value, float lo, float hi,
-                   bool enabled) {
-    text(label, x, y, 15, cream);
-    text(std::string(TextFormat("%.0f", 100 * (value - lo) / (hi - lo))) + "%", x + width - 36, y, 15,
-         gold);
-    float t = (value - lo) / (hi - lo);
-    DrawRectangleRounded({x, y + 29, width, 8}, 1, 8, {5, 15, 27, 255});
-    DrawRectangleRounded({x, y + 29, width * t, 8}, 1, 8, enabled ? aqua : GRAY);
-    DrawCircleV({x + t * width, y + 33}, 9, enabled ? cream : GRAY);
-    DrawCircleV({x + t * width, y + 33}, 4, red);
-    if (enabled && IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
-        CheckCollisionPointRec(GetMousePosition(), {x - 10, y + 16, width + 20, 34}))
-        value = lo + (hi - lo) * std::clamp((GetMouseX() - x) / width, 0.f, 1.f);
-}
-
 inline bool powerButton(int index, int stock, bool selected, bool enabled) {
-    float x = 1182, y = 255 + index * 108.f;
+    float x = 79, y = 350 + index * 104.f;
     bool hover = enabled && !uiBlocked && CheckCollisionPointCircle(GetMousePosition(), {x, y}, 40);
     DrawCircle(x + 3, y + 5, 39, {0, 0, 0, 150});
     DrawCircleGradient(x, y, 39, selected ? gold : Color{167, 179, 180, 255}, {37, 48, 55, 255});

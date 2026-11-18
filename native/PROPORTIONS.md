@@ -1,32 +1,20 @@
-# Fixed playable proportions
+# Canonical playable proportions
 
-`src/lane_geometry.hpp` is the single source for the playable layout. These are arcade world units, not a claim of regulation bowling dimensions.
+The user's latest Zombies graveyard screenshot is the composition reference: a long tapering lane, tiny distant rack and low foreground ball. Exact original world units are unknown. The current intentional arcade baseline is:
 
-| Property | Current baseline |
+| Property | World units |
 |---|---:|
 | Lane width | 10 |
-| Foul line Z | 2 |
-| Head pin Z | 82 |
-| Foul-line-to-head-pin distance | 80 |
-| Normal ball radius | 0.85 |
-| Heavy ball radius | 1.10 |
+| Foul line | 2 |
+| Head pin | 162 |
+| Playable run | 160 |
+| Deck exit / surface end | 172 / 175 |
+| Normal / heavy ball radius | 0.85 / 1.10 |
 | Pin radius / height | 0.55 / 3.28 |
-| Pin spacing X / row depth | 2.65 / 2.295 |
-| Deck exit Z | 92 |
-| Surface end Z | 95 |
+| Rack spacing X / row depth | 2.65 / 2.295 |
 
-The distance was intentionally increased from 42 to 80 after the user said the ball still looked too close to the pins. Width, ball/rack sizes and camera presets were held fixed for that change. This supersedes the abandoned renderer-only regulation-ratio experiment.
+Both modes use these dimensions from `src/lane_geometry.hpp`. Rendering and simulation share world coordinates; only X handedness is converted. Decorative transforms must end before the playable lane, ball and rack are rendered. Stadium seating and mascot course extend around the playable layout.
 
-Simulation and rendering now use identical Z coordinates. The only playable X conversion changes the origin and handedness (`halfWidth - x`) to match a camera looking down positive Z; it does not scale positions. The rack is built from the shared spacing, and the pin model scale derives from the collision radius/height. The ball renderer takes its radius from the simulation. Placement controls clamp to the same launch bounds as physics.
+Stadium ready camera: height 3.8, Z -4.5, target height 1.1, vertical FOV 55. Mascot ready camera: height 4, Z -7, target height -1, FOV 53. All components are regression-tested. At 1280×800 the stadium rack width must project to 38–46 pixels and foul-line-to-head-pin screen distance to 390–440 pixels. This catches visual shortening that a world-length check alone misses.
 
-Scenery may use an authored coordinate transform, but it must be popped before drawing the playable surface, ball and rack. Stadium stands and the mascot course's back scenery extend using the deck-position-derived scenery offset. Never stretch playable geometry to fit a background.
-
-The existing rules suite checks the baseline length/width, body sizes, spacing, camera fields of view, rack containment and launch bounds. The campaign suite checks both drag mappings, opposite-direction sling aim and power limits. Intentional layout changes require updating the shared definition, its regression checks and this document; graphics-only changes must preserve them. Validate a launch view and a pin-impact view in both modes before preserving a graphics milestone.
-
-## Camera correction after stadium references
-
-World length remains 80, width 10, all body sizes unchanged. Stadium ready camera is intentionally raised from 3.8 to 6.5 and moved back from -8 to -12, targeting height 0.6 with unchanged 55-degree FOV. This exposes more lane floor and reduces the oversized foreground ball. Ready framing snaps to the preset instead of retaining a menu/previous-shot interpolation. Mascot and follow cameras are unchanged. Tests now lock every ready camera component and require 285–305 screen pixels between foul line and head-pin base at 1280×800.
-
-## Zombies footage framing correction
-
-The raised camera experiment above is superseded. Current stadium ready camera: height 3.8, back -4.5, target height 1.1, FOV 55. The ball now sits low at the bottom edge as in the supplied footage, with a longer visible run to the distant rack. Lane world geometry remains 80×10; exact original game units cannot be recovered from screenshots. Projected foul-line-to-head-pin screen distance is guarded at 390–440 pixels on an 800px-high display. Mascot camera unchanged.
+The latest deliberate change doubled the playable run from 80 to 160 without changing width, body sizes or cameras. It supersedes previous shorter layouts and the abandoned raised-camera experiment. Physics tests and smoke bounds derive their simulation duration from the shared shot timeout. Graphics-only changes must not modify these constants; intentional changes require updated tests, docs and user-facing explanation. Check launch and pin-impact views in both modes.

@@ -23,10 +23,10 @@ std::string marks(const std::vector<int> &r, int f) {
     }
     return s.empty() ? "." : s;
 }
-void scoreCard(const Game &g, float x, Color c, const char *who) {
+void scoreCard(const Game &g, float x, Color, const char *who) {
     // One shallow score strip per player, like a classic arcade bowling display.
-    panel({x, 0, 610, 49}, {42, 54, 62, 255});
-    DrawLineEx({x, 49}, {x + 610, 49}, 2, {110, 141, 148, 210});
+    panel({x, 0, 610, 67}, {66, 84, 91, 255});
+
     auto scores = g.scores();
     for (int i = 0; i < 10; ++i) {
         float left = x + 9 + i * 51.f;
@@ -38,14 +38,14 @@ void scoreCard(const Game &g, float x, Color c, const char *who) {
             rolls = "";
         center(rolls, left + 24, 7, 15, {211, 230, 224, 255});
         if (scores[i])
-            center(std::to_string(*scores[i]), left + 24, 27, 18, c);
+            center(std::to_string(*scores[i]), left + 24, 31, 23, {150, 242, 77, 255});
     }
     int total = 0;
     for (auto score : scores)
         if (score)
             total = *score;
-    center(std::to_string(total), x + 566, 13, 27, c);
-    title(who, x + 4, 55, 14, cream);
+    center(std::to_string(total), x + 566, 20, 29, Color{150, 242, 77, 255});
+    title(who, x + 4, 68, 18, cream);
 }
 int main(int argc, char **argv) {
     bool smoke = false, startInGame = false, smokeMascot = false, demoShot = false;
@@ -81,6 +81,10 @@ int main(int argc, char **argv) {
     uiFont = LoadFontEx(
         (std::string(GetApplicationDirectory()) + "assets/DejaVuSansCondensed-Bold.ttf").c_str(), 96,
         nullptr, 0);
+    arcadeFont = LoadFontEx(
+        (std::string(GetApplicationDirectory()) + "assets/Bangers-Regular.ttf").c_str(), 96, nullptr, 0);
+    GenTextureMipmaps(&arcadeFont.texture);
+    SetTextureFilter(arcadeFont.texture, TEXTURE_FILTER_TRILINEAR);
     GenTextureMipmaps(&uiFont.texture);
     SetTextureFilter(uiFont.texture, TEXTURE_FILTER_TRILINEAR);
     RenderTexture2D scene = LoadRenderTexture(W, H);
@@ -409,9 +413,7 @@ int main(int argc, char **argv) {
                 int col = id % 8, row = id / 8;
                 Rectangle cell{29 + col * 112.f, 153 + row * 70.f, 104, 62};
                 bool unlocked = id < profile.balls();
-                DrawRectangleRounded(cell, .15f, 5,
-                                     id == selectedSkin ? Color{58, 88, 106, 255}
-                                                        : Color{21, 37, 56, 255});
+                panel(cell, id == selectedSkin ? Color{58, 88, 106, 255} : Color{21, 37, 56, 255});
                 DrawTexturePro(art.skins[id], {0, 0, 256, 128}, {cell.x + 25, cell.y + 3, 54, 36},
                                {0, 0}, 0, unlocked ? WHITE : Color{70, 70, 70, 255});
                 center(std::to_string(id + 1) + (unlocked ? "" : " LOCK"), cell.x + 52, cell.y + 43, 12,
@@ -442,17 +444,17 @@ int main(int argc, char **argv) {
                 screen = 0;
             text("Equipped: " + ballName(skin), 30, 745, 20, aqua);
         } else {
+            baseballHud();
             scoreCard(match.games[0], 16, gold, "YOU");
             scoreCard(match.games[1], 654, aqua, "RIVAL");
-            title(match.mascot ? "RAYS ADVENTURE" : arenas[arena].name, 24, 81, 16, cream);
+            title(match.mascot ? "RAYS ADVENTURE" : arenas[arena].name, 184, 122, 20, cream);
 
             title(state == 3          ? "MATCH COMPLETE"
                   : match.player == 0 ? "YOUR TURN"
                                       : "RIVAL'S TURN",
-                  25, 104, 12, gold);
+                  184, 148, 19, gold);
             if (state == 2 || state == 3) {
-                DrawRectangle(180, 320, 920, 90, {13, 24, 45, 210});
-                center(result, 640, 342, 33, gold);
+                title(result, 260, 245, 46, gold);
             }
             if (state == 3)
                 center(reward, 640, 429, 18, cream);
@@ -465,7 +467,7 @@ int main(int argc, char **argv) {
                 }
             bool enabled = state == 0 && match.player == 0 && !paused;
             if ((state != 1 && state != 2) && state == 3) {
-                panel({770, 691, 486, 66}, {10, 23, 37, 238});
+
                 if (button({790, 706, 219, 48}, state == 3 ? "REMATCH" : "BOWL", true,
                            enabled || state == 3)) {
                     if (state == 3)
@@ -480,14 +482,10 @@ int main(int argc, char **argv) {
                 }
             }
             if (match.mascot && state == 0 && human) {
-                title(charge ? "LET IT FLY!" : "GRAB THE TUBE", 205, 688, 21, gold);
-                text("PULL BACK, AIM, RELEASE", 205, 718, 15, cream);
+                title(charge ? "LET IT FLY!" : "GRAB THE TUBE", 180, 194, 25, gold);
+                text("PULL BACK, AIM, RELEASE", 180, 225, 16, cream);
                 if (charge) {
                     arcadeMeter(1045, 500, shot.power, aqua);
-                }
-                if (button({24, 737, 150, 38}, "CLUBHOUSE")) {
-                    screen = 0;
-                    charge = false;
                 }
             }
             if (!match.mascot && state == 0 && human) {
@@ -497,29 +495,22 @@ int main(int argc, char **argv) {
                     DrawLineEx({x - 28, 535}, {x + 28, 535}, 5, aqua);
                     DrawTriangle({x - 39, 535}, {x - 23, 548}, {x - 23, 522}, aqua);
                     DrawTriangle({x + 39, 535}, {x + 23, 522}, {x + 23, 548}, aqua);
-                    title("MOVE TO LINE UP", 205, 688, 20, gold);
-                    text("HOLD TO POWER UP / RELEASE TO BOWL", 205, 718, 14, cream);
+                    title("MOVE TO LINE UP", 180, 194, 25, gold);
+                    text("HOLD TO POWER UP / RELEASE TO BOWL", 180, 225, 16, cream);
                 } else {
                     arcadeMeter(x, 510, shot.power, gold);
-                    title("RELEASE TO BOWL!", 205, 688, 22, gold);
+                    title("RELEASE TO BOWL!", 180, 194, 25, gold);
                     center(std::to_string(int(shot.power * 100)) + "%", x, 596, 17, aqua);
                 }
-                if (button({24, 737, 150, 38}, "CLUBHOUSE")) {
-                    screen = 0;
-                    charge = false;
-                }
             }
-            if (state == 0) {
+            {
                 for (int i = 0; i < 3; ++i)
                     if (powerButton(i, match.stock[0][i], match.equipped == Power(i + 1),
                                     enabled && match.stock[0][i] > 0))
                         match.equip(Power(i + 1));
             }
-            center(match.mascot
-                       ? "A / D  STEER     SPACE  BOOST"
-                       : "MOUSE: POSITION / HOLD / RELEASE    |    SPACE: CHARGE    |    ARROWS: AIM",
-                   match.mascot ? 1030 : 640, 770, 12, {166, 190, 207, 255});
         }
+        if(screen==1 && button({8,724,144,64},"MENU")) {paused=true;charge=false;}
         uiBlocked = false;
         if (paused) {
             DrawRectangle(0, 77, W, 723, {3, 10, 20, 210});
@@ -538,7 +529,7 @@ int main(int argc, char **argv) {
         DrawTexturePro(target.texture, {0, 0, float(W), -float(H)},
                        {offset.x, offset.y, W * scale, H * scale}, {0, 0}, 0, WHITE);
         EndDrawing();
-        if (smoke && (match.complete() || ticks > 24000)) {
+        if (smoke && (match.complete() || ticks > int(42 * (geometry::shotTimeout + 3) * 60))) {
             ok = match.complete() && rolls >= 24 && rolls <= 42;
             std::cout << "Native match smoke: mode=" << (match.mascot ? "mascot" : "traditional")
                       << " complete=" << match.complete() << " rolls=" << rolls
@@ -553,6 +544,7 @@ int main(int argc, char **argv) {
         }
     }
     audio.close();
+    UnloadFont(arcadeFont);
     UnloadFont(uiFont);
     art.close();
     UnloadShader(antialias);

@@ -1,3 +1,11 @@
+# Long-lane arcade frame milestone
+
+- Intentional playable run increase: 80 to 160 units; width, bodies and camera constants unchanged. Projection tests lock distant rack to 38–46px at 1280×800. Physics/campaign tests use geometry-derived time budgets and pass.
+- Full native stadium match completed: 38 rolls, 68–124. Launch and impact captures inspected in both modes.
+- Original baseball arcade frame, left power strip, portraits and unboxed Bangers menu lettering replace rectangular application-style controls. UI click regions still exclude the side strip from bowling input. Native window resize continues to map coordinates to the 1280×800 reference canvas.
+- Windows cross-build and warning-free NSIS installer compilation pass; installer and portable ZIP include Bangers font and OFL license. Windows runtime remains unverified.
+- Exact source-game dimensions are unknown. The supplied graveyard screenshot governs visible composition, not a claim of pixel-identical reproduction. Art remains procedural.
+
 # Arcade controls and installer milestone
 
 - Linux scoring, geometry/projection, physics and campaign suites pass. Hit tests include clicking the tube below Y=630 and exclude side HUD; stationary hold power is covered.

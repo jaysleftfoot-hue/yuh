@@ -23,7 +23,7 @@ Stadium Bowling places the playable lane on the baseball field: striped turf, ba
 
 Rays Adventure is a separate fantasy course inspired by the supplied Polar/Shrek visuals: navy/aqua surroundings, water channels, rays, bubbles, foliage accents and an original ray riding an inflatable tube. Hold left mouse over the course, pull backward to load the sling and sideways to aim opposite the pull, then release. A longer backward pull increases power. A/D or arrows steer after launch; Space boosts once. Space also remains an alternate timed launch input before launch. The footage establishes the visual slingshot, but exact original mouse-button semantics are inferred.
 
-All playable dimensions are defined in `src/lane_geometry.hpp`; physics and rendering use the same world coordinates. The current arcade baseline has 80 units from foul line to head pin and a 10-unit lane width. The latest distance increase responds to the user's request for pins farther away. Ball/pin sizes and camera framing stay fixed when decoration changes. See `PROPORTIONS.md`. Decoration transforms do not contain the playable lane, ball or rack.
+All playable dimensions are defined in `src/lane_geometry.hpp`; physics and rendering use the same world coordinates. The current arcade baseline has 160 units from foul line to head pin and a 10-unit lane width. The latest distance increase responds to the user's request for pins farther away. Ball/pin sizes and camera framing stay fixed when decoration changes. See `PROPORTIONS.md`. Decoration transforms do not contain the playable lane, ball or rack.
 
 The art remains procedural. Authored models/textures, richer character reactions and more distinct course layouts are still needed to reach the requested commercial-game finish. Team balls use colors/initials rather than official logos. Gameplay is arcade collision simulation, not regulation bowling physics. The 64 ball unlocks, ten stadium unlocks ending with Tropicana, powers, AI rival and saved progression remain in place. Windows runtime and sound playback are unverified here.
 
@@ -79,3 +79,5 @@ Blue title panels have been replaced with ballpark scoreboards. Wrigley uses pai
 ## Easy Windows installation
 
 Run Big-League-Bowling-Setup.exe, choose Install, then Play on the finish screen. The installer adds desktop and Start menu shortcuts and a Windows Installed Apps uninstaller. No admin rights required. Career saves survive uninstall. See installer/README.md for rebuilding. This build is unsigned and Windows execution remains unverified here.
+
+Latest visual reference pass: 160-unit lane run with unchanged width and body sizes. A distant-rack projection test protects the reference composition. Decorative baseball framing, left power strip, player portraits, Bangers arcade lettering and unboxed menu actions replace application-like controls.

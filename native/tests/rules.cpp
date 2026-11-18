@@ -42,7 +42,7 @@ int main() {
     check(rejected && tenth.frames[9].size() == 2, "invalid roll preserves state");
     tenth.roll(3);
     check(tenth.complete && tenth.scores()[9] == 20, "tenth bonus score");
-    check(geometry::width == 10 && geometry::headPin - geometry::foulLine == 80,
+    check(geometry::width == 10 && geometry::headPin - geometry::foulLine == 160,
           "fixed arcade lane proportion baseline");
     check(geometry::ballRadius == .85f && geometry::pinRadius == .55f && geometry::pinSpacingX == 2.65f,
           "fixed ball and rack proportion baseline");
@@ -63,6 +63,10 @@ int main() {
     };
     float visibleRun = projectedY(geometry::foulLine) - projectedY(geometry::headPin);
     check(visibleRun > 390 && visibleRun < 440, "launch view preserves lane run on an 800px display");
+    float rackPixels = (3 * geometry::pinSpacingX + 2 * geometry::pinRadius) * 400.f /
+                       ((geometry::headPin - geometry::stadiumCamera.back) *
+                        std::tan(geometry::stadiumCamera.fov * 3.14159265f / 360.f));
+    check(rackPixels > 38 && rackPixels < 46, "reference rack remains small in the distance");
     check(geometry::renderX(geometry::launchMin) > geometry::renderX(geometry::launchMax),
           "mouse right maps to camera right looking down positive Z");
     Simulation dimensions;
@@ -75,14 +79,14 @@ int main() {
     Shot shot;
     a.launch(shot);
     b.launch(shot);
-    for (int i = 0; i < 1000; ++i) {
+    for (int i = 0; i < int(geometry::shotTimeout * 120 + 240); ++i) {
         a.step(1.f / 120);
         b.step(1.f / 120);
     }
     check(!a.active && a.knocked() > 0 && a.knocked() == b.knocked(), "deterministic collisions");
     Simulation miss;
     miss.launch({1, -1, .7f, 0});
-    for (int i = 0; i < 1000; ++i)
+    for (int i = 0; i < int(geometry::shotTimeout * 120 + 240); ++i)
         miss.step(1.f / 120);
     check(miss.knocked() == 0 && miss.gutter, "gutter misses rack");
     Game full;
@@ -91,7 +95,7 @@ int main() {
     while (!full.complete && rolls++ < 22) {
         check(int(sim.pins.size()) == full.standing(), "rack matches score");
         sim.launch({5, .08f, .75f, -.1f});
-        for (int i = 0; i < 1000 && sim.active; ++i)
+        for (int i = 0; i < int(geometry::shotTimeout * 120 + 240) && sim.active; ++i)
             sim.step(1.f / 120);
         check(!sim.active, "shot settles");
         full.roll(sim.knocked());

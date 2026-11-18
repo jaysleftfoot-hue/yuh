@@ -96,7 +96,7 @@ int main() {
             auto &g = match.games[who];
             require(int(match.lanes[who].pins.size()) == g.standing(), "rack survives turn switching");
             match.launch(who ? match.aiShot() : Shot{4, .2f, .8f, .1f});
-            for (int i = 0; i < 1000 && match.lanes[who].active; ++i)
+            for (int i = 0; i < int(geometry::shotTimeout * 120 + 240) && match.lanes[who].active; ++i)
                 match.step(1.f / 120);
             require(!match.lanes[who].active, "shot settles");
             match.settle();

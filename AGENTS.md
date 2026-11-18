@@ -7,3 +7,5 @@ Cloud environments may reset. Do not rely on local uncommitted files, ignored ar
 The native game is in native/. Graphics is the user's top priority. Read native/ART_DIRECTION.md and native/README.md. Use the existing checkout; do not create a worktree unless explicitly requested. Preserve the earlier browser prototype.
 
 Playable proportions are centralized in native/src/lane_geometry.hpp. Physics and rendering use the same world coordinates; scenery transforms must not contain the playable lane, ball or rack. During graphics-only changes, preserve these dimensions and camera presets. Any intentional proportion change must update the geometry regression tests and be called out to the user. Check launch and pin-impact views in both modes.
+
+The latest supplied Zombies graveyard screenshot governs lane composition and HUD framing. No website/application-style buttons, rounded cards, sliders or flat dashboard overlays. Use decorative baseball-themed frames, a left power strip, portrait badges and free-standing arcade lettering; preserve legibility and input accessibility. Do not replace this direction with generic UI polish.

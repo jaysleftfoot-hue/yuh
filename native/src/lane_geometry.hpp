@@ -3,7 +3,7 @@
 // Art themes may change decoration, never rescale these playable dimensions.
 namespace bowling::geometry {
 inline constexpr float width = 10.f, halfWidth = width / 2;
-inline constexpr float foulLine = 2.f, headPin = 82.f, deckEnd = headPin + 10.f;
+inline constexpr float foulLine = 2.f, headPin = 162.f, deckEnd = headPin + 10.f;
 inline constexpr float surfaceStart = -7.f, surfaceEnd = deckEnd + 3.f;
 inline constexpr float surfaceLength = surfaceEnd - surfaceStart;
 inline constexpr float surfaceCenter = (surfaceStart + surfaceEnd) / 2;
