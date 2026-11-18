@@ -1,3 +1,11 @@
+# Arcade controls and installer milestone
+
+- Linux scoring, geometry/projection, physics and campaign suites pass. Hit tests include clicking the tube below Y=630 and exclude side HUD; stationary hold power is covered.
+- Real X11 mouse input at (640,710) pulled the mascot sling; release reached the pin deck and knocked pins down. Stadium press/upward drag displayed 81% power. Launch and impact captures cover both modes.
+- Windows native cross-build and ZIP CRC pass; every packaged asset equals source. NSIS 3.11 installer compiles without warnings. Installer includes user-level shortcuts, launch-on-finish and uninstall registration; no Windows runtime install/uninstall/play verification is available.
+- Reviewed supplied video frames and official Steam screenshots (app32160). Matching is visual, not a claim of exact original game dimensions or input semantics. See CONTROL_REFERENCE.md.
+- Current screenshot: tropicana-stadium.png; input evidence: alley-power.png, mascot-pull.png and mascot-release.png. The held mascot image predates the final circular power-icon styling.
+
 # Stadium identity and camera follow-up
 
 - World lane remains 80×10; ball, pin, rack and simulation dimensions unchanged. Stadium ready camera deliberately raised and pulled back. Full camera constants and independent perspective projection now have regression checks (about 295 pixels foul-line-to-head-pin base at 1280×800).

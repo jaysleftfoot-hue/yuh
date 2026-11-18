@@ -28,7 +28,7 @@ inline constexpr float rackZ(int row) {
 struct CameraPreset {
     float height, back, targetHeight, fov;
 };
-inline constexpr CameraPreset stadiumCamera{6.5f, -12.f, .6f, 55.f};
+inline constexpr CameraPreset stadiumCamera{3.8f, -4.5f, 1.1f, 55.f};
 inline constexpr CameraPreset mascotCamera{4.f, -7.f, -1.f, 53.f};
 static_assert(rackX(3, 0) - pinRadius > 0 && rackX(3, 3) + pinRadius < width);
 static_assert(rackZ(3) + pinRadius < deckEnd && deckEnd < surfaceEnd);

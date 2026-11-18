@@ -11,6 +11,13 @@ inline Shot alleyDrag(Shot shot, float dx, float upward) {
     shot.aim = std::clamp(dx / 240.f, -1.f, 1.f);
     return shot;
 }
+// Shared hit region excludes the top scores and side HUD, but includes the actual tube.
+inline bool coursePointer(float x, float y) {
+    return x > 185 && x < 1090 && y > 120 && y < 790;
+}
+inline float heldPower(float seconds) {
+    return .15f + .85f * (.5f - .5f * std::cos(seconds * 4));
+}
 // Pull the tube backward and to either side; release sends it opposite the pull.
 inline Shot mascotPull(Shot shot, float dx, float downward) {
     shot.power = std::clamp(.15f + downward / 160.f, .15f, 1.f);

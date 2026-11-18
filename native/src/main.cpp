@@ -25,7 +25,7 @@ std::string marks(const std::vector<int> &r, int f) {
 }
 void scoreCard(const Game &g, float x, Color c, const char *who) {
     // One shallow score strip per player, like a classic arcade bowling display.
-    DrawRectangleGradientV(int(x), 0, 610, 49, {68, 91, 102, 245}, {26, 44, 57, 245});
+    panel({x, 0, 610, 49}, {42, 54, 62, 255});
     DrawLineEx({x, 49}, {x + 610, 49}, 2, {110, 141, 148, 210});
     auto scores = g.scores();
     for (int i = 0; i < 10; ++i) {
@@ -205,7 +205,7 @@ int main(int argc, char **argv) {
                     shot.curve = std::clamp(
                         shot.curve + ((IsKeyDown(KEY_E) ? 1.f : 0) - (IsKeyDown(KEY_Q) ? 1.f : 0)) * dt,
                         -1.f, 1.f);
-                    bool alleyPointer = GetMouseY() > 190 && GetMouseY() < 630;
+                    bool alleyPointer = coursePointer(GetMouseX(), GetMouseY());
                     if (!match.mascot && !charge && alleyPointer &&
                         (GetMouseDelta().x != 0 || GetMouseDelta().y != 0))
                         shot.position = alleyPosition(GetMouseX());
@@ -223,8 +223,10 @@ int main(int argc, char **argv) {
                                                              GetMouseY() - dragStart.y)
                                                 : alleyDrag(shot, GetMouseX() - dragStart.x,
                                                             dragStart.y - GetMouseY());
+                            if (!match.mascot && std::abs(dragStart.y - GetMouseY()) < 8)
+                                shot.power = heldPower(chargeTime);
                         } else
-                            shot.power = .15f + .85f * (.5f - .5f * std::cos(chargeTime * 4));
+                            shot.power = heldPower(chargeTime);
                     }
                     if (((!mouseCharge && IsKeyReleased(KEY_SPACE)) ||
                          (mouseCharge && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))) &&
@@ -305,6 +307,7 @@ int main(int argc, char **argv) {
         art.arena = arena;
         art.skin = skin;
         art.mascot = match.mascot;
+        art.slingPower = charge ? shot.power : 0;
         art.updateScoreboard(match);
         const auto cameraStyle = match.mascot ? geometry::mascotCamera : geometry::stadiumCamera;
         camera.fovy = cameraStyle.fov;
@@ -462,12 +465,7 @@ int main(int argc, char **argv) {
                 }
             bool enabled = state == 0 && match.player == 0 && !paused;
             if ((state != 1 && state != 2) && state == 3) {
-                panel({24, 691, 1232, 66}, {10, 23, 37, 238});
-                slider("POSITION", 39, 702, 160, shot.position, geometry::launchMin, geometry::launchMax,
-                       enabled);
-                slider("AIM", 223, 702, 160, shot.aim, -1, 1, enabled);
-                slider("POWER", 407, 702, 160, shot.power, .1f, 1, enabled && !charge);
-                slider("SPIN", 591, 702, 160, shot.curve, -1, 1, enabled);
+                panel({770, 691, 486, 66}, {10, 23, 37, 238});
                 if (button({790, 706, 219, 48}, state == 3 ? "REMATCH" : "BOWL", true,
                            enabled || state == 3)) {
                     if (state == 3)
@@ -482,11 +480,10 @@ int main(int argc, char **argv) {
                 }
             }
             if (match.mascot && state == 0 && human) {
-                text(charge ? "RELEASE THE SLING!" : "PULL BACK TO LAUNCH", 24, 690, 18, cream);
-                text("PULL SIDEWAYS TO AIM  |  LONGER PULL = MORE POWER", 24, 715, 12, aqua);
+                title(charge ? "LET IT FLY!" : "GRAB THE TUBE", 205, 688, 21, gold);
+                text("PULL BACK, AIM, RELEASE", 205, 718, 15, cream);
                 if (charge) {
-                    panel({960, 604, 280, 20}, ink);
-                    DrawRectangleRounded({964, 608, 272 * shot.power, 12}, .5f, 8, aqua);
+                    arcadeMeter(1045, 500, shot.power, aqua);
                 }
                 if (button({24, 737, 150, 38}, "CLUBHOUSE")) {
                     screen = 0;
@@ -500,15 +497,11 @@ int main(int argc, char **argv) {
                     DrawLineEx({x - 28, 535}, {x + 28, 535}, 5, aqua);
                     DrawTriangle({x - 39, 535}, {x - 23, 548}, {x - 23, 522}, aqua);
                     DrawTriangle({x + 39, 535}, {x + 23, 522}, {x + 23, 548}, aqua);
-                    center("MOVE TO POSITION", 640, 705, 18, cream);
-                    center("HOLD MOUSE / DRAG UP FOR POWER", 640, 735, 14, aqua);
+                    title("MOVE TO LINE UP", 205, 688, 20, gold);
+                    text("HOLD TO POWER UP / RELEASE TO BOWL", 205, 718, 14, cream);
                 } else {
-                    panel({x - 21, 438, 42, 149}, ink);
-                    float fill = std::clamp((shot.power - .15f) / .85f, 0.f, 1.f) * 129;
-                    DrawRectangleRounded({x - 13, 577 - fill, 26, fill}, .2f, 8, aqua);
-                    for (int i = 1; i < 8; ++i)
-                        DrawLine(x - 13, 577 - i * 16, x + 13, 577 - i * 16, ink);
-                    center("DRAG TO AIM / RELEASE TO BOWL", 640, 705, 20, cream);
+                    arcadeMeter(x, 510, shot.power, gold);
+                    title("RELEASE TO BOWL!", 205, 688, 22, gold);
                     center(std::to_string(int(shot.power * 100)) + "%", x, 596, 17, aqua);
                 }
                 if (button({24, 737, 150, 38}, "CLUBHOUSE")) {
@@ -517,13 +510,10 @@ int main(int argc, char **argv) {
                 }
             }
             if (state == 0) {
-                const char *names[] = {"1  HEAVY", "2  MAGNET", "3  BUMPERS"};
-                for (int i = 0; i < 3; ++i) {
-                    std::string label = std::string(names[i]) + "  " + std::to_string(match.stock[0][i]);
-                    if (button({28 + i * 140.f, 641, 130, 34}, label, match.equipped == Power(i + 1),
-                               enabled && match.stock[0][i] > 0))
+                for (int i = 0; i < 3; ++i)
+                    if (powerButton(i, match.stock[0][i], match.equipped == Power(i + 1),
+                                    enabled && match.stock[0][i] > 0))
                         match.equip(Power(i + 1));
-                }
             }
             center(match.mascot
                        ? "A / D  STEER     SPACE  BOOST"

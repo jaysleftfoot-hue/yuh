@@ -26,3 +26,7 @@ The existing rules suite checks the baseline length/width, body sizes, spacing, 
 ## Camera correction after stadium references
 
 World length remains 80, width 10, all body sizes unchanged. Stadium ready camera is intentionally raised from 3.8 to 6.5 and moved back from -8 to -12, targeting height 0.6 with unchanged 55-degree FOV. This exposes more lane floor and reduces the oversized foreground ball. Ready framing snaps to the preset instead of retaining a menu/previous-shot interpolation. Mascot and follow cameras are unchanged. Tests now lock every ready camera component and require 285–305 screen pixels between foul line and head-pin base at 1280×800.
+
+## Zombies footage framing correction
+
+The raised camera experiment above is superseded. Current stadium ready camera: height 3.8, back -4.5, target height 1.1, FOV 55. The ball now sits low at the bottom edge as in the supplied footage, with a longer visible run to the distant rack. Lane world geometry remains 80×10; exact original game units cannot be recovered from screenshots. Projected foul-line-to-head-pin screen distance is guarded at 390–440 pixels on an 800px-high display. Mascot camera unchanged.

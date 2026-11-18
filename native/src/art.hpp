@@ -14,6 +14,7 @@ struct Art {
     std::array<Texture2D, 10> parkLogos{}, teamLogos{};
     std::string scoreboardKey;
     int arena = 0, skin = 0;
+    float slingPower=0;
     bool mascot = false, inSceneryTransform = false;
     // Continuous shaded tube and an irregular, inward-facing stadium grotto.
     Mesh tubeMesh() {
@@ -951,7 +952,7 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         if (ballPos.z < geo::surfaceEnd) {
             if (mascot)
                 rider({ballPos.x + (aim ? shot.aim * 1.6f : 0), .57f,
-                       ballPos.z - (aim ? .3f + shot.power * 1.4f : 0)},
+                       ballPos.z - (aim ? slingPower * 2.7f : 0)},
                       time, aim, sim.active ? sim.ball.vx : 0);
             else
                 bowlingBall({ballPos.x, sim.gutter ? .28f : (sim.hasBall ? sim.ball.r : geo::ballRadius),
@@ -960,7 +961,7 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
                             sim.hasBall ? sim.ball.r : geo::ballRadius);
         }
         if (aim && mascot) {
-            float pull = .3f + shot.power * 1.4f;
+            float pull = slingPower * 2.7f;
             Vector3 center{ballPos.x + shot.aim * 1.6f, .70f, ballPos.z - pull};
             for (int side : {-1, 1}) {
                 cyl({side * 4.8f, .04f, 2.4f}, .24f, 1.3f, {24, 69, 110, 255});

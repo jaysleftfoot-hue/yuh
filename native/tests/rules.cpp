@@ -48,8 +48,8 @@ int main() {
           "fixed ball and rack proportion baseline");
     check(geometry::stadiumCamera.fov == 55 && geometry::mascotCamera.fov == 53,
           "art updates preserve camera framing presets");
-    check(geometry::stadiumCamera.height == 6.5f && geometry::stadiumCamera.back == -12.f &&
-              geometry::stadiumCamera.targetHeight == .6f && geometry::mascotCamera.height == 4.f &&
+    check(geometry::stadiumCamera.height == 3.8f && geometry::stadiumCamera.back == -4.5f &&
+              geometry::stadiumCamera.targetHeight == 1.1f && geometry::mascotCamera.height == 4.f &&
               geometry::mascotCamera.back == -7.f && geometry::mascotCamera.targetHeight == -1.f,
           "full camera baseline stays fixed across stadium artwork updates");
     // Independent perspective projection: guard visible distance, not just world length.
@@ -62,7 +62,7 @@ int main() {
         return 400.f - 400.f * up / (depth * std::tan(c.fov * 3.14159265f / 360.f));
     };
     float visibleRun = projectedY(geometry::foulLine) - projectedY(geometry::headPin);
-    check(visibleRun > 285 && visibleRun < 305, "launch view preserves lane run on an 800px display");
+    check(visibleRun > 390 && visibleRun < 440, "launch view preserves lane run on an 800px display");
     check(geometry::renderX(geometry::launchMin) > geometry::renderX(geometry::launchMax),
           "mouse right maps to camera right looking down positive Z");
     Simulation dimensions;

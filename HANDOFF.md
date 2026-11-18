@@ -1,3 +1,5 @@
+Latest: native/installer/setup.nsi builds a per-user Windows installer with shortcuts and uninstaller. Read native/docs/CONTROL_REFERENCE.md for the restored reachable tube drag, timed/drag stadium power and corrected low Zombies-like camera. native/PROPORTIONS.md latest section supersedes earlier camera experiments.
+
 Latest stadium identity pass: actual sourced stadium wordmarks and MLB marks in native/assets/parks (provenance in SOURCES.md), layered video graphics and steel trusses. Tropicana has a wide screen, catwalk and orange landmark. Stadium ready camera intentionally reframed; world geometry remains 80×10. See native/PROPORTIONS.md for the projected-view regression guard. Existing ten-park roster unchanged; Citi, Comerica and Rate photos inform presentation only.
 
 Latest signage: stadium scoreboards replace blue title panels. Wrigley follows the supplied green manual-board reference, with a 3D clock, flags and lamps; bowling scores update live. See native/docs/wrigley-scoreboard.png.

@@ -15,7 +15,7 @@ C++17 + raylib 5.5 desktop prototype. The native work lost in the cloud refresh 
 
 ## Controls
 
-Traditional alley: move the mouse over the lane to position the ball, hold left mouse and drag upward for power / sideways for aim, then release to bowl. The position locks during a drag. A/D position; arrows aim; Q/E curve; sliders adjust all shot values. Hold Space to time power and release to bowl, or press LET IT RIP. In Mascot Ride, arrows/A/D steer after launch and Space boosts once. Keys 1/2/3 select a power before launch. Escape pauses, M toggles sound, F11 toggles fullscreen. The clubhouse selects mode, stadium and ball. A rematch is available after scoring.
+Traditional alley: move the mouse over the lane to position the ball, hold left mouse to build power (or drag upward to set it directly) / sideways for aim, then release to bowl. The position locks during a drag. A/D position; arrows aim; Q/E curve; Hold Space to time power and release to bowl, or press LET IT RIP. In Mascot Ride, arrows/A/D steer after launch and Space boosts once. Keys 1/2/3 select a power before launch. Escape pauses, M toggles sound, F11 toggles fullscreen. The clubhouse selects mode, stadium and ball. A rematch is available after scoring.
 
 ## Graphics and proportions
 
@@ -75,3 +75,7 @@ Source, shader, font/license, procedural assets, tests, build instructions, art 
 ## Stadium scoreboards
 
 Blue title panels have been replaced with ballpark scoreboards. Wrigley uses painted green manual panels, white league grids, a clock, flags and lamps inspired by the supplied photograph. Fenway uses a green manual face; other parks and Rays Adventure use dark LED faces with amber numbers. Bowling frame scores and totals update with the match; the decorative baseball grids do not represent live MLB results.
+
+## Easy Windows installation
+
+Run Big-League-Bowling-Setup.exe, choose Install, then Play on the finish screen. The installer adds desktop and Start menu shortcuts and a Windows Installed Apps uninstaller. No admin rights required. Career saves survive uninstall. See installer/README.md for rebuilding. This build is unsigned and Windows execution remains unverified here.

@@ -105,6 +105,9 @@ int main() {
         for (auto &g : match.games)
             require(*g.scores()[9] >= 0 && *g.scores()[9] <= 300, "legal match score");
     }
+    require(coursePointer(640, 720), "tube itself accepts sling press");
+    require(!coursePointer(1160, 260) && !coursePointer(80, 750), "HUD buttons cannot launch shots");
+    require(heldPower(.6f) > heldPower(.1f), "stationary stadium hold builds power");
     std::cout << "Campaign tests passed: 64 designs, 10 stadiums, save/restore, powers, steering, "
                  "boost, AI matches\n";
 }
