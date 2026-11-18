@@ -1,6 +1,7 @@
 # Illustrated title / pacing / floor shader milestone
 
 - Original illustrated title-screen texture is packaged, with native menu hit targets. Real X11 mouse navigation verified Help → Back, Scores → Back, Locker → Back, Single Player → Setup → Gameplay, and Mascot Adventure → Setup → Gameplay. Preview tracing confirmed screen and mode transitions. F12 captures/exits when using --screenshot for interactive verification.
+- Real-time frame accumulation now accepts up to 250ms per frame; physics still advances in 1/120s steps. The old 50ms cap slowed throws on machines rendering below 20 FPS. Long stalls remain capped.
 - Physics tests measure full-power travel to the head pin within 3–4 seconds (nominal 3.5) and verify actual rack contact at low, medium and full power. Lane size and camera presets unchanged. Rules and campaign suites pass.
 - Full native stadium match completed: 38 rolls, 63–122. Launch/impact screenshots inspected in both modes; floor renders on both sides in Linux.
 - Fixed undefined GLSL pow() calls with signed bases in floor reflection and edge highlights. This is a plausible cause of the reported half-black lane on Windows; confirmation on the affected GPU remains outstanding.

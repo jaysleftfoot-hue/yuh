@@ -162,7 +162,7 @@ int main(int argc, char **argv) {
         }
     };
     while (!WindowShouldClose() && !done) {
-        float dt = smoke ? 1.f / 15 : !screenshot.empty() ? 1.f / 60 : std::min(GetFrameTime(), .05f);
+        float dt = smoke ? 1.f / 15 : !screenshot.empty() ? 1.f / 60 : std::min(GetFrameTime(), .25f);
         time += dt;
         ++ticks;
         if (demoShot && ticks == 30 && screen == 1)
