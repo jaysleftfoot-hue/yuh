@@ -192,30 +192,10 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
             BeginTextureMode(signs[a]);
             ClearBackground({7, 19, 38, 255});
             DrawRectangleGradientV(0, 0, 1024, 256, {26, 83, 124, 255}, {8, 27, 61, 255});
-            for (int ray = 0; ray < 22; ++ray) {
-                float a = ray * 2 * PI / 22, b = a + .10f;
-                DrawTriangle({512, 128}, {512 + std::cos(b) * 1100, 128 + std::sin(b) * 1100},
-                             {512 + std::cos(a) * 1100, 128 + std::sin(a) * 1100}, {47, 119, 151, 85});
-            }
-            DrawRectangleRoundedLinesEx({9, 9, 1006, 238}, .20f, 10, 10, {9, 20, 39, 255});
-            DrawRectangleRoundedLinesEx({16, 16, 992, 224}, .20f, 10, 5, gold);
-            for (int side : {-1, 1}) {
-                float x = 512 + side * 427.f;
-                DrawLineEx({x - 30, 77}, {x + 31, 179}, 11, {219, 159, 74, 255});
-                DrawLineEx({x + 30, 77}, {x - 31, 179}, 11, {219, 159, 74, 255});
-                DrawCircleV({x, 128}, 39, {7, 19, 40, 255});
-                DrawCircleV({x - 2, 125}, 34, cream);
-                for (int j = -2; j <= 2; ++j) {
-                    DrawLineEx({x - 18, 109 + j * 7.f}, {x - 11, 113 + j * 7.f}, 3, red);
-                    DrawLineEx({x + 11, 109 + j * 7.f}, {x + 18, 113 + j * 7.f}, 3, red);
-                }
-            }
-            float size = std::min(82.f, 755.f / std::max(1.f, tw(bowling::arenas[a].name, 82)) * 82);
-            center("BIG LEAGUE BOWLING", 512, 31, 24, aqua);
-            center(bowling::arenas[a].name, 516, 83, size, {2, 12, 29, 255});
-            center(bowling::arenas[a].name, 512, 77, size, cream);
-            DrawRectangleRounded({224, 176, 576, 48}, .25f, 8, {173, 48, 55, 255});
-            center(bowling::arenas[a].theme, 512, 184, 30, gold);
+            DrawRectangleLinesEx({12, 12, 1000, 232}, 3, {82, 136, 151, 255});
+            float size = std::min(75.f, 900.f / std::max(1.f, tw(bowling::arenas[a].name, 75)) * 75);
+            center(bowling::arenas[a].name, 512, 56, size, cream);
+            center("B A L L P A R K   L A N E S", 512, 164, 26, {110, 189, 196, 255});
             EndTextureMode();
             GenTextureMipmaps(&signs[a].texture);
             SetTextureFilter(signs[a].texture, TEXTURE_FILTER_TRILINEAR);
@@ -551,8 +531,7 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
             }
         }
         // A broad themed marquee above the rack, with a readable stadium identity.
-        box({0, 4.6f, 30.8f}, {11.6f, 3.1f, .6f}, {9, 26, 48, 255});
-        sign(signs[arena].texture, {0, 4.6f, 30.42f}, 11.3f, 2.8f);
+        neonMural(30.42f);
         for (int side : {-1, 1}) {
             for (int j = 0; j < 5; ++j)
                 orb({side * (5.4f + j * .18f), 2.2f + j * .5f, 30.4f}, {.23f, .23f, .23f}, gold);
@@ -576,6 +555,44 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
                     }
                 }
             }
+    }
+    void neonMural(float z) {
+        auto tubeLine = [&](Vector3 a, Vector3 b, Color hue) {
+            beam(a, b, .095f, {31, 49, 63, 255});
+            beam({a.x, a.y, a.z - .12f}, {b.x, b.y, b.z - .12f}, .035f, hue);
+        };
+        // Original neon bowling illustration, built from continuous tube strokes.
+        for (int i = 0; i < 64; ++i) {
+            float a = i * 2 * PI / 64, b = (i + 1) * 2 * PI / 64;
+            tubeLine({-3.9f + 1.45f * std::cos(a), 5.25f + 1.45f * std::sin(a), z},
+                     {-3.9f + 1.45f * std::cos(b), 5.25f + 1.45f * std::sin(b), z}, {69, 232, 194, 255});
+        }
+        for (Vector2 hole : {Vector2{-4.35f, 5.8f}, Vector2{-3.8f, 6.f}, Vector2{-3.95f, 5.35f}})
+            for (int i = 0; i < 16; ++i) {
+                float a = i * 2 * PI / 16, b = (i + 1) * 2 * PI / 16;
+                tubeLine({hole.x + .12f * std::cos(a), hole.y + .12f * std::sin(a), z},
+                         {hole.x + .12f * std::cos(b), hole.y + .12f * std::sin(b), z},
+                         {69, 232, 194, 255});
+            }
+        const Vector2 shape[] = {
+            {-.48f, 0},     {-.68f, .36f},  {-.72f, .82f}, {-.61f, 1.25f}, {-.29f, 1.9f}, {-.22f, 2.36f},
+            {-.39f, 2.65f}, {-.36f, 3.02f}, {0, 3.19f},    {.36f, 3.02f},  {.39f, 2.65f}, {.22f, 2.36f},
+            {.29f, 1.9f},   {.61f, 1.25f},  {.72f, .82f},  {.68f, .36f},   {.48f, 0},     {-.48f, 0}};
+        for (int pin = 0; pin < 3; ++pin) {
+            float angle = (pin - 1) * .25f, ox = .2f + pin * 1.7f;
+            auto point = [&](Vector2 p) {
+                return Vector3{ox + p.x * std::cos(angle) - p.y * std::sin(angle),
+                               3.7f + p.x * std::sin(angle) + p.y * std::cos(angle), z};
+            };
+            for (int i = 0; i < 17; ++i)
+                tubeLine(point(shape[i]), point(shape[i + 1]), {233, 111, 220, 255});
+            tubeLine(point({-.24f, 2.2f}), point({.24f, 2.2f}), {255, 202, 108, 255});
+        }
+        for (int i = 0; i < 28; ++i) {
+            float x = -6.3f + i * .45f;
+            tubeLine({x, 3.45f + .1f * std::sin(x), z}, {x + .45f, 3.45f + .1f * std::sin(x + .45f), z},
+                     {255, 184, 99, 255});
+        }
     }
     void loungeDetails(Color team) {
         // Close columns, soffits and pendant lights, in the warm arcade-bowling style.
@@ -691,11 +708,15 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
                 box({x, 2.85f, 28.7f}, {7, .20f, .35f}, team);
                 box({x, 2.71f, 28.65f}, {6.5f, .06f, .12f}, aqua);
             }
-            box({0, 5.5f, 30.5f}, {18, 3.9f, 1}, ink);
-            box({0, 7.65f, 30.5f}, {19, .25f, 1.4f}, gold);
-            sign(signs[arena].texture, {0, 5.5f, 29.95f}, 17.6f, 3.7f);
-            for (float x : {-15.f, 15.f})
-                sign(arena == 9 ? ad.texture : signs[arena].texture, {x, 5.4f, 29.8f}, 7, 3.5f);
+            material(2);
+            box({0, 5.4f, 30.5f}, {45, 5.1f, .7f}, {72, 56, 62, 255});
+            material(0);
+            box({0, 7.95f, 30.2f}, {45, .12f, .3f}, {128, 83, 62, 255});
+            neonMural(29.8f);
+            for (float x : {-14.f, 14.f}) {
+                box({x, 5.2f, 29.9f}, {5.1f, 1.4f, .2f}, {17, 30, 42, 255});
+                sign(signs[arena].texture, {x, 5.2f, 29.75f}, 4.8f, 1.2f);
+            }
             material(2);
             box({0, 9, 39}, {66, 18, 1}, {91, 62, 48, 255});
             material(0);

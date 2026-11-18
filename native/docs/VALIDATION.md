@@ -45,3 +45,7 @@ The 26.333-second Zombies clip is now accessible and was visually sampled, inclu
 Linux build passed all nine physics/rules scenarios and the campaign suite, including new drag power/aim, locked position, bounds and downward-drag checks. Both graphical matches passed (traditional 37 rolls, 115–119; mascot 41 rolls, 72–35). Real X11 mouse movement/press/drag was injected into the native window and the 81% held-power screenshot was visually checked. Windows cross-build and ZIP verification passed; Windows execution remains unverified.
 
 A second real X11 input run pressed, dragged and released the mouse. The captured result showed the ball at the pin deck, fallen pins and the following camera, confirming release launches the shot. The original game's exact mouse-button semantics still cannot be proven from a screen recording alone.
+
+## Slim scorecard / neon wall pass
+
+Linux build and existing rules/campaign suites passed. A full traditional match completed in 37 rolls (115–119). Visually inspected both the initial scene and completed scorecards, including strikes, spares, cumulative totals and tenth-frame bonus marks. Saved screenshots: wrigley-traditional.png and scorecard-result.png. No graphical shader errors. Windows cross-build completed; Windows execution remains unverified.

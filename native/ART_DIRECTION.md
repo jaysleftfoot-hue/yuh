@@ -48,3 +48,9 @@ Removed riveted panel borders and the right-side power tower. Powers are compact
 The second Dropbox clip is now accessible: 26.333 seconds. Sampled frames (including 0.5-second samples around 12–21 seconds) show lateral placement arrows, a vertical green meter, launch and following camera. This supersedes the earlier unavailable-reference notes. Mouse button events are not visible: upward drag for power, lateral drag for aim and release-to-launch are an inferred mapping, not verified original input internals. Space retains the timed keyboard alternative. Traditional uses the new on-lane UI instead of four sliders.
 
 The previous 17.35:1 presentation stretched the entire hall and was a poor match for this arcade reference. Traditional mode now deliberately compresses lane depth (1.55 times normalized coordinates), with restored close scenery and a 53-degree camera. It is not presented as a regulation simulation. Mascot presentation is unchanged.
+
+## Scoreboard / back wall detail pass
+
+Scorecards now use 49-pixel slate strips with fine frame dividers, roll marks above cumulative scores, and totals at the outside ends. Player labels sit below the strips. Empty frames no longer display placeholder dots/dashes. Both modes share the slim scorecards.
+
+The large center stadium billboards have been removed in both scenes. Original neon tube outlines of bowling pins and a ball replace them. Traditional's back wall has brick texture and wood trim; smaller side plaques retain stadium identity. Side plaque artwork is now a restrained wordmark rather than the baseball/bat billboard. The bowling controls and progression are unchanged.

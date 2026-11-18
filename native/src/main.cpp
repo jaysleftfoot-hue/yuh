@@ -24,23 +24,28 @@ std::string marks(const std::vector<int> &r, int f) {
     return s.empty() ? "." : s;
 }
 void scoreCard(const Game &g, float x, Color c, const char *who) {
-    panel({x, 8, 610, 77}, {23, 41, 59, 245});
-    text(who, x + 12, 16, 17, c);
+    // One shallow score strip per player, like a classic arcade bowling display.
+    DrawRectangleGradientV(int(x), 0, 610, 49, {68, 91, 102, 245}, {26, 44, 57, 245});
+    DrawLineEx({x, 49}, {x + 610, 49}, 2, {110, 141, 148, 210});
     auto scores = g.scores();
     for (int i = 0; i < 10; ++i) {
-        float left = x + 77 + i * 48.f;
-        DrawRectangleRounded({left, 14, 45, 61}, .12f, 4,
-                             i == g.frame ? Color{65, 100, 116, 255} : Color{15, 29, 44, 220});
-        text(std::to_string(i + 1), left + 3, 17, 9, {145, 177, 188, 255});
-        center(marks(g.frames[i], i), left + 23, 25, 15, cream);
-        DrawLine(left + 4, 46, left + 41, 46, {72, 103, 115, 255});
-        center(scores[i] ? std::to_string(*scores[i]) : "-", left + 23, 51, 18, c);
+        float left = x + 9 + i * 51.f;
+        if (i == g.frame)
+            DrawRectangle(int(left), 3, 49, 43, {88, 123, 132, 125});
+        DrawLine(int(left + 50), 6, int(left + 50), 44, {117, 143, 150, 130});
+        std::string rolls = marks(g.frames[i], i);
+        if (rolls == ".")
+            rolls = "";
+        center(rolls, left + 24, 7, 15, {211, 230, 224, 255});
+        if (scores[i])
+            center(std::to_string(*scores[i]), left + 24, 27, 18, c);
     }
     int total = 0;
     for (auto score : scores)
         if (score)
             total = *score;
-    center(std::to_string(total), x + 36, 43, 24, c);
+    center(std::to_string(total), x + 566, 13, 27, c);
+    title(who, x + 4, 55, 14, cream);
 }
 int main(int argc, char **argv) {
     bool smoke = false, startInGame = false, smokeMascot = false, demoShot = false;
@@ -417,12 +422,12 @@ int main(int argc, char **argv) {
         } else {
             scoreCard(match.games[0], 16, gold, "YOU");
             scoreCard(match.games[1], 654, aqua, "RIVAL");
-            title(arenas[arena].name, 24, 99, 23, cream);
-            title(match.mascot ? "MASCOT RIDE" : "BALLPARK BOWLING", 25, 127, 13, aqua);
+            title(arenas[arena].name, 24, 81, 16, cream);
+
             title(state == 3          ? "MATCH COMPLETE"
                   : match.player == 0 ? "YOUR TURN"
                                       : "RIVAL'S TURN",
-                  25, 151, 16, gold);
+                  25, 104, 12, gold);
             if (state == 2 || state == 3) {
                 DrawRectangle(180, 320, 920, 90, {13, 24, 45, 210});
                 center(result, 640, 342, 33, gold);
