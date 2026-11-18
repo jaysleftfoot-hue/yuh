@@ -10,7 +10,7 @@ C++17 + raylib 5.5 desktop prototype. The native work lost in the cloud refresh 
 - Mascot Ride: an original ray mascot on an inflatable tube; steering after launch and one boost per shot.
 - Heavy Ball, Magnet and Bumpers; two charges of each per player per match.
 - Ten-frame bowling with strikes, spares and tenth-frame bonus balls. Players alternate after each completed frame, with independent racks.
-- Exactly 64 named unlocks: 30 MLB team color/initial designs, 30 playful team-inspired pattern designs, and four Rays specials (Sunburst, Devil Ray, Touch Tank, Tropicana Finale). The first ball is unlocked; each 80 XP unlocks the next, all 64 at 5,040 XP.
+- Exactly 64 named unlocks: 30 MLB logo balls, 30 individually illustrated club designs, and four Rays specials (Sunburst, Devil Ray, Touch Tank, Tropicana Finale). Use left/right arrows in the locker to inspect the reverse artwork. The first ball is unlocked; each 80 XP unlocks the next, all 64 at 5,040 XP.
 - Completed matches award 120 + score XP, plus 150 for a win. Abandoned matches award nothing.
 - Ten stadium-themed layouts open by winning at the previous stop: Wrigley, Fenway, Oracle, PNC, Coors, Kauffman, Chase, T-Mobile, Yankee, and **Tropicana Field last**.
 - Local profile with XP, wins, stadium unlocks and best score. Saved under APPDATA, XDG_DATA_HOME or HOME as big-league-bowling-profile.txt, with .bak recovery. Failed persistence is reported on screen.
@@ -34,7 +34,7 @@ Rays Adventure is a separate fantasy course inspired by the supplied Polar/Shrek
 
 All playable dimensions are defined in `src/lane_geometry.hpp`; physics and rendering use the same world coordinates. The current arcade baseline has 160 units from foul line to head pin and a 10-unit lane width. The latest distance increase responds to the user's request for pins farther away. Ball/pin sizes and camera framing stay fixed when decoration changes. See `PROPORTIONS.md`. Decoration transforms do not contain the playable lane, ball or rack.
 
-The art remains procedural. Authored models/textures, richer character reactions and more distinct course layouts are still needed to reach the requested commercial-game finish. Team balls use colors/initials rather than official logos. Gameplay is arcade collision simulation, not regulation bowling physics. The 64 ball unlocks, ten stadium unlocks ending with Tropicana, powers, AI rival and saved progression remain in place. Windows runtime and sound playback are unverified here.
+The art remains procedural. Authored models/textures, richer character reactions and more distinct course layouts are still needed to reach the requested commercial-game finish. Logo balls use the MLB team marks. Gameplay is arcade collision simulation, not regulation bowling physics. The 64 ball unlocks, ten stadium unlocks ending with Tropicana, powers, AI rival and saved progression remain in place. Windows runtime and sound playback are unverified here.
 
 ## Linux / cloud build
 

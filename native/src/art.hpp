@@ -72,10 +72,11 @@ struct Art {
     }
     void init() {
         const char *vs = R"(#version 330
-in vec2 vertexTexCoord;out vec2 uv;in vec3 vertexPosition;in vec3 vertexNormal;in vec4 vertexColor;uniform mat4 mvp;uniform mat4 matModel;uniform mat4 matNormal;out vec3 normal;out vec3 world;out vec4 color;
+in vec2 vertexTexCoord;out vec2 uv;in vec3 vertexPosition;in vec3 vertexNormal;in vec4 vertexColor;uniform mat4 mvp;uniform mat4 matModel;uniform mat4 matNormal;out vec3 normal;out vec3 world;out vec3 localPos;out vec4 color;
 uniform int woodMode;
 uniform float sceneTime;
 void main(){
+localPos=vertexPosition;
 vec3 pos=vertexPosition;
 if(woodMode==6){
     float wing=pow(clamp((abs(pos.x)-.57)/1.46,0.0,1.0),2.0);
@@ -277,69 +278,15 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         rlEnd();
         rlSetTexture(0);
     }
-    void makeSkins() {
-        const Color palettes[] = {{20, 46, 88, 255},  {255, 196, 43, 255}, {48, 210, 177, 255},
-                                  {212, 49, 46, 255}, {120, 60, 194, 255}, {103, 201, 249, 255},
-                                  {37, 151, 83, 255}, {236, 224, 207, 255}};
-        for (int id = 0; id < 64; ++id) {
-            Image im = GenImageColor(256, 128, palettes[id % 8]);
-            Color base = id < 60 ? GetColor(teams[id % 30].color)
-                                 : palettes[std::array<int, 4>{0, 2, 5, 1}[id - 60]];
-            for (int y = 0; y < 128; ++y)
-                for (int x = 0; x < 256; ++x) {
-                    float u = x / 256.f, v = y / 128.f;
-                    bool mark = false;
-                    switch (id < 30 ? 0 : id < 60 ? 1 + (id - 30) % 7 : id - 56) {
-                    case 0:
-                        mark =
-                            std::sin(u * 32 + std::sin(v * 19) * 3 + std::sin(u * 12 + v * 16)) > .65f;
-                        break;
-                    case 1:
-                        mark = std::fmod(u * 7 + v * .6f + std::abs(std::sin(v * 28)) * .3f, 1.f) < .11f;
-                        break;
-                    case 2:
-                        mark = std::abs(std::sin(u * PI * 4)) < .15f && int(v * 35) % 2 == 0;
-                        break;
-                    case 3: {
-                        float a = std::fmod(u * 8, 1.f) - .5f, b = std::fmod(v * 4, 1.f) - .5f;
-                        mark = (std::abs(a) < .05f || std::abs(b) < .05f) && a * a + b * b < .12f;
-                        break;
-                    }
-                    case 4:
-                        mark = std::sin(u * 54 + std::sin(v * 13) * 4) > .25f;
-                        break;
-                    case 5:
-                        mark = std::sin(v * 60 + std::sin(u * 12) * 5) > .7f;
-                        break;
-                    case 6:
-                        mark = (int(u * 16) + int(v * 8)) % 2;
-                        break;
-                    case 7:
-                        mark = ((x * 73 + y * 97 + x * y * 11) % 997) < 24;
-                        break;
-                    }
-                    if (id == 60)
-                        mark = std::sin(std::atan2(v - .5f, u - .5f) * 12) > .25f;
-                    if (id == 61)
-                        mark = std::abs(u - .5f) * 1.2f + std::abs(v - .5f) < .28f;
-                    if (id == 62)
-                        mark = std::sin(v * 55 + std::sin(u * 15) * 4) > .4f;
-                    if (id == 63)
-                        mark = (std::sin(u * 48) * std::sin(v * 48) > .6f) ||
-                               std::hypot(u - .5f, v - .5f) < .12f;
-                    Color c =
-                        mark ? (id / 8 == 4 ? Color{15, 18, 30, 255} : Color{251, 223, 137, 255}) : base;
-                    float glow = .8f + .2f * std::sin(u * 6 + v * 4);
-                    c.r = static_cast<unsigned char>(c.r * glow);
-                    c.g = static_cast<unsigned char>(c.g * glow);
-                    c.b = static_cast<unsigned char>(c.b * glow);
-                    ImageDrawPixel(&im, x, y, c);
-                }
-            ImageDrawText(&im, id < 60 ? teams[id % 30].id : "TB", 90, 45, 32, id >= 60 ? gold : WHITE);
-            skins[id] = LoadTextureFromImage(im);
+    void loadBallSkins() {
+        const std::string folder = std::string(GetApplicationDirectory()) + "assets/balls/";
+        for (size_t id = 0; id < skins.size(); ++id) {
+            const auto path = folder + (id < 10 ? "0" : "") + std::to_string(id) + ".png";
+            skins[id] = LoadTexture(path.c_str());
+            if (!skins[id].id)
+                throw std::runtime_error("Missing ball artwork: " + path);
             GenTextureMipmaps(&skins[id]);
             SetTextureFilter(skins[id], TEXTURE_FILTER_TRILINEAR);
-            UnloadImage(im);
         }
     }
     void bowlingBall(Vector3 p, float roll, float radius = .51f) {
@@ -348,12 +295,10 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         rlRotatef(roll, 1, 0, 0);
         Texture2D original = sphere.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture;
         sphere.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = skins[skin];
+        material(7);
         orb({0, 0, 0}, {radius, radius, radius}, WHITE);
+        material(0);
         sphere.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = original;
-        for (Vector3 hole :
-             {Vector3{-.12f, .12f, -.47f}, Vector3{.12f, .12f, -.47f}, Vector3{0, -.12f, -.48f}})
-            orb(Vector3Scale(hole, radius / .51f), {.065f * radius / .51f, .065f * radius / .51f, .025f},
-                ink);
         rlPopMatrix();
     }
     void drawPin(const bowling::Body &p, float time) {
@@ -844,7 +789,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
             else
                 bowlingBall({ballPos.x, sim.gutter ? .28f : (sim.hasBall ? sim.ball.r : geo::ballRadius),
                              ballPos.z},
-                            sim.hasBall ? ballPos.z * 110 : time * 12,
+                            sim.hasBall ? (ballPos.z - geo::foulLine) * RAD2DEG / sim.ball.r : 0.f,
                             sim.hasBall ? sim.ball.r : geo::ballRadius);
         }
         if (aim && mascot) {

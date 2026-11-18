@@ -1,3 +1,9 @@
+# Illustrated ball collection
+
+- Verified 64 distinct 768 × 384 textures and compared every packaged asset and the executable against the Windows build. The portable ZIP passed its CRC check.
+- Native rules and campaign suites passed. On Linux, opened the locker with an unlocked test profile, rotated Tropicana Finale, equipped it and launched it through Spot, Curve and Power.
+- Collection sheet, locker and ready-to-bowl views are in ball-collection.jpg, collection-locker.jpg and collection-lane.jpg. The Windows x64 executable and NSIS installer were cross-built. Windows playback and installation still need a Windows test.
+
 # Live pins and rival difficulty
 
 - Native rules and campaign checks passed. The rack tests cover a live fall, the same pin IDs on a spare attempt and the rival's independent rack.

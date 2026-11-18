@@ -1,0 +1,3 @@
+The supplied MLB Bowling Ball Reference Kit in references/ball-designs contains the ESPN primary logo and MLB wordmark URLs used in this collection. The PNG and wordmark SVG filenames use the MLB club ID. The cap SVGs come from https://www.mlbstatic.com/team-logos/{id}.svg. Team marks belong to their respective owners.
+
+native/art/ball_collection.py builds the game textures from these local sources with Pillow, NumPy and Inkscape. Each companion pairs original generated travel-poster artwork in native/art/murals with an original vector emblem and the official club wordmark on the reverse. The four Rays panoramas were generated for this game and packed into native/art/rays-panoramas.jpg. Slot order follows the existing career unlock order.

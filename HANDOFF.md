@@ -1,3 +1,5 @@
+The 64-ball locker now ships separate club logo, illustrated club, and Rays special wraps. The supplied MLB reference kit guides marks and themes. Left/right arrows rotate the selected locker preview. The existing unlock slots and XP thresholds still apply.
+
 Current character assets are the textured GLBs in native/assets/models. Editable geometry and paint live in native/art. The ready and impact previews are native/docs/ray-model.png and native/docs/pin-model.png.
 
 Latest gameplay pass adds a live standing-pin display and Rookie, Pro and All-Star rivals. Click the AI label in Ballpark Showdown to choose a tier for either mode. Pin indicators use the current simulation rack and its original pin IDs. Match flow uses named screen and turn states. See native/docs/VALIDATION.md for checks.

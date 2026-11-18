@@ -2,6 +2,7 @@
 in vec2 uv;
 in vec3 normal;
 in vec3 world;
+in vec3 localPos;
 in vec4 color;
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
@@ -24,7 +25,18 @@ float noise(vec3 p) {
 }
 void main() {
     vec3 n=normalize(normal), v=normalize(eye-world);
-    vec3 tex=texture(texture0,uv).rgb*colDiffuse.rgb*color.rgb;
+    vec2 sampleUV=uv;
+    float holeLight=1.0;
+    if (woodMode==7) {
+        vec3 b=normalize(localPos);
+        sampleUV=vec2(.5+atan(-b.x,-b.z)/6.283185,acos(clamp(b.y,-1.,1.))/3.141593);
+        if (b.z<0.) {
+            vec2 p=vec2(-b.x,-b.y);
+            float hole=min(length(p-vec2(.46,-.32)),min(length(p-vec2(.65,-.19)),length(p-vec2(.44,.01))));
+            holeLight=mix(.10,1.,smoothstep(.065,.09,hole));
+        }
+    }
+    vec3 tex=texture(texture0,sampleUV).rgb*colDiffuse.rgb*color.rgb;
     vec3 key=normalize(vec3(-.35,.85,-.4));
     float diffuse=max(dot(n,key),0.0);
     float rim=pow(1.0-clamp(dot(n,v),0.0,1.0),3.0);
@@ -97,5 +109,5 @@ void main() {
     }
     float fog=1.0-exp(-length(eye-world)*.0035);
     lit=mix(lit,vec3(.09,.17,.24),fog);
-    finalColor=vec4(lit,colDiffuse.a*color.a);
+    finalColor=vec4(lit*holeLight,colDiffuse.a*color.a);
 }

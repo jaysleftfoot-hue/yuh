@@ -19,12 +19,12 @@ inline constexpr Arena arenas[] = {
     {"Yankee Stadium", "Championship Row", 18}, {"Tropicana Field", "Rays of Glory", 26}};
 inline std::string ballName(int id) {
     const char *fun[] = {
-        "Desert Fangs",     "Peach Power",  "Birdland",    "Monster Mash",     "Ivy Cub",
-        "Southside Sparks", "Red Machine",  "Lake Effect", "Purple Peaks",     "Motor City",
-        "Orbit Blast",      "Crown Jewels", "Halo Glow",   "Blue Heaven",      "Splash Party",
-        "Barrel Roll",      "Twin Cities",  "Big Apple",   "Pinstripe Legend", "Green & Gold",
-        "Liberty Bell",     "Cannonball",   "Friar Fire",  "Bay Splash",       "Sea Monster",
-        "Redbird Rally",    "Ray Wave",     "Lone Star",   "Northern Lights",  "Capital Fireworks"};
+        "Sonoran Sidewinder", "Peachtree Feather", "Camden Oriole", "The Green Monster", "Ivy League Cub",
+        "South Side Pinwheel", "Riverboat Machine", "Guardian of Traffic", "Purple Peaks", "Motor City Prowler",
+        "Rainbow Express", "Crown Fountain", "Golden Halo", "Chavez Ravine", "Teal Marlin",
+        "Barrelman", "Twin Cities Crossing", "Home Run Apple", "Pinstripe Legend", "White Elephant",
+        "Liberty Bell", "Three Rivers Fleet", "Swinging Friar", "Cove Splash", "Emerald Trident",
+        "Birds on the Bat", "Gulf Breaker", "Lone Star Silver", "Northern Flight", "Capitol Fireworks"};
     const char *rays[] = {"Rays Sunburst", "Devil Ray", "Touch Tank", "Tropicana Finale"};
     if (id >= 60)
         return rays[id - 60];

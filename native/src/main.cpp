@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
     SetTextureFilter(target.texture, TEXTURE_FILTER_BILINEAR);
     Art art;
     art.init();
-    art.makeSkins();
+    art.loadBallSkins();
     art.makeSigns();
     Texture2D titleArt =
         LoadTexture((std::string(GetApplicationDirectory()) + "assets/title-screen.png").c_str());
@@ -132,6 +132,8 @@ int main(int argc, char **argv) {
     };
     uiBallShader =
         LoadShader(nullptr, (std::string(GetApplicationDirectory()) + "assets/ui-ball.fs").c_str());
+    const int lockerLongitude = GetShaderLocation(uiBallShader, "longitude");
+    float previewAngle = 0;
     uiSlate = uiTexture("arcade-slate.png");
     uiFrame = uiTexture("arcade-frame.png");
     uiButton = uiTexture("arcade-button.png");
@@ -440,6 +442,7 @@ int main(int argc, char **argv) {
             }
             if (button({145, 718, 190, 42}, "BALL LOCKER")) {
                 selectedSkin = skin;
+                previewAngle = 0;
                 lockerReturn = Screen::Title;
                 screen = Screen::Locker;
             }
@@ -513,6 +516,7 @@ int main(int argc, char **argv) {
                 screen = Screen::Title;
             if (button({275, 594, 212, 35}, "BALL LOCKER")) {
                 selectedSkin = skin;
+                previewAngle = 0;
                 lockerReturn = Screen::Setup;
                 screen = Screen::Locker;
             }
@@ -531,12 +535,20 @@ int main(int argc, char **argv) {
                 arcadeCenter(std::to_string(id + 1) + (unlocked ? "" : " X"), cell.x + 39, cell.y + 43,
                              13, unlocked ? cream : GRAY);
                 if (CheckCollisionPointRec(GetMousePosition(), cell) &&
-                    IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
+                    IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
                     selectedSkin = id;
+                    previewAngle = 0;
+                }
             }
             panel({855, 208, 278, 403});
             arcadeCenter("BALL " + std::to_string(selectedSkin + 1), 994, 237, 31, gold);
+            arcadeCenter("ARROW KEYS TO TURN", 994, 271, 15);
+            previewAngle = std::fmod(previewAngle + (float(IsKeyDown(KEY_RIGHT)) -
+                                                      float(IsKeyDown(KEY_LEFT))) * dt * .32f, 1.f);
+            SetShaderValue(uiBallShader, lockerLongitude, &previewAngle, SHADER_UNIFORM_FLOAT);
             ballIcon(art.skins[selectedSkin], 926, 290, 136);
+            const float front = 0;
+            SetShaderValue(uiBallShader, lockerLongitude, &front, SHADER_UNIFORM_FLOAT);
             std::string name = ballName(selectedSkin);
             float size = std::min(
                 24.f, 230.f / std::max(1.f, MeasureTextEx(arcadeFont, name.c_str(), 24, 1).x) * 24);
