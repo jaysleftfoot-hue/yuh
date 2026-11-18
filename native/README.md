@@ -15,7 +15,7 @@ C++17 + raylib 5.5 desktop prototype. The native work lost in the cloud refresh 
 
 ## Controls
 
-A/D position; arrows aim; Q/E curve; sliders adjust all shot values. Hold Space to time power and release to bowl, or press LET IT RIP. In Mascot Ride, arrows/A/D steer after launch and Space boosts once. Keys 1/2/3 select a power before launch. Escape pauses, M toggles sound, F11 toggles fullscreen. The clubhouse selects mode, stadium and ball. A rematch is available after scoring.
+Traditional alley: move the mouse over the lane to position the ball, hold left mouse and drag upward for power / sideways for aim, then release to bowl. The position locks during a drag. A/D position; arrows aim; Q/E curve; sliders adjust all shot values. Hold Space to time power and release to bowl, or press LET IT RIP. In Mascot Ride, arrows/A/D steer after launch and Space boosts once. Keys 1/2/3 select a power before launch. Escape pauses, M toggles sound, F11 toggles fullscreen. The clubhouse selects mode, stadium and ball. A rematch is available after scoring.
 
 ## Graphics and limits
 

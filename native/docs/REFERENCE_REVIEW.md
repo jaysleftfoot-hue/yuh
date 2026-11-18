@@ -28,3 +28,7 @@ python3 native/headless.py --play --mascot --arena 9 --demo-shot --capture-frame
 ```
 
 Screenshots use fixed simulation steps and do not write career progress. They are actual native-game captures, not concept renders.
+
+## Second clip now inspected
+
+The user's second Dropbox file is 26.333 seconds and shows Zombie Bowl-a-Rama. At 10–16 seconds the player positions the ball using a green horizontal marker; around 16.5–19 seconds a vertical green power indicator appears; around 19 seconds the ball launches and the camera follows. Sampled at 2 fps through this control sequence. The footage supports these visual stages but does not reveal mouse-button events. Our drag/release mapping is an implementation inference. No original video or private Dropbox URL is included in source.

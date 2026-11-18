@@ -1,3 +1,4 @@
+#include "alley_controls.hpp"
 #include "art.hpp"
 #include "audio.hpp"
 #include "campaign.hpp"
@@ -101,6 +102,8 @@ int main(int argc, char **argv) {
     int state = 0, screen = startInGame || smoke ? 1 : 0, arena = previewArena < 0 ? 0 : previewArena,
         skin = 0, rolls = 0, ticks = 0, selectedSkin = 0;
     float time = 0, accum = 0, reaction = 0, chargeTime = 0, aiWait = .9f, celebration = 0;
+    Vector2 dragStart{};
+    bool mouseCharge = false;
     bool paused = false, charge = false, done = false, ok = false, awarded = false;
     std::string result = "WELCOME TO THE TOUR", reward;
     Camera3D camera{{0, 3.0f, -6.2f}, {0, 1.7f, 23}, {0, 1, 0}, 43, CAMERA_PERSPECTIVE};
@@ -189,15 +192,27 @@ int main(int argc, char **argv) {
                     shot.curve = std::clamp(
                         shot.curve + ((IsKeyDown(KEY_E) ? 1.f : 0) - (IsKeyDown(KEY_Q) ? 1.f : 0)) * dt,
                         -1.f, 1.f);
-                    if (IsKeyPressed(KEY_SPACE)) {
+                    bool alleyPointer = !match.mascot && GetMouseY() > 190 && GetMouseY() < 630;
+                    if (!match.mascot && !charge && alleyPointer &&
+                        (GetMouseDelta().x != 0 || GetMouseDelta().y != 0))
+                        shot.position = alleyPosition(GetMouseX());
+                    if (IsKeyPressed(KEY_SPACE) ||
+                        (alleyPointer && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))) {
                         charge = true;
+                        mouseCharge = alleyPointer && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+                        dragStart = GetMousePosition();
                         chargeTime = 0;
                     }
                     if (charge) {
                         chargeTime += dt;
-                        shot.power = .15f + .85f * (.5f - .5f * std::cos(chargeTime * 4));
+                        if (mouseCharge) {
+                            shot = alleyDrag(shot, GetMouseX() - dragStart.x, dragStart.y - GetMouseY());
+                        } else
+                            shot.power = .15f + .85f * (.5f - .5f * std::cos(chargeTime * 4));
                     }
-                    if (IsKeyReleased(KEY_SPACE) && charge)
+                    if (((!mouseCharge && IsKeyReleased(KEY_SPACE)) ||
+                         (mouseCharge && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))) &&
+                        charge)
                         launch();
                     for (int i = 0; i < 3; ++i)
                         if (IsKeyPressed(KEY_ONE + i))
@@ -270,10 +285,13 @@ int main(int argc, char **argv) {
         art.arena = arena;
         art.skin = skin;
         art.mascot = match.mascot;
+        // The alley reference uses a deliberately compressed arcade perspective.
+        laneDepthScale = match.mascot ? (720.f / 41.5f) * 10.f / 21.f : 1.55f;
+        camera.fovy = match.mascot ? 43.f : 53.f;
         const auto &view = match.lanes[match.player];
-        Vector3 desired{shot.position * .25f - 1.25f, match.mascot ? 4.5f : 4.5f,
-                        match.mascot ? -9.0f : -9.0f},
-            look{0, -18.f, laneZ(23)};
+        Vector3 desired{shot.position * .25f - 1.25f, match.mascot ? 4.5f : 2.8f,
+                        match.mascot ? -9.0f : -5.8f},
+            look{0, match.mascot ? -18.f : 1.2f, laneZ(23)};
         if (screen != 1) {
             desired = match.mascot ? Vector3{-3.2f, 4.5f, -5} : Vector3{-9, 7, -4};
             look = {0, 1, match.mascot ? 13.f : 19.f};
@@ -419,7 +437,7 @@ int main(int argc, char **argv) {
                                   i % 2 ? gold : aqua);
                 }
             bool enabled = state == 0 && match.player == 0 && !paused;
-            if (state != 1 && state != 2) {
+            if ((state != 1 && state != 2) && (match.mascot || state == 3)) {
                 panel({24, 691, 1232, 66}, {10, 23, 37, 238});
                 slider("POSITION", 39, 702, 160, shot.position, .55f, 9.45f, enabled);
                 slider("AIM", 223, 702, 160, shot.aim, -1, 1, enabled);
@@ -438,6 +456,28 @@ int main(int argc, char **argv) {
                     charge = false;
                 }
             }
+            if (!match.mascot && state == 0 && human) {
+                float x = 240 + (shot.position - .55f) / 8.9f * 800;
+                if (!charge) {
+                    DrawLineEx({x - 28, 535}, {x + 28, 535}, 5, aqua);
+                    DrawTriangle({x - 39, 535}, {x - 23, 548}, {x - 23, 522}, aqua);
+                    DrawTriangle({x + 39, 535}, {x + 23, 522}, {x + 23, 548}, aqua);
+                    center("MOVE TO POSITION", 640, 705, 18, cream);
+                    center("HOLD MOUSE / DRAG UP FOR POWER", 640, 735, 14, aqua);
+                } else {
+                    panel({x - 21, 438, 42, 149}, ink);
+                    float fill = std::clamp((shot.power - .15f) / .85f, 0.f, 1.f) * 129;
+                    DrawRectangleRounded({x - 13, 577 - fill, 26, fill}, .2f, 8, aqua);
+                    for (int i = 1; i < 8; ++i)
+                        DrawLine(x - 13, 577 - i * 16, x + 13, 577 - i * 16, ink);
+                    center("DRAG TO AIM / RELEASE TO BOWL", 640, 705, 20, cream);
+                    center(std::to_string(int(shot.power * 100)) + "%", x, 596, 17, aqua);
+                }
+                if (button({24, 737, 150, 38}, "CLUBHOUSE")) {
+                    screen = 0;
+                    charge = false;
+                }
+            }
             if (state == 0) {
                 const char *names[] = {"1  HEAVY", "2  MAGNET", "3  BUMPERS"};
                 for (int i = 0; i < 3; ++i) {
@@ -447,8 +487,9 @@ int main(int argc, char **argv) {
                         match.equip(Power(i + 1));
                 }
             }
-            center(match.mascot ? "A / D  STEER     SPACE  BOOST"
-                                : "HOLD SPACE TO CHARGE  /  RELEASE TO BOWL",
+            center(match.mascot
+                       ? "A / D  STEER     SPACE  BOOST"
+                       : "MOUSE: POSITION / HOLD / RELEASE    |    SPACE: CHARGE    |    ARROWS: AIM",
                    640, 770, 12, {166, 190, 207, 255});
         }
         uiBlocked = false;

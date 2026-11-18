@@ -37,3 +37,11 @@ The source, assets, scripts, tests, art direction and this evidence are preserve
 ## Lane/HUD follow-up
 
 Linux build and rules/campaign suites pass. Full graphical matches completed: traditional 37 rolls (115–119), mascot 41 rolls (72–35). Launch screenshots were regenerated after the camera framing correction. Windows was cross-built again; execution remains unverified. The `tropicana-in-motion.png` image above belongs to the earlier graphics pass; the two launch screenshots show the current lane/HUD.
+
+## Zombies controls and alley correction
+
+The 26.333-second Zombies clip is now accessible and was visually sampled, including 2 fps through the control sequence. Traditional's stretched hall was replaced with a compressed arcade presentation. The on-lane marker/power meter follows the observed visual stages; exact button semantics remain inferred.
+
+Linux build passed all nine physics/rules scenarios and the campaign suite, including new drag power/aim, locked position, bounds and downward-drag checks. Both graphical matches passed (traditional 37 rolls, 115–119; mascot 41 rolls, 72–35). Real X11 mouse movement/press/drag was injected into the native window and the 81% held-power screenshot was visually checked. Windows cross-build and ZIP verification passed; Windows execution remains unverified.
+
+A second real X11 input run pressed, dragged and released the mouse. The captured result showed the ball at the pin deck, fallen pins and the following camera, confirming release launches the shot. The original game's exact mouse-button semantics still cannot be proven from a screen recording alone.

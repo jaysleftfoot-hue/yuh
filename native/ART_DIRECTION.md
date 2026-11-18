@@ -42,3 +42,9 @@ A cloud refresh removed the prior uncommitted native files. The native implement
 The rendered foul-line-to-head-pin distance now uses 60 feet / 41.5 inches (17.35 lane widths). The simulation still uses normalized arcade coordinates and existing shot timing; this is a presentation conversion, not a regulation physics rewrite. Rack depth is preserved after the head pin to avoid stretching the pin triangle. Characters remain stylized. Small scenery props retain their depth while the lane and enclosing scenery extend longitudinally. The following camera uses converted positions.
 
 Removed riveted panel borders and the right-side power tower. Powers are compact buttons above the shot bar; shot controls disappear during travel/reaction. Menu panels share the simpler treatment. The launch camera pitches down to keep the rider clear of the bottom controls.
+
+## Zombies reference correction
+
+The second Dropbox clip is now accessible: 26.333 seconds. Sampled frames (including 0.5-second samples around 12–21 seconds) show lateral placement arrows, a vertical green meter, launch and following camera. This supersedes the earlier unavailable-reference notes. Mouse button events are not visible: upward drag for power, lateral drag for aim and release-to-launch are an inferred mapping, not verified original input internals. Space retains the timed keyboard alternative. Traditional uses the new on-lane UI instead of four sliders.
+
+The previous 17.35:1 presentation stretched the entire hall and was a poor match for this arcade reference. Traditional mode now deliberately compresses lane depth (1.55 times normalized coordinates), with restored close scenery and a 53-degree camera. It is not presented as a regulation simulation. Mascot presentation is unchanged.

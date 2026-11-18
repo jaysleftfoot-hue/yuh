@@ -1,4 +1,5 @@
 #include "campaign.hpp"
+#include "alley_controls.hpp"
 #include <iostream>
 #include <set>
 using namespace bowling;
@@ -7,6 +8,16 @@ void require(bool b, const char *s) {
         throw std::runtime_error(s);
 }
 int main() {
+    Shot input{};
+    input.position = 3;
+    input.curve = .2f;
+    auto drag = alleyDrag(input, 120, 90);
+    require(std::abs(drag.power - .65f) < .001f && drag.aim == .5f, "drag sets power and aim");
+    require(drag.position == 3 && drag.curve == .2f, "drag locks position and preserves spin");
+    require(alleyDrag(input, -1000, 1000).power == 1 && alleyDrag(input, -1000, 1000).aim == -1,
+            "drag upper bounds");
+    require(alleyDrag(input, 1000, -1000).power == .15f, "downward drag minimum power");
+    require(alleyPosition(-100) == .55f && alleyPosition(2000) == 9.45f, "placement clamps to lane");
     Profile p;
     require(p.balls() == 1 && p.stadiums() == 1, "initial unlocks");
     std::set<std::string> names;

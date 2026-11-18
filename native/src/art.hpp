@@ -4,7 +4,7 @@
 #include "raymath.h"
 #include "rlgl.h"
 #include "ui.hpp"
-inline constexpr float laneDepthScale = (720.f / 41.5f) * 10.f / 21.f;
+inline float laneDepthScale = (720.f / 41.5f) * 10.f / 21.f;
 inline float laneZ(float z) {
     return z <= 23.f ? 2.f + (z - 2.f) * laneDepthScale : 2.f + 21.f * laneDepthScale + (z - 23.f);
 }
