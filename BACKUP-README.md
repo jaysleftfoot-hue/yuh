@@ -1,5 +1,1 @@
-# Live pins and rival difficulty
-
-Source d53f86a6650d6c01e055da3893c57bd13c19d37a on codex/big-league-bowling. The HUD follows the active rack, and Rookie, Pro and All-Star are selectable in both modes.
-
-Native rules, campaign, window smoke and input checks passed. The Windows installer was cross-built on Linux. Windows execution remains unverified.
+Game models build from c2b4eebe673a29b0bd0a0465123706fbd9561201. Includes the Windows installer and portable ZIP, editable model sources and a full Git bundle. Both game modes rendered on Linux. Windows execution remains unverified.
