@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+ <linearGradient id="ivory" x1="0" y1="0" x2=".12" y2="1" gradientUnits="objectBoundingBox"><stop stop-color="#fffaf0"/><stop offset=".45" stop-color="#fffae8"/><stop offset=".8" stop-color="#f6edd6"/><stop offset="1" stop-color="#d4bf99"/></linearGradient>
+ <g id="crest">
+  <path d="M0 -116 L92 -18 Q82 55 0 119 Q-82 55 -92 -18Z" fill="#b78e42" stroke="#63472f" stroke-width="4"/>
+  <path d="M0 -104 L82 -16 Q72 48 0 106 Q-72 48 -82 -16Z" fill="#122e45" stroke="#ffdf88" stroke-width="5"/>
+  <circle cy="-5" r="47" fill="#fff2cc" stroke="#cdbb83" stroke-width="4"/>
+  <path d="M-37 -33 Q-5 -21 -38 25 M38 -32 Q8 -16 39 24" fill="none" stroke="#ae3432" stroke-width="5" stroke-dasharray="7 3"/>
+  <path d="M0 -83 L5 -66 17 -64 6 -57 0 -41 -4 -57 -17 -62 -5 -66Z" fill="#ffe084"/>
+  <path d="M-68 38 Q0 21 68 38 L59 65 Q0 50 -59 65Z" fill="#a63137" stroke="#ffdf88" stroke-width="3"/>
+  <text x="0" y="51" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" font-size="20" fill="#fff2ce">LEAGUE</text>
+ </g>
+</defs>
+<rect width="1024" height="1024" fill="url(#ivory)"/>
+<g fill="#a83439"><path d="M0 254h1024v28H0zM0 307h1024v24H0z"/></g>
+<path d="M0 250h1024M0 286h1024M0 303h1024M0 335h1024" stroke="#d5af64" stroke-width="4"/>
+<g fill="none" stroke="#b34445"><path d="M235 -65 Q435 70 235 231 M789 -65 Q589 70 789 231" stroke-width="4"/><path d="M242 -65 Q442 70 242 231 M782 -65 Q582 70 782 231" stroke-width="19" stroke-dasharray="4 12"/></g>
+<use xlink:href="#crest" transform="translate(512 678)"/><use xlink:href="#crest" transform="translate(0 678)"/><use xlink:href="#crest" transform="translate(1024 678)"/>
+<path d="M0 974h1024v8H0z" fill="#c5a36d"/><path d="M0 991h1024v33H0z" fill="#243442"/>
+</svg>

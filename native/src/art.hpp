@@ -1,6 +1,5 @@
 #pragma once
 #include "campaign.hpp"
-#include "ray_model.hpp"
 #include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
@@ -8,7 +7,7 @@
 namespace geo = bowling::geometry;
 inline constexpr float sceneryDepthScale = geo::sceneryDepthScale;
 struct Art {
-    Model cube{}, sphere{}, cylinder{}, pin{}, wing{}, tube{}, course{}, rayBody{};
+    Model cube{}, sphere{}, cylinder{}, pin{}, tube{}, course{}, rayBody{};
     Shader shader{};
     std::array<Texture2D, 64> skins{};
     RenderTexture2D scoreboard{};
@@ -17,11 +16,6 @@ struct Art {
     int arena = 0, skin = 0;
     float slingPower = 0;
     bool mascot = false, inSceneryTransform = false;
-    // Continuous shaded tube and an irregular, inward-facing stadium grotto.
-    Mesh tubeMesh() {
-        Mesh m = GenMeshTorus(.30f, 1.0f, 24, 64);
-        return m;
-    }
     Mesh courseMesh() {
         constexpr int rings = 26 + int(geo::sceneryExtension / 2) + 1, sides = 24;
         Mesh m{};
@@ -62,96 +56,34 @@ struct Art {
         UploadMesh(&m, false);
         return m;
     }
-    Mesh wingMesh() {
-        constexpr int nx = 16, nz = 12;
-        Mesh m{};
-        m.vertexCount = nx * nz * 12;
-        m.triangleCount = m.vertexCount / 3;
-        m.vertices = (float *)MemAlloc(m.vertexCount * 3 * sizeof(float));
-        m.normals = (float *)MemAlloc(m.vertexCount * 3 * sizeof(float));
-        m.texcoords = (float *)MemAlloc(m.vertexCount * 2 * sizeof(float));
-        int n = 0;
-        auto point = [](float u, float v, float side) {
-            float width = (1 - u) * .8f + .03f;
-            return Vector3{.3f + u * 1.15f,
-                           .16f + std::sin(u * PI) * .19f + side * .07f * std::sin(v * PI) * (1 - u),
-                           (.5f - v) * width * 2 - u * .33f};
-        };
-        auto tri = [&](Vector3 a, Vector3 b, Vector3 c) {
-            Vector3 normal =
-                Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
-            for (Vector3 p : {a, b, c}) {
-                m.vertices[n * 3] = p.x;
-                m.vertices[n * 3 + 1] = p.y;
-                m.vertices[n * 3 + 2] = p.z;
-                Vector3 smooth = Vector3Normalize(
-                    {-.23f * std::cos((p.x - .3f) / 1.15f * PI), normal.y > 0 ? 1.f : -1.f, .10f});
-                m.normals[n * 3] = smooth.x;
-                m.normals[n * 3 + 1] = smooth.y;
-                m.normals[n * 3 + 2] = smooth.z;
-                m.texcoords[n * 2] = p.x;
-                m.texcoords[n * 2 + 1] = p.z;
-                ++n;
-            }
-        };
-        for (int i = 0; i < nx; ++i)
-            for (int j = 0; j < nz; ++j)
-                for (int side : {-1, 1}) {
-                    float u = i / float(nx), v = j / float(nz), du = 1.f / nx, dv = 1.f / nz;
-                    Vector3 a = point(u, v, side), b = point(u + du, v, side),
-                            c = point(u + du, v + dv, side), d = point(u, v + dv, side);
-                    if (side > 0) {
-                        tri(a, b, c);
-                        tri(a, c, d);
-                    } else {
-                        tri(a, c, b);
-                        tri(a, d, c);
-                    }
-                }
-        UploadMesh(&m, false);
-        return m;
-    }
-    Mesh pinMesh() {
-        const float heights[] = {0, .08f, .28f, .58f, .85f, 1.12f, 1.38f, 1.55f, 1.72f, 1.92f, 2.05f},
-                    radii[] = {.22f, .31f, .38f, .40f, .34f, .22f, .14f, .15f, .23f, .23f, .05f};
-        constexpr int rings = 11, sides = 20;
-        Mesh m{};
-        m.vertexCount = (rings - 1) * sides * 6;
-        m.triangleCount = m.vertexCount / 3;
-        m.vertices = (float *)MemAlloc(m.vertexCount * 3 * sizeof(float));
-        m.normals = (float *)MemAlloc(m.vertexCount * 3 * sizeof(float));
-        m.texcoords = (float *)MemAlloc(m.vertexCount * 2 * sizeof(float));
-        int index = 0;
-        auto put = [&](int r, int s) {
-            float a = 2 * PI * s / sides,
-                  slope = r == 0 ? 0 : (radii[r] - radii[r - 1]) / (heights[r] - heights[r - 1]);
-            Vector3 n = Vector3Normalize({std::cos(a), -slope, std::sin(a)});
-            m.vertices[index * 3] = std::cos(a) * radii[r];
-            m.vertices[index * 3 + 1] = heights[r];
-            m.vertices[index * 3 + 2] = std::sin(a) * radii[r];
-            m.normals[index * 3] = n.x;
-            m.normals[index * 3 + 1] = n.y;
-            m.normals[index * 3 + 2] = n.z;
-            m.texcoords[index * 2] = float(s) / sides;
-            m.texcoords[index * 2 + 1] = heights[r] / 2;
-            ++index;
-        };
-        for (int r = 0; r < rings - 1; ++r)
-            for (int s = 0; s < sides; ++s) {
-                put(r, s);
-                put(r + 1, s);
-                put(r + 1, s + 1);
-                put(r, s);
-                put(r + 1, s + 1);
-                put(r, s + 1);
-            }
-        UploadMesh(&m, false);
-        return m;
+    Model loadCharacter(const char *name) {
+        const auto path = std::string(GetApplicationDirectory()) + "assets/models/" + name + ".glb";
+        Model model = LoadModel(path.c_str());
+        if (!IsModelValid(model) || model.meshCount != 1)
+            throw std::runtime_error("Could not load character mesh: " + path);
+        auto &material = model.materials[model.meshMaterial[0]];
+        auto &paint = material.maps[MATERIAL_MAP_ALBEDO].texture;
+        if (paint.width <= 1)
+            throw std::runtime_error("Missing character paint: " + path);
+        GenTextureMipmaps(&paint);
+        SetTextureFilter(paint, TEXTURE_FILTER_TRILINEAR);
+        material.shader = shader;
+        return model;
     }
     void init() {
         const char *vs = R"(#version 330
 in vec2 vertexTexCoord;out vec2 uv;in vec3 vertexPosition;in vec3 vertexNormal;in vec4 vertexColor;uniform mat4 mvp;uniform mat4 matModel;uniform mat4 matNormal;out vec3 normal;out vec3 world;out vec4 color;
-void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matModel*vec4(vertexPosition,1));color=vertexColor;gl_Position=mvp*vec4(vertexPosition,1);})";
+uniform int woodMode;
+uniform float sceneTime;
+void main(){
+vec3 pos=vertexPosition;
+if(woodMode==6){
+    float wing=pow(clamp((abs(pos.x)-.57)/1.46,0.0,1.0),2.0);
+    pos.y+=wing*.18*sin(sceneTime*4.0+pos.z*2.3);
+    float tail=clamp((-pos.z-.9)/1.7,0.0,1.0);
+    pos.x+=tail*tail*.22*sin(sceneTime*3.0+pos.z*2.0);
+}
+uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matModel*vec4(pos,1));color=vertexColor;gl_Position=mvp*vec4(pos,1);})";
         std::string path = std::string(GetApplicationDirectory()) + "assets/lighting.fs";
         char *fs = LoadFileText(path.c_str());
         if (!fs)
@@ -161,12 +93,11 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         cube = LoadModelFromMesh(GenMeshCube(1, 1, 1));
         sphere = LoadModelFromMesh(GenMeshSphere(1, 24, 20));
         cylinder = LoadModelFromMesh(GenMeshCylinder(1, 1, 16));
-        pin = LoadModelFromMesh(pinMesh());
-        wing = LoadModelFromMesh(wingMesh());
-        rayBody = LoadModelFromMesh(makeRayBody());
-        tube = LoadModelFromMesh(tubeMesh());
+        pin = loadCharacter("league-pin");
+        rayBody = loadCharacter("sunburst-ray");
+        tube = loadCharacter("rider-tube");
         course = LoadModelFromMesh(courseMesh());
-        for (Model *m : {&cube, &sphere, &cylinder, &pin, &wing, &tube, &course, &rayBody})
+        for (Model *m : {&cube, &sphere, &cylinder, &course})
             m->materials[0].shader = shader;
     }
     void box(Vector3 p, Vector3 scale, Color c) {
@@ -425,29 +356,17 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
                 ink);
         rlPopMatrix();
     }
-    void drawPin(const bowling::Body &p, Color team, float time) {
+    void drawPin(const bowling::Body &p, float time) {
         rlPushMatrix();
-        rlTranslatef(geo::renderX(p.x), .06f, p.z);
+        const float tilt = p.down ? p.fall * 86.f : std::sin(time * 3 + p.id) * 2.f;
+        const float tip = std::sin(std::abs(tilt) * DEG2RAD);
+        // As the pin tips over, its contact point moves from the foot to the belly.
+        const float lift =
+            p.down ? std::max(.30f * tip, geo::pinRadius * tip - .9f * std::cos(tilt * DEG2RAD)) : 0.f;
+        rlTranslatef(geo::renderX(p.x), .06f + lift, p.z);
+        rlRotatef(tilt, p.id % 2 ? 1.f : -1.f, 0, .4f);
         rlScalef(geo::pinRadius / .40f, geo::pinHeight / 2.05f, geo::pinRadius / .40f);
-        rlRotatef(p.down ? p.fall * 86 : std::sin(time * 3 + p.id) * 2, p.id % 2 ? 1.f : -1.f, 0, .4f);
-        DrawModel(pin, {0, 0, 0}, 1, {250, 242, 220, 255});
-        cyl({0, 1.35f, 0}, .16f, .10f, red);
-        cyl({0, 1.48f, 0}, .16f, .06f, red);
-        orb({0, 1.96f, 0}, {.29f, .16f, .28f}, team);
-        box({0, 1.91f, -.22f}, {.58f, .07f, .36f}, team);
-        for (float x : {-.105f, .105f}) {
-            orb({x, 1.77f, -.205f}, {.075f, .09f, .035f}, WHITE);
-            orb({x, 1.77f, -.239f}, {.032f, .048f, .018f}, ink);
-            beam({x - .06f, 1.88f, -.23f}, {x + .05f, 1.90f, -.23f}, .017f, ink);
-        }
-        orb({0, .85f, -.30f}, {.20f, .23f, .055f}, team);
-        for (int j = 0; j < 7; ++j)
-            orb({0, .64f + j * .055f, -.365f}, {.012f, .015f, .009f}, cream);
-        box({0, 1.62f, -.19f}, {.13f, .035f, .045f}, ink);
-        for (int side : {-1, 1}) {
-            orb({side * .39f, .75f, -.02f}, {.13f, .19f, .15f}, {158, 91, 44, 255});
-            orb({side * .15f, .08f, -.12f}, {.22f, .10f, .32f}, team);
-        }
+        DrawModel(pin, {0, 0, 0}, 1, WHITE);
         rlPopMatrix();
     }
     void rider(Vector3 p, float time, bool ready = false, float bank = 0) {
@@ -455,67 +374,14 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         rlTranslatef(p.x, p.y + std::sin(time * 3) * .035f, p.z);
         rlRotatef(std::sin(time * 3) * 2 - bank * 3.5f, 0, 0, 1);
         rlRotatef(bank * 2, 0, 1, 0);
-        // Real ring silhouette, two-tone rubber, stitched grab rope and handles.
-        DrawModelEx(tube, {0, -.16f, 0}, {1, 0, 0}, 90, {1.05f, 1.20f, .95f}, {18, 52, 103, 255});
-        DrawModelEx(tube, {0, -.03f, 0}, {1, 0, 0}, 90, {1.01f, 1.16f, .60f}, {55, 146, 194, 255});
-        orb({0, -.16f, 0}, {.80f, .12f, .94f}, {9, 28, 58, 255});
-        for (int i = 0; i < 48; ++i) {
-            float a = i * 2 * PI / 48, b = (i + 1) * 2 * PI / 48;
-            beam({std::cos(a) * 1.18f, .04f, std::sin(a) * 1.36f},
-                 {std::cos(b) * 1.18f, .04f, std::sin(b) * 1.36f}, .022f, cream);
-        }
-        for (int side : {-1, 1}) {
-            box({side * .96f, .16f, 0}, {.12f, .08f, .37f}, ink);
-            for (float z : {-.20f, .20f})
-                orb({side * .96f, .12f, z}, {.11f, .07f, .08f}, gold);
-        }
-        // Unified ray: swept fins, domed back and ivory underside, rather than a humanoid torso.
+        DrawModel(tube, {0, 0, 0}, 1, WHITE);
         rlPushMatrix();
         rlTranslatef(0, .12f, 0);
         rlRotatef(ready ? 180.f + std::sin(time * 1.5f) * 5.f : bank * 2, 0, 1, 0);
         rlRotatef(std::sin(time * 4) * 2.5f, 0, 0, 1);
-        rlDisableBackfaceCulling();
+        material(6);
         DrawModel(rayBody, {0, 0, 0}, 1, WHITE);
-        rlEnableBackfaceCulling();
-        // Almond eyes sit on the face, with small highlights and a soft lower eyelid.
-        for (int side : {-1, 1}) {
-            float x = side * .28f, blink = std::fmod(time + 1, 5) < .12f ? .025f : .115f;
-            orb({x, .55f, .57f}, {.205f, blink, .125f}, cream);
-            orb({x - side * .025f, .56f, .677f}, {.089f, blink * .8f, .043f}, {12, 47, 73, 255});
-            orb({x - side * .045f, .61f, .712f}, {.027f, .031f, .012f}, WHITE);
-            for (int i = 0; i < 12; ++i) {
-                float t = i / 11.f;
-                Vector3 a{x - .18f + t * .36f, .66f + .055f * std::sin(t * PI), .61f};
-                Vector3 b{x - .18f + (t + .09f) * .36f, .66f + .055f * std::sin((t + .09f) * PI), .61f};
-                beam(a, b, .018f, {16, 85, 105, 255});
-            }
-        }
-        // Wide curved smile follows the snout, with a continuous ivory teeth ribbon.
-        for (int i = 0; i < 24; ++i) {
-            float x = -.39f + i * .0325f, xx = x + .0325f;
-            float y = .39f - .09f * (1 - x * x / .1521f), yy = .39f - .09f * (1 - xx * xx / .1521f);
-            beam({x, y, .93f}, {xx, yy, .93f}, .032f, {12, 54, 73, 255});
-            beam({x, y + .022f, .95f}, {xx, yy + .022f, .95f}, .012f, cream);
-        }
-        // Small backward-set cap keeps the face unobstructed.
-        orb({0, .83f, -.13f}, {.37f, .22f, .34f}, {12, 39, 75, 255});
-        orb({0, .72f, .12f}, {.41f, .035f, .29f}, {18, 56, 93, 255});
-        orb({0, 1.05f, -.13f}, {.035f, .025f, .035f}, gold);
-        sign(teamLogos[9], {0, .81f, .212f}, -.24f, .20f, true);
-        // Flexible, tapered whip tail trails behind the whole body.
-        Vector3 last{0, .09f, -.95f};
-        for (int i = 1; i <= 30; ++i) {
-            float t = i / 30.f;
-            Vector3 next{std::sin(time * 3 - t * 4) * t * .32f, .09f + .26f * t * t, -.95f - t * 1.65f};
-            DrawCylinderEx(last, next, .065f * (1 - (t - 1.f / 30)) + .008f, .065f * (1 - t) + .008f, 12,
-                           {26, 131, 157, 255});
-            last = next;
-        }
-        // Gill lines on the shoulders add readable anatomy without extra body lumps.
-        for (int side : {-1, 1})
-            for (int i = 0; i < 3; ++i)
-                beam({side * (.5f + i * .08f), .46f - i * .04f, .05f},
-                     {side * (.53f + i * .08f), .40f - i * .04f, -.16f}, .012f, {16, 104, 125, 255});
+        material(0);
         rlPopMatrix();
         rlPopMatrix();
     }
@@ -968,11 +834,8 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         }
         for (int i = -2; i <= 2; ++i)
             DrawSphere({i * 1.1f, .05f, geo::dotsZ}, .045f, ink);
-        for (const auto &p : sim.pins) {
-            auto visible = p;
-            visible.z = p.z;
-            drawPin(visible, team, time);
-        }
+        for (const auto &p : sim.pins)
+            drawPin(p, time);
         if (ballPos.z < geo::surfaceEnd) {
             if (mascot)
                 rider({ballPos.x + (aim ? shot.aim * 1.6f : 0), .57f,
@@ -1007,7 +870,10 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         EndMode3D();
     }
     void close() {
-        for (Model m : {cube, sphere, cylinder, pin, wing, tube, course, rayBody})
+        for (Model *character : {&pin, &rayBody, &tube})
+            UnloadTexture(
+                character->materials[character->meshMaterial[0]].maps[MATERIAL_MAP_ALBEDO].texture);
+        for (Model m : {cube, sphere, cylinder, pin, tube, course, rayBody})
             UnloadModel(m);
         for (auto t : skins)
             UnloadTexture(t);

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="256">
+<defs>
+ <linearGradient id="rubber" x2="0" y2="1"><stop stop-color="#154365"/><stop offset=".24" stop-color="#4499b2"/><stop offset=".52" stop-color="#163a57"/><stop offset=".85" stop-color="#102b43"/><stop offset="1" stop-color="#154365"/></linearGradient>
+ <pattern id="panels" width="256" height="256" patternUnits="userSpaceOnUse"><path d="M40 0h96l80 128h-96z" fill="#f1d084"/><path d="M49 0h79l80 128h-79z" fill="#e7efe1"/><path d="M139 0h10l80 128h-10z" fill="#6ce0cf"/><path d="M244 0v256" stroke="#20394b" stroke-width="4"/><path d="M247 0v256" stroke="#b4c8bc" stroke-width="2" stroke-dasharray="5 3"/></pattern>
+</defs>
+<rect width="1024" height="256" fill="url(#rubber)"/><rect width="1024" height="256" fill="url(#panels)"/><path d="M0 3h1024M0 249h1024" stroke="#e3bd6f" stroke-width="5"/>
+</svg>
