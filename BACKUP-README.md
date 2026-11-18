@@ -1,3 +1,3 @@
-# Long lane / arcade frame milestone
+# Illustrated title and faster throws
 
-Source dfd007d5dc6a3c5496a8c0a8e10705a9714d1e2e on codex/big-league-bowling. 160-unit playable run, distant-rack projection regression guard, decorative baseball frame and unboxed arcade menu actions. Run Big-League-Bowling-Setup.exe on Windows x64. Linux tests and full match passed; Windows cross-build, ZIP assets and NSIS compile verified. Windows runtime is unverified; installer unsigned. Verify SHA256SUMS.txt.
+Source a7d6fddf9a8422cc405ac7a34dc18d56695023f3 on codex/big-league-bowling. Original painted baseball title screen, working native menus, ~3.5s full-power throws with lane size unchanged, and GLSL floor fix for signed pow operations. Linux tests, menu navigation and full match passed. Installer/ZIP compiled and checked; Windows runtime and affected-GPU confirmation remain unverified. Run Big-League-Bowling-Setup.exe on Windows x64; unsigned. Verify SHA256SUMS.txt.
