@@ -1,1 +1,1 @@
-Game models build from c2b4eebe673a29b0bd0a0465123706fbd9561201. Includes the Windows installer and portable ZIP, editable model sources and a full Git bundle. Both game modes rendered on Linux. Windows execution remains unverified.
+64-ball collection build from 448b530458d67f4ec404b3ccf963870e156fe22f. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
