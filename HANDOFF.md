@@ -1,3 +1,5 @@
+Latest stadium identity pass: actual sourced stadium wordmarks and MLB marks in native/assets/parks (provenance in SOURCES.md), layered video graphics and steel trusses. Tropicana has a wide screen, catwalk and orange landmark. Stadium ready camera intentionally reframed; world geometry remains 80×10. See native/PROPORTIONS.md for the projected-view regression guard. Existing ten-park roster unchanged; Citi, Comerica and Rate photos inform presentation only.
+
 Latest signage: stadium scoreboards replace blue title panels. Wrigley follows the supplied green manual-board reference, with a 3D clock, flags and lamps; bowling scores update live. See native/docs/wrigley-scoreboard.png.
 
 # Current handoff

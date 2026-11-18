@@ -1,0 +1,43 @@
+# Stadium artwork sources
+Stadium wordmarks identify the depicted venues; trademarks belong to their respective owners. Downloaded from the Wikipedia file sources below. Reference photos are used for study only and are not bundled. Team marks from MLB static asset server. No endorsement implied.
+
+- Wrigley_Field: https://en.wikipedia.org/wiki/Wrigley_Field
+  - Wordmark: https://upload.wikimedia.org/wikipedia/en/f/fa/Wrigley_Field_Logo.svg
+  - Photo reference: https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c9/Wrigley_Field_in_line_with_sign.jpg/960px-Wrigley_Field_in_line_with_sign.jpg
+- Fenway_Park: https://en.wikipedia.org/wiki/Fenway_Park
+  - Wordmark: https://upload.wikimedia.org/wikipedia/en/7/71/Fenway_Park_logo.svg
+  - Photo reference: https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4f/131023-F-PR861-033_Hanscom_participates_in_World_Series_pregame_events.jpg/960px-131023-F-PR861-033_Hanscom_participates_in_World_Series_pregame_events.jpg
+- Oracle_Park: https://en.wikipedia.org/wiki/Oracle_Park
+  - Wordmark: https://upload.wikimedia.org/wikipedia/en/4/4b/Oracle_Park_logo.svg
+  - Photo reference: https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8e/Oracle_Park_2021.jpg/960px-Oracle_Park_2021.jpg
+- PNC_Park: https://en.wikipedia.org/wiki/PNC_Park
+  - Wordmark: https://upload.wikimedia.org/wikipedia/commons/c/cd/PNC_Park_logo_2021.svg
+  - Photo reference: https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0e/Pittsburgh_Pirates_park_%28Unsplash%29.jpg/960px-Pittsburgh_Pirates_park_%28Unsplash%29.jpg
+- Coors_Field: https://en.wikipedia.org/wiki/Coors_Field
+  - Wordmark: https://upload.wikimedia.org/wikipedia/en/6/61/Coors_Field_logo.svg
+  - Photo reference: https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e2/Coors_Field_July_2015.jpg/960px-Coors_Field_July_2015.jpg
+- Kauffman_Stadium: https://en.wikipedia.org/wiki/Kauffman_Stadium
+  - Wordmark: https://upload.wikimedia.org/wikipedia/en/e/e9/Kauffman_Stadium_logo.png
+  - Photo reference: https://thumb.wikimedia.org/wikipedia/commons/thumb/3/35/Kauffman2017.jpg/960px-Kauffman2017.jpg
+- Chase_Field: https://en.wikipedia.org/wiki/Chase_Field
+  - Wordmark: https://upload.wikimedia.org/wikipedia/en/6/63/Chase_field_logo.svg
+  - Photo reference: https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Reserve_A-10_Warthogs_Flyover_2023_World_Series_%288099146%29.jpg/960px-Reserve_A-10_Warthogs_Flyover_2023_World_Series_%288099146%29.jpg
+- T-Mobile_Park: https://en.wikipedia.org/wiki/T-Mobile_Park
+  - Wordmark: https://upload.wikimedia.org/wikipedia/commons/c/c4/T_mobile_park_logo.svg
+  - Photo reference: https://thumb.wikimedia.org/wikipedia/commons/thumb/1/10/SafecoFieldTop.jpg/960px-SafecoFieldTop.jpg
+- Yankee_Stadium: https://en.wikipedia.org/wiki/Yankee_Stadium
+  - Wordmark: https://upload.wikimedia.org/wikipedia/en/e/e2/Yankee_Stadium_Logo.svg
+  - Photo reference: https://thumb.wikimedia.org/wikipedia/commons/thumb/a/af/Yankee_Stadium_overhead_2010.jpg/960px-Yankee_Stadium_overhead_2010.jpg
+- Tropicana_Field: https://en.wikipedia.org/wiki/Tropicana_Field
+  - Wordmark: https://upload.wikimedia.org/wikipedia/en/c/c6/Tropicana_Field.svg
+  - Photo reference: https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5e/PXL_20220528_205520913.jpg/960px-PXL_20220528_205520913.jpg
+- Team mark 0: https://www.mlbstatic.com/team-logos/112.svg
+- Team mark 1: https://www.mlbstatic.com/team-logos/111.svg
+- Team mark 2: https://www.mlbstatic.com/team-logos/137.svg
+- Team mark 3: https://www.mlbstatic.com/team-logos/134.svg
+- Team mark 4: https://www.mlbstatic.com/team-logos/115.svg
+- Team mark 5: https://www.mlbstatic.com/team-logos/118.svg
+- Team mark 6: https://www.mlbstatic.com/team-logos/109.svg
+- Team mark 7: https://www.mlbstatic.com/team-logos/136.svg
+- Team mark 8: https://www.mlbstatic.com/team-logos/147.svg
+- Team mark 9: https://www.mlbstatic.com/team-logos/139.svg

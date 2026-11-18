@@ -1,3 +1,5 @@
+Latest stadium identity pass: actual sourced stadium wordmarks and MLB marks in native/assets/parks (provenance in SOURCES.md), layered video graphics and steel trusses. Tropicana has a wide screen, catwalk and orange landmark. Stadium ready camera intentionally reframed; world geometry remains 80×10. See native/PROPORTIONS.md for the projected-view regression guard. Existing ten-park roster unchanged; Citi, Comerica and Rate photos inform presentation only.
+
 # Current direction — stadium bowling and Rays adventure
 
 The references specify the rendering style and gameplay feel, not literal scenery to transplant into every mode. The user explicitly corrected the indoor-hall approach: stadium mode must feel like a baseball-themed Zombie Bowl-a-Rama, with a bowling lane in the middle of the selected stadium. Mascot mode should feel like a Tampa Bay Rays-inspired Polar/Shrek bowling game.

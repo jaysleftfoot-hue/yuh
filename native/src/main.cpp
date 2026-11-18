@@ -321,6 +321,10 @@ int main(int argc, char **argv) {
             look = {std::clamp(geometry::renderX(view.ball.x) * .3f, -1.5f, 1.5f),
                     match.mascot ? 1.5f : .9f, z + 12};
         }
+        if (screen == 1 && state == 0) {
+            camera.position = desired;
+            camera.target = look;
+        }
         camera.position =
             Vector3Lerp(camera.position, desired, std::min(1.f, dt * (state == 1 ? 18 : 5)));
         camera.target = Vector3Lerp(camera.target, look, std::min(1.f, dt * (state == 1 ? 18 : 5)));

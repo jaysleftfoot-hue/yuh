@@ -1,3 +1,12 @@
+# Stadium identity and camera follow-up
+
+- World lane remains 80×10; ball, pin, rack and simulation dimensions unchanged. Stadium ready camera deliberately raised and pulled back. Full camera constants and independent perspective projection now have regression checks (about 295 pixels foul-line-to-head-pin base at 1280×800).
+- Linux scoring/geometry/physics and campaign suites pass. Real native launch/impact captures checked for both modes; Wrigley, Chase and Tropicana stadium previews regenerated.
+- Actual stadium wordmarks for all ten parks and MLB team insignia load from packaged PNGs. Sources recorded in assets/parks/SOURCES.md. Reference photographs were inspected as a contact sheet; photographs are not bundled.
+- Video displays show live bowling scores over layered team graphics. Tropicana gets a wide video wall, roof catwalk and orange landmark. No claim of photoreal stadium reconstruction.
+- Tropicana full graphical match completed: 37 rolls, 69–200; live scoreboard result captured.
+- Windows cross-build succeeds; all 20 logo PNGs and source attribution must match the ZIP. Windows runtime remains unverified.
+
 # Current stadium / Rays / scoreboard validation
 
 - Linux build passes scoring, geometry regression, physics and campaign checks, including 64 designs, ten stadiums, save/restore, powers, steering, boost and AI matches.
