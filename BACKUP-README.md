@@ -1,3 +1,3 @@
-# Arcade installer milestone
+# Long lane / arcade frame milestone
 
-Source e55b29ea02af0f787e507443a0bdfc829655591f on codex/big-league-bowling. Run Big-League-Bowling-Setup.exe on Windows x64 for user-level installation, shortcuts and uninstaller. Portable ZIP also available. Native Linux tests and mouse-input checks passed. Windows cross-build and NSIS compile passed; Windows install/play/uninstall is unverified. Unsigned installer. Verify SHA256SUMS.txt.
+Source dfd007d5dc6a3c5496a8c0a8e10705a9714d1e2e on codex/big-league-bowling. 160-unit playable run, distant-rack projection regression guard, decorative baseball frame and unboxed arcade menu actions. Run Big-League-Bowling-Setup.exe on Windows x64. Linux tests and full match passed; Windows cross-build, ZIP assets and NSIS compile verified. Windows runtime is unverified; installer unsigned. Verify SHA256SUMS.txt.
