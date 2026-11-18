@@ -204,8 +204,9 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         }
     }
     void updateScoreboard(const bowling::Match &match) {
-        std::string key =
-            std::to_string(arena) + ":" + std::to_string(mascot) + ":" + std::to_string(match.player);
+        int pinsStanding = match.lanes[match.player].standingCount();
+        std::string key = std::to_string(arena) + ":" + std::to_string(mascot) + ":" +
+                          std::to_string(match.player) + ":" + std::to_string(pinsStanding);
         for (const auto &game : match.games) {
             key += "/" + std::to_string(game.frame);
             for (const auto &frame : game.frames) {
@@ -241,7 +242,7 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
             center(std::to_string(std::min(10, match.games[match.player].frame + 1)), 512, 132, 53,
                    letters);
             center("PINS", 512, 216, 19, letters);
-            center(std::to_string(match.games[match.player].standing()), 512, 245, 35, letters);
+            center(std::to_string(pinsStanding), 512, 245, 35, letters);
             const char *names[2][8] = {{"COLORADO", "SAN DIEGO", "LOS ANGELES", "ARIZONA",
                                         "PHILADELPHIA", "WASHINGTON", "PITTSBURGH", "CUBS"},
                                        {"BALTIMORE", "TEXAS", "OAKLAND", "CLEVELAND", "BOSTON",

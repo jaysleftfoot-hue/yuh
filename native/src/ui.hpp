@@ -1,6 +1,7 @@
 #pragma once
 #include "raylib.h"
 #include <algorithm>
+#include <array>
 #include <string>
 inline Font uiFont{}, arcadeFont{};
 inline Texture2D uiSlate{}, uiFrame{}, uiButton{};
@@ -61,7 +62,7 @@ inline void portraitCard(Texture2D portraits, int who, Rectangle r, const char *
     const char *names[] = {"YOU", "SLUGGER", "UMPIRE", "BALL BOY"};
     arcadeCenter(names[who], r.x + r.width / 2, r.y + r.height - 37, 23);
 }
-inline void baseballHud(Texture2D portraits, int rival) {
+inline void baseballHud(Texture2D portraits, int rival, const std::array<bool, 10> &standing) {
     // Painted turf/rock cornice connects the shallow slate scoreboards.
     DrawTexturePro(uiFrame, {0, 0, float(uiFrame.width), uiFrame.height * .135f}, {0, 58, 1280, 55},
                    {0, 0}, 0, WHITE);
@@ -71,9 +72,16 @@ inline void baseballHud(Texture2D portraits, int rival) {
     DrawLineEx({563, 60}, {716, 125}, 7, {213, 170, 91, 255});
     DrawTriangle({640, 160}, {699, 83}, {581, 83}, {36, 52, 48, 255});
     DrawTriangleLines({640, 160}, {699, 83}, {581, 83}, gold);
+    // The back row is at the top of the display, viewed from the approach.
+    int pin = 0;
     for (int row = 0; row < 4; ++row)
-        for (int col = 0; col <= row; ++col)
-            DrawCircle(640 + (col - row * .5f) * 19, 139 - row * 15, 5, {150, 242, 77, 255});
+        for (int col = 0; col <= row; ++col) {
+            const float x = 640 + (row * .5f - col) * 19;
+            const float y = 139 - row * 15;
+            DrawCircle(x, y, 5, standing[pin++] ? Color{150, 242, 77, 255} : Color{78, 86, 77, 255});
+        }
+    arcadeCenter(std::to_string(std::count(standing.begin(), standing.end(), true)) + " STANDING", 640,
+                 164, 19);
     panel({8, 130, 145, 566}, {49, 64, 70, 255});
     title("POWER UPS", 14, 274, 30, gold);
     // Vector-style illustrated busts replace the primitive oval/rectangle faces.

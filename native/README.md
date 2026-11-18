@@ -4,7 +4,9 @@ C++17 + raylib 5.5 desktop prototype. The native work lost in the cloud refresh 
 
 ## Playable systems
 
-- Traditional ball bowling against a simulated AI opponent: position, aim, timed release, power and curve.
+- Stadium bowling against an AI rival with separate spot, curve and power phases.
+- Rookie, Pro and All-Star rivals in both modes. Click the AI label in Ballpark Showdown to cycle the difficulty. Pro is the default, and the selection carries into rematches.
+- The pin triangle and standing count follow the active rack in real time, including spare attempts and changes of player.
 - Mascot Ride: an original ray mascot on an inflatable tube; steering after launch and one boost per shot.
 - Heavy Ball, Magnet and Bumpers; two charges of each per player per match.
 - Ten-frame bowling with strikes, spares and tenth-frame bonus balls. Players alternate after each completed frame, with independent racks.

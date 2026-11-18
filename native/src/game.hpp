@@ -185,6 +185,15 @@ struct Simulation {
         }
         return false;
     }
+    std::array<bool, 10> standingPins() const {
+        std::array<bool, 10> standing{};
+        for (const auto &pin : pins)
+            standing[pin.id] = !pin.down;
+        return standing;
+    }
+    int standingCount() const {
+        return int(pins.size()) - knocked();
+    }
     int knocked() const {
         return int(std::count_if(pins.begin(), pins.end(), [](const Body &p) { return p.down; }));
     }

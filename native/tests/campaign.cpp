@@ -97,23 +97,54 @@ int main() {
     for (int i = 0; i < 150; ++i)
         bumper.step(1.f / 120);
     require(!bumper.lanes[0].gutter, "bumpers prevent gutter");
+    Match rack;
+    auto &lane = rack.lanes[0];
+    lane.pins[2].down = true;
+    lane.pins[9].down = true;
+    auto standing = lane.standingPins();
+    require(lane.standingCount() == 8 && !standing[2] && !standing[9],
+            "HUD shows fallen pins before the roll is scored");
+    rack.settle();
+    require(lane.standingPins() == standing && lane.pins.size() == 8, "spare keeps original pin IDs");
+    rack.settle();
+    require(rack.player == 1 && rack.lanes[1].standingCount() == 10, "rival gets its own rack");
     for (bool mascot : {false, true}) {
-        Match match;
-        match.mascot = mascot;
-        int rolls = 0;
-        while (!match.complete() && rolls++ < 43) {
-            int who = match.player;
-            auto &g = match.games[who];
-            require(int(match.lanes[who].pins.size()) == g.standing(), "rack survives turn switching");
-            match.launch(who ? match.aiShot() : Shot{4, .2f, .8f, .1f});
-            for (int i = 0; i < int(geometry::shotTimeout * 120 + 240) && match.lanes[who].active; ++i)
-                match.step(1.f / 120);
-            require(!match.lanes[who].active, "shot settles");
-            match.settle();
+        int previousScore = -1;
+        for (auto difficulty :
+             {RivalDifficulty::Rookie, RivalDifficulty::Pro, RivalDifficulty::AllStar}) {
+            Match match;
+            match.mascot = mascot;
+            match.difficulty = difficulty;
+            int rolls = 0;
+            while (!match.complete() && rolls++ < 43) {
+                int who = match.player;
+                auto &lane = match.lanes[who];
+                require(lane.standingCount() == match.games[who].standing(),
+                        "rack survives turn switching");
+                if (who)
+                    match.equipRivalPower();
+                match.launch(who ? match.aiShot() : Shot{4, .2f, .8f, .1f});
+                for (int i = 0; i < int(geometry::shotTimeout * 120 + 240) && lane.active; ++i) {
+                    if (mascot && who) {
+                        match.steering = match.rivalSteering();
+                        if (lane.ball.z >
+                            geometry::foulLine + (geometry::headPin - geometry::foulLine) * .4f)
+                            match.boost();
+                    }
+                    match.step(1.f / 120);
+                }
+                require(!lane.active, "shot settles");
+                match.settle();
+            }
+            require(match.complete() && rolls <= 42, "both competitors finish");
+            for (const auto &game : match.games)
+                require(*game.scores()[9] >= 0 && *game.scores()[9] <= 300, "legal match score");
+            int score = *match.games[1].scores()[9];
+            std::cout << (mascot ? "Mascot " : "Stadium ") << difficultyName(difficulty) << ": " << score
+                      << "\n";
+            require(score > previousScore, "higher difficulty scores more in the reference match");
+            previousScore = score;
         }
-        require(match.complete() && rolls <= 42, "both competitors finish");
-        for (auto &g : match.games)
-            require(*g.scores()[9] >= 0 && *g.scores()[9] <= 300, "legal match score");
     }
     require(coursePointer(640, 720), "tube itself accepts sling press");
     require(!coursePointer(1160, 260) && !coursePointer(80, 750), "HUD buttons cannot launch shots");

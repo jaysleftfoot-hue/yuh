@@ -6,6 +6,8 @@
 #include <iostream>
 using namespace bowling;
 constexpr int W = 1280, H = 800;
+enum class Screen { Title, Lane, Locker, Setup, Scores, Help };
+enum class Turn { Ready, Rolling, Reaction, Complete };
 std::string marks(const std::vector<int> &r, int f) {
     std::string s;
     for (size_t j = 0; j < r.size(); ++j) {
@@ -21,11 +23,11 @@ std::string marks(const std::vector<int> &r, int f) {
         else
             s += r[j] ? std::to_string(r[j]) : "-";
     }
-    return s.empty() ? "." : s;
+    return s;
 }
-void scoreCard(const Game &g, float x, Color, const char *who) {
+void scoreCard(const Game &g, float x, const char *who) {
     // One shallow score strip per player, like a classic arcade bowling display.
-    panel({x, 0, 610, 67}, {66, 84, 91, 255});
+    panel({x, 0, 610, 67});
 
     auto scores = g.scores();
     for (int i = 0; i < 10; ++i) {
@@ -34,8 +36,6 @@ void scoreCard(const Game &g, float x, Color, const char *who) {
             DrawRectangle(int(left), 3, 49, 43, {88, 123, 132, 125});
         DrawLine(int(left + 50), 6, int(left + 50), 44, {117, 143, 150, 130});
         std::string rolls = marks(g.frames[i], i);
-        if (rolls == ".")
-            rolls = "";
         center(rolls, left + 24, 7, 15, {211, 230, 224, 255});
         if (scores[i])
             center(std::to_string(*scores[i]), left + 24, 31, 23, {150, 242, 77, 255});
@@ -51,6 +51,7 @@ int main(int argc, char **argv) {
     bool smoke = false, startInGame = false, smokeMascot = false, demoShot = false;
     int captureFrame = 90;
     int previewArena = -1;
+    RivalDifficulty selectedDifficulty = RivalDifficulty::Pro;
     std::string screenshot, scoreboardScreenshot;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
@@ -62,6 +63,19 @@ int main(int argc, char **argv) {
             smoke = true;
         if (a == "--mascot")
             smokeMascot = true;
+        if (a == "--difficulty" && i + 1 < argc) {
+            std::string difficulty = argv[++i];
+            if (difficulty == "rookie")
+                selectedDifficulty = RivalDifficulty::Rookie;
+            else if (difficulty == "pro")
+                selectedDifficulty = RivalDifficulty::Pro;
+            else if (difficulty == "all-star")
+                selectedDifficulty = RivalDifficulty::AllStar;
+            else {
+                std::cerr << "Difficulty must be rookie, pro, or all-star\n";
+                return 2;
+            }
+        }
         if (a == "--play")
             startInGame = true;
         if (a == "--arena" && i + 1 < argc)
@@ -136,36 +150,45 @@ int main(int argc, char **argv) {
     match.mascot = smokeMascot;
     Shot shot;
     StadiumSetup stadiumSetup;
-    int state = 0, screen = startInGame || smoke ? 1 : 0, arena = previewArena < 0 ? 0 : previewArena,
-        skin = 0, rolls = 0, ticks = 0, selectedSkin = 0, lockerReturn = 0;
+    Turn turn = Turn::Ready;
+    Screen screen = startInGame || smoke ? Screen::Lane : Screen::Title;
+    Screen lockerReturn = Screen::Title;
+    int arena = previewArena < 0 ? 0 : previewArena;
+    int skin = 0, rolls = 0, ticks = 0, selectedSkin = 0;
     float time = 0, accum = 0, reaction = 0, chargeTime = 0, aiWait = .9f, celebration = 0;
     Vector2 dragStart{};
     bool mouseCharge = false, stadiumArmed = false;
     bool paused = false, charge = false, done = false, ok = false, awarded = false;
     std::string result = "WELCOME TO THE TOUR", reward;
     Camera3D camera{{0, 3.0f, -6.2f}, {0, 1.7f, 23}, {0, 1, 0}, 43, CAMERA_PERSPECTIVE};
+    auto resetShot = [&]() {
+        shot = Shot{};
+        stadiumSetup.reset();
+        stadiumArmed = false;
+    };
     auto restart = [&]() {
         bool mode = match.mascot;
         match = Match{};
         match.mascot = mode;
         match.stage = arena;
-        state = 0;
+        match.difficulty = selectedDifficulty;
+        rolls = 0;
+        celebration = accum = 0;
+        turn = Turn::Ready;
         charge = false;
         paused = false;
         awarded = false;
         reward.clear();
-        shot = Shot{};
-        stadiumSetup.reset();
-        stadiumArmed = false;
+        resetShot();
         aiWait = .9f;
         result = "MAKE SOME NOISE!";
     };
     restart();
     int lastLoggedScreen = -1;
     auto launch = [&]() {
-        if (state == 0 && !paused) {
+        if (turn == Turn::Ready && !paused) {
             match.launch(shot);
-            state = 1;
+            turn = Turn::Rolling;
             charge = false;
             audio.play(audio.bowl);
         }
@@ -187,7 +210,7 @@ int main(int argc, char **argv) {
         float dt = smoke ? 1.f / 15 : !screenshot.empty() ? 1.f / 60 : std::min(GetFrameTime(), .25f);
         time += dt;
         ++ticks;
-        if (demoShot && ticks == 30 && screen == 1)
+        if (demoShot && ticks == 30 && screen == Screen::Lane)
             launch();
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
         float scale = std::min(GetScreenWidth() / float(W), GetScreenHeight() / float(H));
@@ -199,25 +222,24 @@ int main(int argc, char **argv) {
         if (IsKeyPressed(KEY_M))
             audio.toggle();
         if (IsKeyPressed(KEY_ESCAPE)) {
-            if (screen == 1) {
+            if (screen == Screen::Lane) {
                 paused = !paused;
                 charge = false;
                 stadiumArmed = false;
-            } else if (screen != 0)
-                screen = 0;
+            } else if (screen != Screen::Title)
+                screen = Screen::Title;
             else
                 done = true;
         }
         bool human = match.player == 0;
         auto &sim = match.lanes[match.player];
-        if (screen == 1 && !paused) {
-            if (state == 0) {
+        if (screen == Screen::Lane && !paused) {
+            if (turn == Turn::Ready) {
                 if (!human) {
                     aiWait -= dt;
                     if (aiWait <= 0) {
                         shot = match.aiShot();
-                        if (match.games[1].frame % 3 == 1)
-                            match.equip(Power(1 + match.games[1].frame % 3));
+                        match.equipRivalPower();
                         launch();
                     }
                 } else if (smoke) {
@@ -255,7 +277,7 @@ int main(int argc, char **argv) {
                                 audio.play(audio.click);
                             if (!screenshot.empty())
                                 std::cout << "Shot phase: " << int(stadiumSetup.phase)
-                                          << " state=" << state << " position=" << shot.position
+                                          << " state=" << int(turn) << " position=" << shot.position
                                           << " curve=" << shot.curve << " power=" << shot.power
                                           << std::endl;
                         }
@@ -290,27 +312,28 @@ int main(int argc, char **argv) {
                             match.equip(Power(i + 1));
                 }
             }
-            if (state == 1 && match.mascot) {
-                match.steering =
-                    human && !smoke
-                        ? float(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) -
-                              float(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))
-                        : std::clamp((5 + std::sin(rolls * 2.37f) * (1.6f - arena * .09f) - sim.ball.x) *
-                                             .65f -
-                                         sim.ball.vx * .35f,
-                                     -1.f, 1.f);
-                if ((human && IsKeyPressed(KEY_SPACE)) ||
-                    (!human &&
-                     sim.ball.z > geometry::foulLine + (geometry::headPin - geometry::foulLine) * .4f) ||
-                    (smoke &&
-                     sim.ball.z > geometry::foulLine + (geometry::headPin - geometry::foulLine) * .4f))
+            if (turn == Turn::Rolling && match.mascot) {
+                if (!human) {
+                    match.steering = match.rivalSteering();
+                } else if (smoke) {
+                    float target = 5 + std::sin(rolls * 2.37f) * (1.6f - arena * .09f);
+                    match.steering =
+                        std::clamp((target - sim.ball.x) * .65f - sim.ball.vx * .35f, -1.f, 1.f);
+                } else {
+                    match.steering = float(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) -
+                                     float(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A));
+                }
+                const float boostMark =
+                    geometry::foulLine + (geometry::headPin - geometry::foulLine) * .4f;
+                if ((human && !smoke && IsKeyPressed(KEY_SPACE)) ||
+                    ((!human || smoke) && sim.ball.z > boostMark))
                     match.boost();
             }
             accum += dt;
             while (accum >= 1.f / 120) {
                 int impacts = sim.impacts;
-                if (state == 1 && match.step(1.f / 120)) {
-                    state = 2;
+                if (turn == Turn::Rolling && match.step(1.f / 120)) {
+                    turn = Turn::Reaction;
                     reaction = smoke ? .1f : 1.4f;
                     int n = sim.knocked();
                     result = n == 10  ? "STRIKE! OUT OF THE PARK!"
@@ -325,19 +348,17 @@ int main(int argc, char **argv) {
                     audio.play(audio.hit);
                 accum -= 1.f / 120;
             }
-            if (state == 2) {
+            if (turn == Turn::Reaction) {
                 reaction -= dt;
                 if (reaction <= 0) {
                     match.settle();
                     ++rolls;
-                    state = match.complete() ? 3 : 0;
+                    turn = match.complete() ? Turn::Complete : Turn::Ready;
                     aiWait = smoke ? 0 : .9f;
-                    shot = Shot{};
-                    stadiumSetup.reset();
-                    stadiumArmed = false;
+                    resetShot();
                 }
             }
-            if (state == 3 && !awarded) {
+            if (turn == Turn::Complete && !awarded) {
                 int yours = *match.games[0].scores()[9], theirs = *match.games[1].scores()[9];
                 result = yours > theirs    ? "YOU WIN!"
                          : yours == theirs ? "A TIE! REMATCH?"
@@ -369,28 +390,30 @@ int main(int argc, char **argv) {
         const auto &view = match.lanes[match.player];
         Vector3 desired{geometry::renderX(shot.position) * .25f, cameraStyle.height, cameraStyle.back},
             look{0, cameraStyle.targetHeight, geometry::headPin};
-        if (screen != 1) {
+        if (screen != Screen::Lane) {
             desired = match.mascot ? Vector3{-3.2f, 4.5f, -5} : Vector3{-9, 7, -4};
             look = {0, 1, match.mascot ? 13.f : 19.f};
-        } else if (state == 1 || state == 2) {
+        } else if (turn == Turn::Rolling || turn == Turn::Reaction) {
             float z = std::min(view.ball.z, geometry::headPin + 1);
             desired = {std::clamp(geometry::renderX(view.ball.x) * .65f, -3.f, 3.f),
                        match.mascot ? 3.1f : 2.0f, z - (match.mascot ? 5.3f : 5.8f)};
             look = {std::clamp(geometry::renderX(view.ball.x) * .3f, -1.5f, 1.5f),
                     match.mascot ? 1.5f : .9f, z + 12};
         }
-        if (screen == 1 && state == 0) {
+        if (screen == Screen::Lane && turn == Turn::Ready) {
             camera.position = desired;
             camera.target = look;
         }
         camera.position =
-            Vector3Lerp(camera.position, desired, std::min(1.f, dt * (state == 1 ? 18 : 5)));
-        camera.target = Vector3Lerp(camera.target, look, std::min(1.f, dt * (state == 1 ? 18 : 5)));
+            Vector3Lerp(camera.position, desired, std::min(1.f, dt * (turn == Turn::Rolling ? 18 : 5)));
+        camera.target =
+            Vector3Lerp(camera.target, look, std::min(1.f, dt * (turn == Turn::Rolling ? 18 : 5)));
         BeginTextureMode(scene);
         ClearBackground({45, 92, 129, 255});
         DrawRectangleGradientV(0, 0, W, 550, {17, 39, 75, 255}, {140, 182, 193, 255});
-        if (screen == 1 || screen == 3)
-            art.world(view, shot, state == 0 && screen == 1, arenas[arena].team, camera, time);
+        if (screen == Screen::Lane || screen == Screen::Setup)
+            art.world(view, shot, turn == Turn::Ready && screen == Screen::Lane, arenas[arena].team,
+                      camera, time);
         EndTextureMode();
         BeginTextureMode(target);
         ClearBackground(BLACK);
@@ -398,39 +421,39 @@ int main(int argc, char **argv) {
         DrawTexturePro(scene.texture, {0, 0, float(W), -float(H)}, {0, 0, float(W), float(H)}, {0, 0}, 0,
                        WHITE);
         EndShaderMode();
-        if (screen != 1) {
+        if (screen != Screen::Lane) {
             DrawTexturePro(titleArt, {0, 0, float(titleArt.width), float(titleArt.height)},
                            {0, 0, float(W), float(H)}, {0, 0}, 0, WHITE);
         }
         uiBlocked = paused;
-        if (screen == 0) {
+        if (screen == Screen::Title) {
             title("WELCOME TO THE BIG LEAGUES!", 565, 16, 20, cream);
             if (button({282, 650, 320, 52}, "SINGLE PLAYER", true) || IsKeyPressed(KEY_ENTER)) {
                 match.mascot = false;
-                screen = 3;
+                screen = Screen::Setup;
                 audio.play(audio.click);
             }
             if (button({660, 650, 320, 52}, "MASCOT ADVENTURE", true)) {
                 match.mascot = true;
-                screen = 3;
+                screen = Screen::Setup;
                 audio.play(audio.click);
             }
             if (button({145, 718, 190, 42}, "BALL LOCKER")) {
                 selectedSkin = skin;
-                lockerReturn = 0;
-                screen = 2;
+                lockerReturn = Screen::Title;
+                screen = Screen::Locker;
             }
             if (button({350, 718, 145, 42}, "SCORES"))
-                screen = 4;
+                screen = Screen::Scores;
             if (button({515, 718, 215, 42}, audio.muted ? "SOUND OFF" : "SOUND ON"))
                 audio.toggle();
             if (button({750, 718, 140, 42}, "HELP"))
-                screen = 5;
+                screen = Screen::Help;
             if (button({920, 718, 140, 42}, "QUIT"))
                 done = true;
-        } else if (screen == 4 || screen == 5) {
-            modal({184, 35, 912, 730}, screen == 4 ? "HALL OF FAME" : "HOW TO BOWL");
-            if (screen == 4) {
+        } else if (screen == Screen::Scores || screen == Screen::Help) {
+            modal({184, 35, 912, 730}, screen == Screen::Scores ? "HALL OF FAME" : "HOW TO BOWL");
+            if (screen == Screen::Scores) {
                 portraitCard(portraits, 0, {290, 242, 200, 270}, "THE BIG LEAGUER");
                 arcadeCenter(std::to_string(profile.wins) + " WINS  /  " +
                                  std::to_string(profile.matches) + " GAMES",
@@ -454,8 +477,8 @@ int main(int argc, char **argv) {
                        640, 589, 16, cream);
             }
             if (plaqueButton({516, 650, 248, 64}, "BACK"))
-                screen = 0;
-        } else if (screen == 3) {
+                screen = Screen::Title;
+        } else if (screen == Screen::Setup) {
             modal({180, 24, 920, 752}, "BALLPARK SHOWDOWN");
             // Compact versus composition: park preview above two portrait plaques.
             panel({486, 154, 308, 180});
@@ -471,7 +494,10 @@ int main(int argc, char **argv) {
             arcadeCenter("VS", 640, 387, 76, {170, 255, 64, 255});
             if (plaqueButton({495, 487, 290, 68}, match.mascot ? "MASCOT RIDE" : "STADIUM BOWLING"))
                 match.mascot = !match.mascot;
-            arcadeCenter("CLICK TO CHANGE MODE", 640, 560, 18);
+            if (button({495, 554, 290, 40}, std::string("AI: ") + difficultyName(selectedDifficulty))) {
+                selectedDifficulty = static_cast<RivalDifficulty>((int(selectedDifficulty) + 1) % 3);
+                audio.play(audio.click);
+            }
             bool unlocked = arena < profile.stadiums();
             arcadeCenter(unlocked ? (match.mascot ? "PULL BACK. LET FLY. RIDE THE RAY!"
                                                   : "SPOT. CURVE. POWER. TAKE ON THE RIVAL!")
@@ -479,19 +505,19 @@ int main(int argc, char **argv) {
                          640, 608, 24, unlocked ? cream : gold);
             if (plaqueButton({395, 650, 226, 65}, unlocked ? "START" : "LOCKED", unlocked) ||
                 (IsKeyPressed(KEY_ENTER) && unlocked)) {
-                screen = 1;
+                screen = Screen::Lane;
                 restart();
                 audio.play(audio.cheer);
             }
             if (plaqueButton({659, 650, 226, 65}, "BACK"))
-                screen = 0;
+                screen = Screen::Title;
             if (button({275, 594, 212, 35}, "BALL LOCKER")) {
                 selectedSkin = skin;
-                lockerReturn = 3;
-                screen = 2;
+                lockerReturn = Screen::Setup;
+                screen = Screen::Locker;
             }
             arcadeCenter("PARK " + std::to_string(arena + 1) + " / 10", 900, 598, 20, gold);
-        } else if (screen == 2) {
+        } else if (screen == Screen::Locker) {
             modal({74, 12, 1132, 778}, "THE BALL LOCKER");
             arcadeCenter("30 CLUBS. 30 FUN DESIGNS. 4 RAYS SPECIALS.", 640, 134, 23);
             // Display balls on a single stone cabinet, without individual dashboard cards.
@@ -528,16 +554,16 @@ int main(int argc, char **argv) {
             if (plaqueButton({891, 657, 216, 64}, "BACK"))
                 screen = lockerReturn;
         } else {
-            baseballHud(portraits, 1 + arena % 3);
-            scoreCard(match.games[0], 16, gold, "YOU");
-            scoreCard(match.games[1], 654, aqua, "RIVAL");
+            baseballHud(portraits, 1 + arena % 3, match.lanes[match.player].standingPins());
+            scoreCard(match.games[0], 16, "YOU");
+            scoreCard(match.games[1], 654, difficultyName(match.difficulty));
             title(match.mascot ? "RAYS ADVENTURE" : arenas[arena].name, 184, 122, 20, cream);
 
-            title(state == 3          ? "MATCH COMPLETE"
-                  : match.player == 0 ? "YOUR TURN"
-                                      : "RIVAL'S TURN",
+            title(turn == Turn::Complete ? "MATCH COMPLETE"
+                  : match.player == 0    ? "YOUR TURN"
+                                         : "RIVAL'S TURN",
                   184, 148, 19, gold);
-            if (state == 2) {
+            if (turn == Turn::Reaction) {
                 title(result, 260, 245, 46, gold);
             }
 
@@ -548,8 +574,8 @@ int main(int argc, char **argv) {
                                   int(280 + std::cos(i * 3.f) * phase * 240 + phase * phase * 90), 7, 5,
                                   i % 2 ? gold : aqua);
                 }
-            bool enabled = state == 0 && match.player == 0 && !paused;
-            if (state == 3) {
+            bool enabled = turn == Turn::Ready && match.player == 0 && !paused;
+            if (turn == Turn::Complete) {
                 DrawRectangle(0, 0, W, H, {0, 0, 0, 110});
                 panel({292, 187, 696, 458});
                 arcadeCenter(result, 640, 231, 39, {170, 255, 64, 255});
@@ -562,19 +588,19 @@ int main(int argc, char **argv) {
                 if (plaqueButton({382, 568, 225, 60}, "REMATCH"))
                     restart();
                 if (plaqueButton({673, 568, 225, 60}, "CLUBHOUSE")) {
-                    screen = 0;
+                    screen = Screen::Title;
                     paused = false;
                     charge = false;
                 }
             }
-            if (match.mascot && state == 0 && human) {
+            if (match.mascot && turn == Turn::Ready && human) {
                 title(charge ? "LET IT FLY!" : "GRAB THE TUBE", 180, 194, 25, gold);
                 text("PULL BACK, AIM, RELEASE", 180, 225, 16, cream);
                 if (charge) {
                     arcadeMeter(1045, 500, shot.power, aqua);
                 }
             }
-            if (!match.mascot && state == 0 && human) {
+            if (!match.mascot && turn == Turn::Ready && human) {
                 float x = 240 + (shot.position - geometry::launchMin) /
                                     (geometry::launchMax - geometry::launchMin) * 800;
                 const char *labels[] = {"1. SPOT - MOVE THE BALL", "2. CURVE - SHAPE YOUR SHOT",
@@ -617,14 +643,14 @@ int main(int argc, char **argv) {
                         match.equip(Power(i + 1));
             }
         }
-        if (screen == 1 && button({8, 724, 144, 64}, "MENU")) {
+        if (screen == Screen::Lane && button({8, 724, 144, 64}, "MENU")) {
             paused = true;
             charge = false;
             stadiumArmed = false;
         }
-        if (!screenshot.empty() && screen != lastLoggedScreen) {
-            std::cout << "UI preview: screen=" << screen << " mascot=" << match.mascot << std::endl;
-            lastLoggedScreen = screen;
+        if (!screenshot.empty() && int(screen) != lastLoggedScreen) {
+            std::cout << "UI preview: screen=" << int(screen) << " mascot=" << match.mascot << std::endl;
+            lastLoggedScreen = int(screen);
         }
         uiBlocked = false;
         if (paused) {
@@ -634,7 +660,7 @@ int main(int argc, char **argv) {
             if (plaqueButton({500, 365, 280, 62}, "RESUME") || IsKeyPressed(KEY_ENTER))
                 paused = false;
             if (plaqueButton({500, 442, 280, 62}, "LEAVE MATCH")) {
-                screen = 0;
+                screen = Screen::Title;
                 paused = false;
             }
         }
@@ -647,6 +673,7 @@ int main(int argc, char **argv) {
         if (smoke && (match.complete() || ticks > int(42 * (geometry::shotTimeout + 3) * 60))) {
             ok = match.complete() && rolls >= 24 && rolls <= 42;
             std::cout << "Native match smoke: mode=" << (match.mascot ? "mascot" : "traditional")
+                      << " difficulty=" << difficultyName(match.difficulty)
                       << " complete=" << match.complete() << " rolls=" << rolls
                       << " player=" << (match.complete() ? *match.games[0].scores()[9] : -1)
                       << " rival=" << (match.complete() ? *match.games[1].scores()[9] : -1) << '\n';

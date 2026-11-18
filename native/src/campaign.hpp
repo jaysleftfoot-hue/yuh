@@ -102,11 +102,41 @@ struct Profile {
     }
 };
 enum class Power { None, Heavy, Magnet, Bumpers };
+enum class RivalDifficulty { Rookie, Pro, AllStar };
+inline const char *difficultyName(RivalDifficulty difficulty) {
+    switch (difficulty) {
+    case RivalDifficulty::Rookie:
+        return "ROOKIE";
+    case RivalDifficulty::Pro:
+        return "PRO";
+    case RivalDifficulty::AllStar:
+        return "ALL-STAR";
+    }
+    return "PRO";
+}
+struct RivalTuning {
+    float spread, power, steeringGain;
+    int powerUpInterval;
+    bool aimsAtStandingPin;
+};
+inline RivalTuning rivalTuning(RivalDifficulty difficulty) {
+    switch (difficulty) {
+    case RivalDifficulty::Rookie:
+        return {3.4f, .42f, .12f, 0, false};
+    case RivalDifficulty::Pro:
+        return {1.15f, .72f, .50f, 3, true};
+    case RivalDifficulty::AllStar:
+        return {.22f, .98f, .85f, 2, true};
+    }
+    return {1.15f, .72f, .50f, 3, true};
+}
 struct Match {
     std::array<Game, 2> games{};
     std::array<Simulation, 2> lanes{};
     int player = 0, stage = 0;
     bool mascot = false;
+    RivalDifficulty difficulty = RivalDifficulty::Pro;
+    float rivalTarget = geometry::halfWidth;
     std::array<std::array<int, 3>, 2> stock{{{2, 2, 2}, {2, 2, 2}}};
     Power equipped = Power::None;
     bool boostUsed = false;
@@ -191,20 +221,42 @@ struct Match {
         }
     }
     Shot aiShot() {
-        auto &s = lanes[1];
-        float target = 5;
-        if (!s.pins.empty()) {
+        const auto tuning = rivalTuning(difficulty);
+        const auto &pins = lanes[1].pins;
+        float target = geometry::halfWidth;
+        if (!pins.empty()) {
             target = 0;
-            for (auto &p : s.pins)
-                target += p.x;
-            target /= s.pins.size();
+            for (const auto &pin : pins)
+                target += pin.x;
+            target /= pins.size();
+            if (tuning.aimsAtStandingPin) {
+                // Favor a real pin near the middle of the leave over the gap in a split.
+                auto nearest =
+                    std::min_element(pins.begin(), pins.end(), [target](const Body &a, const Body &b) {
+                        return std::abs(a.x - target) < std::abs(b.x - target);
+                    });
+                target = nearest->x;
+            }
+            if (pins.size() == 10)
+                target = geometry::halfWidth + .48f;
         }
         std::uniform_real_distribution<float> error(-1, 1);
-        float spread = .75f - stage * .055f;
-        float distanceScale = 21.f / (geometry::headPin - geometry::foulLine);
-        return {std::clamp(target + error(rng) * spread, geometry::launchMin, geometry::launchMax),
-                error(rng) * spread * distanceScale, .55f + .03f * stage,
-                mascot ? 0.f : error(rng) * .25f * distanceScale * distanceScale};
+        const float spread = tuning.spread * (1.f - .025f * stage);
+        rivalTarget = std::clamp(target + error(rng) * spread, geometry::launchMin, geometry::launchMax);
+        const float aim = error(rng) * spread / (geometry::headPin - geometry::foulLine);
+        const float power = std::clamp(tuning.power + error(rng) * spread * .045f, .15f, 1.f);
+        return {rivalTarget, aim, power, 0};
+    }
+    void equipRivalPower() {
+        const int interval = rivalTuning(difficulty).powerUpInterval;
+        const int frame = games[1].frame;
+        if (interval && frame % interval == 1 && games[1].frames[frame].empty())
+            equip(frame < 5 ? Power::Heavy : Power::Magnet);
+    }
+    float rivalSteering() const {
+        const auto &ball = lanes[1].ball;
+        float gain = rivalTuning(difficulty).steeringGain;
+        return std::clamp((rivalTarget - ball.x) * gain - ball.vx * .35f, -1.f, 1.f);
     }
 };
 } // namespace bowling

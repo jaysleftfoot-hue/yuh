@@ -1,3 +1,10 @@
+# Live pins and rival difficulty
+
+- Native rules and campaign checks passed. The rack tests cover a live fall, the same pin IDs on a spare attempt and the rival's independent rack.
+- Full deterministic matches scored 113 / 182 / 235 for Rookie / Pro / All-Star in Stadium and 115 / 193 / 202 in Mascot. Native window smoke runs completed in Rookie Stadium and All-Star Mascot.
+- X11 input confirmed the setup selector carried All-Star into the match and the three stadium shot confirmations still worked. The impact capture shows four standing pins on the HUD and Wrigley scoreboard before the roll is scored.
+- Windows x64 ZIP and installer rebuilt. ZIP CRC and packaged asset equality passed. Windows execution remains unverified.
+
 # Painted arcade UI and three-phase stadium shots
 
 - Linux build and native rules/campaign checks passed, including independent Spot/Curve/Power transitions, locked fields, back/reset behavior, lane projection/geometry and launch timing regressions.
