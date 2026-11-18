@@ -1,4 +1,15 @@
-# Native reconstruction verification — November 17, 2026
+# Native verification — November 18, 2026
+
+## Graphics pass (November 18)
+
+- Linux release build passed all nine rules/physics scenarios and the campaign suite.
+- Real native full-match smoke checks passed for traditional mode (37 rolls, 115–119) and mascot mode (41 rolls, 72–35). Scoring, AI, progression and powers remain in the existing implementation.
+- Lighting and scene-only FXAA shaders compiled successfully. No graphical warnings/errors were reported; the only runtime warning was the unavailable audio playback device.
+- Actual game captures were visually inspected at launch in both modes and during a mascot roll. The camera keeps the ring above the controls. A separate clubhouse camera stays inside the new mascot tunnel.
+- `tropicana-mascot.png`, `wrigley-traditional.png` and `tropicana-in-motion.png` show this graphics pass; REFERENCE_REVIEW.md gives reproducible capture commands and honestly scopes the inspected reference.
+- Windows x64 cross-build succeeded. Both shaders and the font/license are included in the ZIP; CRC and source-to-package equality were checked. WINDOWS_BUILD.sha256 identifies the updated package. Windows runtime execution remains unverified.
+
+## Earlier reconstruction (November 17)
 
 The native files were reconstructed from the conversation after a cloud refresh removed uncommitted workspace changes. This is not a byte-for-byte recovery of those missing files.
 
@@ -18,7 +29,7 @@ The native files were reconstructed from the conversation after a cloud refresh 
 
 - Running the EXE on Windows; the Linux cross-build is not a Windows runtime test.
 - Audio playback on this machine (no playback device).
-- Exact gameplay matching to the requested YouTube videos; neither clip has been viewed.
+- Exact gameplay matching to the requested YouTube videos. A 20.733-second Polar Bowler Dropbox clip was sampled visually on November 18; the second video and full YouTube clips remain unviewed.
 - Finished art quality comparable to the supplied commercial-game references. This remains a procedural prototype.
 
-The source, assets, scripts, tests, art direction and this evidence are preserved in Git. Generated build downloads are preserved separately on the artifact-only `backups/native-2026-11-17` Git branch. GitHub Release metadata access worked, but uploads.github.com rejected file uploads with HTTP 401; the empty draft was removed and the verified Git transport is used for these backup files. Future patches must follow the commit/push/remote-verification workflow in ../../AGENTS.md.
+The source, assets, scripts, tests, art direction and this evidence are preserved in Git. Generated build downloads are preserved separately on the artifact-only `backups/native-2026-11-17` Git branch. GitHub Release metadata access worked, but uploads.github.com rejected file uploads with HTTP 401; the empty draft was removed and the verified Git transport is used for these backup files. The November 18 graphics build has its own artifact backup on `backups/native-graphics-2026-11-18`. Future patches must follow the commit/push/remote-verification workflow in ../../AGENTS.md.

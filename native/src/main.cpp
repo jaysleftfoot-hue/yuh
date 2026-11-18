@@ -22,24 +22,36 @@ std::string marks(const std::vector<int> &r, int f) {
     }
     return s.empty() ? "." : s;
 }
-void scoreRow(const Game &g, float y, Color c, const char *who) {
-    text(who, 24, y + 12, 18, c);
+void scoreCard(const Game &g, float x, Color c, const char *who) {
+    panel({x, 8, 610, 77}, {23, 41, 59, 245});
+    text(who, x + 12, 16, 17, c);
     auto scores = g.scores();
     for (int i = 0; i < 10; ++i) {
-        float x = 167 + i * 108.f;
-        if (i == g.frame)
-            DrawRectangleRounded({x, y, 103, 54}, .1f, 4, {43, 63, 79, 240});
-        text(std::to_string(i + 1), x + 4, y + 3, 11, aqua);
-        center(marks(g.frames[i], i), x + 51, y + 3, 16, cream);
-        center(scores[i] ? std::to_string(*scores[i]) : "-", x + 51, y + 28, 19, c);
+        float left = x + 77 + i * 48.f;
+        DrawRectangleRounded({left, 14, 45, 61}, .12f, 4,
+                             i == g.frame ? Color{65, 100, 116, 255} : Color{15, 29, 44, 220});
+        text(std::to_string(i + 1), left + 3, 17, 9, {145, 177, 188, 255});
+        center(marks(g.frames[i], i), left + 23, 25, 15, cream);
+        DrawLine(left + 4, 46, left + 41, 46, {72, 103, 115, 255});
+        center(scores[i] ? std::to_string(*scores[i]) : "-", left + 23, 51, 18, c);
     }
+    int total = 0;
+    for (auto score : scores)
+        if (score)
+            total = *score;
+    center(std::to_string(total), x + 36, 43, 24, c);
 }
 int main(int argc, char **argv) {
-    bool smoke = false, startInGame = false, smokeMascot = false;
+    bool smoke = false, startInGame = false, smokeMascot = false, demoShot = false;
+    int captureFrame = 90;
     int previewArena = -1;
     std::string screenshot;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
+        if (a == "--demo-shot")
+            demoShot = true;
+        if (a == "--capture-frame" && i + 1 < argc)
+            captureFrame = std::clamp(std::atoi(argv[++i]), 1, 3600);
         if (a == "--smoke")
             smoke = true;
         if (a == "--mascot")
@@ -61,7 +73,11 @@ int main(int argc, char **argv) {
     uiFont = LoadFontEx(
         (std::string(GetApplicationDirectory()) + "assets/DejaVuSansCondensed-Bold.ttf").c_str(), 96,
         nullptr, 0);
-    SetTextureFilter(uiFont.texture, TEXTURE_FILTER_BILINEAR);
+    GenTextureMipmaps(&uiFont.texture);
+    SetTextureFilter(uiFont.texture, TEXTURE_FILTER_TRILINEAR);
+    RenderTexture2D scene = LoadRenderTexture(W, H);
+    Shader antialias =
+        LoadShader(nullptr, (std::string(GetApplicationDirectory()) + "assets/antialias.fs").c_str());
     RenderTexture2D target = LoadRenderTexture(W, H);
     SetTextureFilter(target.texture, TEXTURE_FILTER_BILINEAR);
     Art art;
@@ -87,7 +103,7 @@ int main(int argc, char **argv) {
     float time = 0, accum = 0, reaction = 0, chargeTime = 0, aiWait = .9f, celebration = 0;
     bool paused = false, charge = false, done = false, ok = false, awarded = false;
     std::string result = "WELCOME TO THE TOUR", reward;
-    Camera3D camera{{0, 3.2f, -6.5f}, {0, 2, 22}, {0, 1, 0}, 53, CAMERA_PERSPECTIVE};
+    Camera3D camera{{0, 3.0f, -6.2f}, {0, 1.7f, 23}, {0, 1, 0}, 57, CAMERA_PERSPECTIVE};
     auto restart = [&]() {
         bool mode = match.mascot;
         match = Match{};
@@ -119,9 +135,11 @@ int main(int argc, char **argv) {
         }
     };
     while (!WindowShouldClose() && !done) {
-        float dt = smoke ? 1.f / 15 : std::min(GetFrameTime(), .05f);
+        float dt = smoke ? 1.f / 15 : !screenshot.empty() ? 1.f / 60 : std::min(GetFrameTime(), .05f);
         time += dt;
         ++ticks;
+        if (demoShot && ticks == 30 && screen == 1)
+            launch();
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
         float scale = std::min(GetScreenWidth() / float(W), GetScreenHeight() / float(H));
         Vector2 offset{(GetScreenWidth() - W * scale) / 2, (GetScreenHeight() - H * scale) / 2};
@@ -240,7 +258,7 @@ int main(int argc, char **argv) {
                     reward += " | NEW BALLS!";
                 if (profile.stadiums() > oldA)
                     reward += " | NEXT STADIUM OPEN!";
-                if (!smoke && previewArena < 0 && !profile.save(save))
+                if (!smoke && screenshot.empty() && previewArena < 0 && !profile.save(save))
                     reward += " | SAVE FAILED";
                 awarded = true;
             }
@@ -253,30 +271,41 @@ int main(int argc, char **argv) {
         art.skin = skin;
         art.mascot = match.mascot;
         const auto &view = match.lanes[match.player];
-        Vector3 desired{0, 3.2f, -6.5f}, look{0, 2, 22};
+        Vector3 desired{shot.position * .25f - 1.25f, match.mascot ? 3.5f : 2.8f,
+                        match.mascot ? -5.0f : -5.8f},
+            look{0, match.mascot ? .35f : 1.2f, 23};
         if (screen != 1) {
-            desired = {-9, 7, -4};
-            look = {0, 1, 19};
+            desired = match.mascot ? Vector3{-3.2f, 4.5f, -5} : Vector3{-9, 7, -4};
+            look = {0, 1, match.mascot ? 13.f : 19.f};
         } else if (state == 1 || state == 2) {
             float z = std::min(view.ball.z, 24.f);
-            desired = {std::clamp((view.ball.x - 5) * .65f, -3.f, 3.f), match.mascot ? 2.5f : 2.1f,
-                       z - 5.8f};
-            look = {0, 1, z + 10};
+            desired = {std::clamp((view.ball.x - 5) * .65f, -3.f, 3.f), match.mascot ? 3.1f : 2.0f,
+                       z - (match.mascot ? 5.3f : 5.8f)};
+            look = {std::clamp((view.ball.x - 5) * .3f, -1.5f, 1.5f), match.mascot ? 1.5f : .9f, z + 12};
         }
         camera.position = Vector3Lerp(camera.position, desired, std::min(1.f, dt * 5));
         camera.target = Vector3Lerp(camera.target, look, std::min(1.f, dt * 5));
-        BeginTextureMode(target);
+        BeginTextureMode(scene);
         ClearBackground({45, 92, 129, 255});
         DrawRectangleGradientV(0, 0, W, 550, {17, 39, 75, 255}, {140, 182, 193, 255});
         art.world(view, shot, state == 0 && screen == 1, arenas[arena].team, camera, time);
-        DrawRectangle(0, 0, W, 76, ink);
-        DrawRectangle(0, 74, W, 3, gold);
-        text("BIG LEAGUE BOWLING", 24, 16, 27, cream);
-        text("BALLPARK TOUR", 27, 48, 14, aqua);
-        text(arenas[arena].name, 568, 15, 24, gold);
-        text(arenas[arena].theme, 570, 46, 14, cream);
-        if (button({1110, 18, 142, 36}, audio.muted ? "SOUND OFF" : "SOUND ON"))
-            audio.toggle();
+        EndTextureMode();
+        BeginTextureMode(target);
+        ClearBackground(BLACK);
+        BeginShaderMode(antialias);
+        DrawTexturePro(scene.texture, {0, 0, float(W), -float(H)}, {0, 0, float(W), float(H)}, {0, 0}, 0,
+                       WHITE);
+        EndShaderMode();
+        if (screen != 1) {
+            DrawRectangle(0, 0, W, 76, ink);
+            DrawRectangle(0, 74, W, 3, gold);
+            text("BIG LEAGUE BOWLING", 24, 16, 27, cream);
+            text("BALLPARK TOUR", 27, 48, 14, aqua);
+            text(arenas[arena].name, 568, 15, 24, gold);
+            text(arenas[arena].theme, 570, 46, 14, cream);
+            if (button({1110, 18, 142, 36}, audio.muted ? "SOUND OFF" : "SOUND ON"))
+                audio.toggle();
+        }
         uiBlocked = paused;
         if (screen == 0) {
             DrawRectangleGradientH(0, 77, 800, 723, {7, 18, 33, 250}, {7, 18, 33, 0});
@@ -367,15 +396,14 @@ int main(int argc, char **argv) {
                 screen = 0;
             text("Equipped: " + ballName(skin), 30, 745, 20, aqua);
         } else {
-            panel({12, 86, 1256, 119}, {13, 28, 47, 235});
-            scoreRow(match.games[0], 91, gold, "YOU");
-            scoreRow(match.games[1], 148, aqua, "RIVAL");
-            panel({22, 220, 316, 68}, {13, 28, 47, 222});
-            text(state == 3          ? "MATCH COMPLETE"
-                 : match.player == 0 ? "YOUR TURN"
-                                     : "RIVAL IS BOWLING",
-                 38, 232, 22, match.player == 0 ? gold : aqua);
-            text(match.mascot ? "MASCOT RIDE" : "TRADITIONAL BOWLING", 38, 263, 14, cream);
+            scoreCard(match.games[0], 16, gold, "YOU");
+            scoreCard(match.games[1], 654, aqua, "RIVAL");
+            title(arenas[arena].name, 24, 99, 23, cream);
+            title(match.mascot ? "MASCOT RIDE" : "BALLPARK BOWLING", 25, 127, 13, aqua);
+            title(state == 3          ? "MATCH COMPLETE"
+                  : match.player == 0 ? "YOUR TURN"
+                                      : "RIVAL'S TURN",
+                  25, 151, 16, gold);
             if (state == 2 || state == 3) {
                 DrawRectangle(180, 320, 920, 90, {13, 24, 45, 210});
                 center(result, 640, 342, 33, gold);
@@ -408,11 +436,12 @@ int main(int argc, char **argv) {
                 charge = false;
             }
             const char *names[] = {"HEAVY BALL", "MAGNET", "BUMPERS"};
-            text("DUGOUT TRICKS", 1096, 269, 15, gold);
+            panel({1090, 236, 177, 235}, {30, 47, 60, 238});
+            title("DUGOUT TRICKS", 1102, 247, 14, gold);
             for (int i = 0; i < 3; ++i) {
-                float y = 290 + i * 66.f;
+                float y = 274 + i * 62.f;
                 bool available = enabled && match.stock[0][i] > 0;
-                if (button({1088, y, 173, 58}, "", match.equipped == Power(i + 1), available))
+                if (button({1096, y, 165, 55}, "", match.equipped == Power(i + 1), available))
                     match.equip(Power(i + 1));
                 Color hue = i == 0 ? Color{190, 85, 48, 255} : i == 1 ? Color{46, 174, 187, 255} : gold;
                 DrawCircleGradient(1116, int(y + 29), 20, available ? hue : Color{75, 82, 89, 255},
@@ -431,7 +460,7 @@ int main(int argc, char **argv) {
                     DrawRectangleRounded({1105, y + 17, 6, 24}, .5f, 5, cream);
                     DrawRectangleRounded({1121, y + 17, 6, 24}, .5f, 5, cream);
                 }
-                text(names[i], 1143, y + 13, 14, cream);
+                text(names[i], 1143, y + 13, 12, cream);
                 text(std::to_string(i + 1) + "  /  " + std::to_string(match.stock[0][i]) + " left", 1143,
                      y + 34, 12, gold);
             }
@@ -467,7 +496,7 @@ int main(int argc, char **argv) {
             capture();
             done = true;
         }
-        if (!smoke && !screenshot.empty() && ticks == 90) {
+        if (!smoke && !screenshot.empty() && ticks == captureFrame) {
             capture();
             done = true;
         }
@@ -475,6 +504,8 @@ int main(int argc, char **argv) {
     audio.close();
     UnloadFont(uiFont);
     art.close();
+    UnloadShader(antialias);
+    UnloadRenderTexture(scene);
     UnloadRenderTexture(target);
     CloseWindow();
     return smoke && !ok ? 1 : 0;

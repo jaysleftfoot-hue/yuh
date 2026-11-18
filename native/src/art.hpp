@@ -5,13 +5,58 @@
 #include "rlgl.h"
 #include "ui.hpp"
 struct Art {
-    Model cube{}, sphere{}, cylinder{}, pin{}, wing{};
+    Model cube{}, sphere{}, cylinder{}, pin{}, wing{}, tube{}, course{};
     Shader shader{};
     std::array<Texture2D, 64> skins{};
     std::array<RenderTexture2D, 10> signs{};
     RenderTexture2D ad{};
     int arena = 0, skin = 0;
     bool mascot = false;
+    // Continuous shaded tube and an irregular, inward-facing stadium grotto.
+    Mesh tubeMesh() {
+        Mesh m = GenMeshTorus(.30f, 1.0f, 24, 64);
+        return m;
+    }
+    Mesh courseMesh() {
+        constexpr int rings = 26, sides = 24;
+        Mesh m{};
+        m.vertexCount = rings * sides * 6;
+        m.triangleCount = m.vertexCount / 3;
+        m.vertices = (float *)MemAlloc(m.vertexCount * 3 * sizeof(float));
+        m.normals = (float *)MemAlloc(m.vertexCount * 3 * sizeof(float));
+        m.texcoords = (float *)MemAlloc(m.vertexCount * 2 * sizeof(float));
+        auto point = [](int r, int j) {
+            float a = PI * j / sides, z = -8 + r * 2.f;
+            float ripple = .45f * std::sin(j * 1.7f + r * .8f) + .28f * std::sin(r * 2.3f - j);
+            return Vector3{std::cos(a) * (8.6f + ripple), .15f + std::sin(a) * (10.5f + ripple * 1.8f),
+                           z};
+        };
+        int n = 0;
+        auto tri = [&](Vector3 a, Vector3 b, Vector3 c) {
+            Vector3 normal =
+                Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
+            for (Vector3 v : {a, b, c}) {
+                m.vertices[n * 3] = v.x;
+                m.vertices[n * 3 + 1] = v.y;
+                m.vertices[n * 3 + 2] = v.z;
+                m.normals[n * 3] = normal.x;
+                m.normals[n * 3 + 1] = normal.y;
+                m.normals[n * 3 + 2] = normal.z;
+                m.texcoords[n * 2] = v.z * .1f;
+                m.texcoords[n * 2 + 1] = v.y * .1f;
+                ++n;
+            }
+        };
+        for (int r = 0; r < rings; ++r)
+            for (int j = 0; j < sides; ++j) {
+                Vector3 a = point(r, j), b = point(r + 1, j), c = point(r + 1, j + 1),
+                        d = point(r, j + 1);
+                tri(a, b, c);
+                tri(a, c, d);
+            }
+        UploadMesh(&m, false);
+        return m;
+    }
     Mesh wingMesh() {
         constexpr int nx = 16, nz = 12;
         Mesh m{};
@@ -34,9 +79,11 @@ struct Art {
                 m.vertices[n * 3] = p.x;
                 m.vertices[n * 3 + 1] = p.y;
                 m.vertices[n * 3 + 2] = p.z;
-                m.normals[n * 3] = normal.x;
-                m.normals[n * 3 + 1] = normal.y;
-                m.normals[n * 3 + 2] = normal.z;
+                Vector3 smooth = Vector3Normalize(
+                    {-.23f * std::cos((p.x - .3f) / 1.15f * PI), normal.y > 0 ? 1.f : -1.f, .10f});
+                m.normals[n * 3] = smooth.x;
+                m.normals[n * 3 + 1] = smooth.y;
+                m.normals[n * 3 + 2] = smooth.z;
                 m.texcoords[n * 2] = p.x;
                 m.texcoords[n * 2 + 1] = p.z;
                 ++n;
@@ -111,7 +158,9 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         cylinder = LoadModelFromMesh(GenMeshCylinder(1, 1, 16));
         pin = LoadModelFromMesh(pinMesh());
         wing = LoadModelFromMesh(wingMesh());
-        for (Model *m : {&cube, &sphere, &cylinder, &pin, &wing})
+        tube = LoadModelFromMesh(tubeMesh());
+        course = LoadModelFromMesh(courseMesh());
+        for (Model *m : {&cube, &sphere, &cylinder, &pin, &wing, &tube, &course})
             m->materials[0].shader = shader;
     }
     void box(Vector3 p, Vector3 scale, Color c) {
@@ -134,17 +183,34 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
             signs[a] = LoadRenderTexture(1024, 256);
             BeginTextureMode(signs[a]);
             ClearBackground({7, 19, 38, 255});
-            DrawRectangleGradientV(0, 0, 1024, 256, {24, 62, 90, 255}, {5, 13, 28, 255});
-            for (int i = 0; i < 1024; i += 8)
-                DrawLine(i, 0, i, 256, {28, 70, 86, 90});
-            DrawRectangleLinesEx({8, 8, 1008, 240}, 5, gold);
-            DrawRectangleLinesEx({17, 17, 990, 222}, 2, aqua);
-            float size = std::min(69.f, 900.f / std::max(1.f, tw(bowling::arenas[a].name, 69)) * 69);
-            center(bowling::arenas[a].name, 512, 50, size, cream);
-            center(bowling::arenas[a].theme, 512, 143, 36, aqua);
-            center("B I G   L E A G U E   B O W L I N G", 512, 205, 17, gold);
+            DrawRectangleGradientV(0, 0, 1024, 256, {26, 83, 124, 255}, {8, 27, 61, 255});
+            for (int ray = 0; ray < 22; ++ray) {
+                float a = ray * 2 * PI / 22, b = a + .10f;
+                DrawTriangle({512, 128}, {512 + std::cos(b) * 1100, 128 + std::sin(b) * 1100},
+                             {512 + std::cos(a) * 1100, 128 + std::sin(a) * 1100}, {47, 119, 151, 85});
+            }
+            DrawRectangleRoundedLinesEx({9, 9, 1006, 238}, .20f, 10, 10, {9, 20, 39, 255});
+            DrawRectangleRoundedLinesEx({16, 16, 992, 224}, .20f, 10, 5, gold);
+            for (int side : {-1, 1}) {
+                float x = 512 + side * 427.f;
+                DrawLineEx({x - 30, 77}, {x + 31, 179}, 11, {219, 159, 74, 255});
+                DrawLineEx({x + 30, 77}, {x - 31, 179}, 11, {219, 159, 74, 255});
+                DrawCircleV({x, 128}, 39, {7, 19, 40, 255});
+                DrawCircleV({x - 2, 125}, 34, cream);
+                for (int j = -2; j <= 2; ++j) {
+                    DrawLineEx({x - 18, 109 + j * 7.f}, {x - 11, 113 + j * 7.f}, 3, red);
+                    DrawLineEx({x + 11, 109 + j * 7.f}, {x + 18, 113 + j * 7.f}, 3, red);
+                }
+            }
+            float size = std::min(82.f, 755.f / std::max(1.f, tw(bowling::arenas[a].name, 82)) * 82);
+            center("BIG LEAGUE BOWLING", 512, 31, 24, aqua);
+            center(bowling::arenas[a].name, 516, 83, size, {2, 12, 29, 255});
+            center(bowling::arenas[a].name, 512, 77, size, cream);
+            DrawRectangleRounded({224, 176, 576, 48}, .25f, 8, {173, 48, 55, 255});
+            center(bowling::arenas[a].theme, 512, 184, 30, gold);
             EndTextureMode();
-            SetTextureFilter(signs[a].texture, TEXTURE_FILTER_BILINEAR);
+            GenTextureMipmaps(&signs[a].texture);
+            SetTextureFilter(signs[a].texture, TEXTURE_FILTER_TRILINEAR);
         }
         ad = LoadRenderTexture(512, 256);
         BeginTextureMode(ad);
@@ -154,7 +220,8 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         center("SUNSHINE. STRIKES.", 256, 124, 27, cream);
         center("BALLPARK MAYHEM", 256, 177, 26, aqua);
         EndTextureMode();
-        SetTextureFilter(ad.texture, TEXTURE_FILTER_BILINEAR);
+        GenTextureMipmaps(&ad.texture);
+        SetTextureFilter(ad.texture, TEXTURE_FILTER_TRILINEAR);
     }
     void sign(Texture2D t, Vector3 p, float w, float h) {
         rlSetTexture(t.id);
@@ -274,15 +341,24 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         }
         rlPopMatrix();
     }
-    void rider(Vector3 p, float time, bool ready = false) {
+    void rider(Vector3 p, float time, bool ready = false, float bank = 0) {
         rlPushMatrix();
         rlTranslatef(p.x, p.y + std::sin(time * 3) * .035f, p.z);
-        orb({0, -.25f, 0}, {.88f, .22f, 1.13f}, {212, 123, 43, 255});
-        orb({0, -.12f, 0}, {.77f, .13f, 1.02f}, cream);
-        for (float x : {-.53f, .53f}) {
-            beam({x, -.38f, -.85f}, {x, -.38f, .85f}, .065f, {137, 189, 207, 255});
-            for (int i = 0; i < 12; ++i)
-                orb({x, -.04f, -.85f + i * .15f}, {.04f, .015f, .025f}, red);
+        rlRotatef(std::sin(time * 3) * 2 - bank * 3.5f, 0, 0, 1);
+        rlRotatef(bank * 2, 0, 1, 0);
+        // Real ring silhouette, two-tone rubber, stitched grab rope and handles.
+        DrawModelEx(tube, {0, -.16f, 0}, {1, 0, 0}, 90, {1.05f, 1.20f, .95f}, {18, 52, 103, 255});
+        DrawModelEx(tube, {0, -.03f, 0}, {1, 0, 0}, 90, {1.01f, 1.16f, .60f}, {55, 146, 194, 255});
+        orb({0, -.16f, 0}, {.80f, .12f, .94f}, {9, 28, 58, 255});
+        for (int i = 0; i < 48; ++i) {
+            float a = i * 2 * PI / 48, b = (i + 1) * 2 * PI / 48;
+            beam({std::cos(a) * 1.18f, .04f, std::sin(a) * 1.36f},
+                 {std::cos(b) * 1.18f, .04f, std::sin(b) * 1.36f}, .022f, cream);
+        }
+        for (int side : {-1, 1}) {
+            box({side * .96f, .16f, 0}, {.12f, .08f, .37f}, ink);
+            for (float z : {-.20f, .20f})
+                orb({side * .96f, .12f, z}, {.11f, .07f, .08f}, gold);
         }
         orb({0, .19f, 0}, {.58f, .50f, .69f}, {31, 155, 176, 255});
         orb({0, .16f, -.30f}, {.49f, .39f, .42f}, cream);
@@ -291,9 +367,11 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         for (int side : {-1, 1}) {
             rlPushMatrix();
             if (side < 0)
-                rlRotatef(180, 0, 1, 0);
+                rlScalef(-1, 1, 1);
+            rlDisableBackfaceCulling();
             rlRotatef(10 + std::sin(time * 6) * 7, 0, 0, 1);
-            DrawModel(wing, {0, 0, 0}, 1, {32, 161, 182, 255});
+            DrawModel(wing, {0, .05f, 0}, 1.08f, {32, 161, 182, 255});
+            rlEnableBackfaceCulling();
             rlPopMatrix();
         }
         rlPushMatrix();
@@ -415,6 +493,129 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
                     {24, 75, 108, 255});
         }
     }
+    void arch(float z, float width, float height, Color c, float radius) {
+        Vector3 last{-width, .35f, z};
+        for (int i = 1; i <= 28; ++i) {
+            float a = PI * i / 28;
+            Vector3 next{-width * std::cos(a), .35f + height * std::sin(a), z};
+            // Shader-lit spheres hide the joints between curved rib segments.
+            beam(last, next, radius, c);
+            last = next;
+        }
+    }
+    void mascotScenery(float time, Color team) {
+        const Color walls[] = {{64, 114, 60, 255},  {51, 119, 91, 255},   {49, 123, 155, 255},
+                               {91, 116, 157, 255}, {110, 112, 161, 255}, {54, 135, 162, 255},
+                               {172, 103, 66, 255}, {47, 115, 118, 255},  {87, 123, 168, 255},
+                               {56, 133, 186, 255}};
+        Color rock = walls[arena];
+        material(3);
+        DrawModel(course, {0, 0, 0}, 1, rock);
+        box({0, 5.5f, 42.5f}, {20, 11, 1}, rock);
+        material(0);
+        box({0, 1.3f, 30.8f}, {10, 2.6f, .5f}, {5, 17, 34, 255});
+        material(4);
+        for (int side : {-1, 1})
+            box({side * 6.7f, -.13f, 15}, {2.45f, .10f, 46}, {27, 157, 193, 255});
+        material(0);
+        // Layers of close scenery make the ride feel embedded in a themed course.
+        for (int side : {-1, 1})
+            for (int i = 0; i < 9; ++i) {
+                float z = -3 + i * 4.7f;
+                material(3);
+                orb({side * (8.4f + .3f * std::sin(i * 3.f)), 1.2f, z},
+                    {1.1f, 1.8f + .8f * std::sin(i * 2.f), 2.4f}, rock);
+                material(0);
+                if (arena == 0 || arena == 1 || arena == 7) {
+                    for (int j = 0; j < 4; ++j)
+                        orb({side * (7.8f + j * .08f), 3.f + j * .65f, z + .3f * std::sin(j * 2.f)},
+                            {.8f, .7f, 1.1f}, j % 2 ? Color{71, 132, 47, 255} : Color{33, 91, 55, 255});
+                }
+                cyl({side * 6.35f, .05f, z}, .18f, 1.1f, {22, 53, 86, 255});
+                orb({side * 6.35f, 1.2f, z}, {.22f, .25f, .22f}, {135, 246, 255, 255});
+            }
+        for (float z : {4.f, 16.f, 29.f}) {
+            arch(z, 8.1f, 9.3f, {24, 71, 109, 255}, .38f);
+            arch(z - .42f, 7.95f, 9.18f, {109, 217, 224, 255}, .09f);
+            for (int side : {-1, 1}) {
+                box({side * 7.5f, 3.3f, z}, {.7f, 4.5f, .85f}, team);
+                box({side * 7.5f, 5.6f, z}, {1.1f, .25f, 1.15f}, gold);
+            }
+        }
+        // A broad themed marquee above the rack, with a readable stadium identity.
+        box({0, 4.6f, 30.8f}, {11.6f, 3.1f, .6f}, {9, 26, 48, 255});
+        sign(signs[arena].texture, {0, 4.6f, 30.42f}, 11.3f, 2.8f);
+        for (int side : {-1, 1}) {
+            for (int j = 0; j < 5; ++j)
+                orb({side * (5.4f + j * .18f), 2.2f + j * .5f, 30.4f}, {.23f, .23f, .23f}, gold);
+            sign(arena == 9 ? ad.texture : signs[arena].texture, {side * 7.0f, 4.1f, 14.5f}, 3.1f,
+                 1.55f);
+        }
+        // Tropicana's aquarium theme: suspended rays and bubbles beyond the rails.
+        if (arena == 9 || arena == 2 || arena == 5)
+            for (int side : {-1, 1}) {
+                for (int i = 0; i < 3; ++i) {
+                    float z = 8 + i * 9.f;
+                    orb({side * 7.1f, 4.4f + .3f * std::sin(time + i), z}, {.65f, .12f, .6f},
+                        {30, 70, 121, 255});
+                    for (int d : {-1, 1})
+                        orb({side * 7.1f + d * .65f, 4.4f + .3f * std::sin(time + i), z - .1f},
+                            {.7f, .06f, .33f}, {31, 82, 133, 255});
+                    for (int j = 0; j < 5; ++j) {
+                        float y = std::fmod(time * .55f + j * 1.13f + i, 5.f) + 1;
+                        orb({side * (6.9f + .2f * std::sin(j * 3.f)), y, z}, {.045f, .065f, .045f},
+                            {169, 235, 246, 255});
+                    }
+                }
+            }
+    }
+    void loungeDetails(Color team) {
+        // Close columns, soffits and pendant lights, in the warm arcade-bowling style.
+        for (int side : {-1, 1})
+            for (float z : {-1.f, 10.f, 21.f}) {
+                material(2);
+                box({side * 13.f, 3.8f, z}, {1.15f, 7.6f, 1.15f}, {139, 64, 49, 255});
+                material(0);
+                box({side * 13.f, .5f, z}, {1.5f, 1, 1.5f}, {37, 57, 66, 255});
+                box({side * 13.f, 7.35f, z}, {1.65f, .6f, 1.65f}, gold);
+                // Long tables sit between outer lanes, clear of the playable surface.
+                box({side * 13.f, 1.0f, z + 3}, {1.05f, .25f, 3.3f}, {148, 73, 39, 255});
+                for (float dz : {-1.f, 1.f}) {
+                    cyl({side * 13.f, 0, z + 3 + dz}, .09f, .9f, ink);
+                    cyl({side * 13.f, 1.16f, z + 3 + dz}, .15f, .45f, red);
+                    cyl({side * 13.f, 1.62f, z + 3 + dz}, .17f, .04f, cream);
+                    beam({side * 13.f, 1.63f, z + 3 + dz}, {side * 13.f + .05f, 1.9f, z + 3 + dz}, .015f,
+                         cream);
+                }
+            }
+        for (int x = -3; x <= 3; ++x)
+            for (int row = 0; row < 5; ++row) {
+                float z = -5 + row * 9.f;
+                box({x * 8.f, 8.95f, z}, {7.8f, .28f, 8.8f},
+                    (x + row) % 2 ? Color{73, 93, 88, 255} : Color{117, 74, 66, 255});
+                box({x * 8.f, 8.78f, z}, {6.6f, .06f, 7.6f},
+                    (x + row) % 2 ? Color{91, 113, 103, 255} : Color{135, 91, 73, 255});
+            }
+        for (float z : {1.f, 12.f, 23.f}) {
+            box({0, 8.5f, z}, {29, .45f, 1.2f}, {84, 39, 49, 255});
+            box({0, 8.24f, z - .48f}, {28, .06f, .08f}, {255, 179, 100, 255});
+            for (float x : {-8.f, 0.f, 8.f}) {
+                beam({x, 8.3f, z}, {x, 6.9f, z}, .035f, ink);
+                DrawCylinder({x, 6.6f, z}, .38f, .85f, .5f, 24, team);
+                cyl({x, 6.34f, z}, .81f, .035f, {255, 223, 155, 255});
+            }
+        }
+        // Rounded neon line work on the pinsetter wall, visible under the sign.
+        for (int side : {-1, 1}) {
+            float x = side * 10.f;
+            for (int i = 0; i < 32; ++i) {
+                float a = i * 2 * PI / 32, b = (i + 1) * 2 * PI / 32;
+                beam({x + std::cos(a) * 2.2f, 4.9f + std::sin(a) * 1.2f, 28.4f},
+                     {x + std::cos(b) * 2.2f, 4.9f + std::sin(b) * 1.2f, 28.4f}, .055f,
+                     side < 0 ? Color{250, 107, 119, 255} : Color{76, 236, 201, 255});
+            }
+        }
+    }
     void world(const bowling::Simulation &sim, const bowling::Shot &shot, bool aim, int selected,
                Camera3D cam, float time) {
         Color team = GetColor(teams[selected].color);
@@ -428,25 +629,29 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
                         10);
         Vector3 ballPos{(sim.hasBall ? sim.ball.x : shot.position) - 5, 0, sim.hasBall ? sim.ball.z : 2};
         SetShaderValue(shader, GetShaderLocation(shader, "ballShadow"), &ballPos, SHADER_UNIFORM_VEC3);
+        SetShaderValue(shader, GetShaderLocation(shader, "sceneTime"), &time, SHADER_UNIFORM_FLOAT);
         BeginMode3D(cam);
         material(0);
         box({0, -.7f, 15}, {95, 1, 95}, {17, 39, 43, 255});
-        for (int side : {-1, 1})
-            for (int lane = 0; lane < 2; ++lane) {
-                float x = side * (9.4f + lane * 7.4f);
-                material(1);
-                box({x, -.03f, 14}, {6.3f, .18f, 32}, {205, 158, 94, 255});
-                material(0);
-                for (int edge : {-1, 1}) {
-                    box({x + edge * 3.3f, -.10f, 14}, {.35f, .13f, 32}, {21, 39, 57, 255});
-                    box({x + edge * 3.65f, .07f, 14}, {.16f, .3f, 32}, {20, 116, 151, 255});
+        if (!mascot)
+            for (int side : {-1, 1})
+                for (int lane = 0; lane < 2; ++lane) {
+                    float x = side * (9.4f + lane * 7.4f);
+                    material(1);
+                    box({x, -.03f, 14}, {6.3f, .18f, 32}, {205, 158, 94, 255});
+                    material(0);
+                    for (int edge : {-1, 1}) {
+                        box({x + edge * 3.3f, -.10f, 14}, {.35f, .13f, 32}, {21, 39, 57, 255});
+                        box({x + edge * 3.65f, .07f, 14}, {.16f, .3f, 32}, {20, 116, 151, 255});
+                    }
+                    for (int row = 0; row < 4; ++row)
+                        for (int col = 0; col <= row; ++col)
+                            DrawModel(pin, {x + (col - row * .5f) * .7f, .04f, 25 + row * .65f}, .7f,
+                                      cream);
                 }
-                for (int row = 0; row < 4; ++row)
-                    for (int col = 0; col <= row; ++col)
-                        DrawModel(pin, {x + (col - row * .5f) * .7f, .04f, 25 + row * .65f}, .7f, cream);
-            }
-        material(1);
-        box({0, -.06f, 13.5f}, {10, .2f, 32}, {222, 171, 103, 255});
+        material(mascot ? 5 : 1);
+        box({0, -.06f, 13.5f}, {10, .2f, 32},
+            mascot ? Color{158, 213, 224, 255} : Color{222, 171, 103, 255});
         material(0);
         for (float x : {-5.35f, 5.35f}) {
             box({x, -.08f, 13.5f}, {.64f, .15f, 32}, {16, 37, 55, 255});
@@ -463,81 +668,95 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         }
         for (int i = -2; i <= 2; ++i)
             DrawSphere({i * 1.1f, .05f, 3.3f}, .045f, ink);
-        box({0, 2, 30}, {46, 4.1f, 1.8f}, {8, 17, 28, 255});
-        for (int i = -3; i <= 3; ++i) {
-            float x = i * 7.2f;
-            box({x, 1.35f, 28.98f}, {6.9f, 2.7f, .15f}, {2, 8, 13, 255});
-            box({x, 2.85f, 28.7f}, {7, .20f, .35f}, team);
-            box({x, 2.71f, 28.65f}, {6.5f, .06f, .12f}, aqua);
-        }
-        box({0, 5.5f, 30.5f}, {18, 3.9f, 1}, ink);
-        box({0, 7.65f, 30.5f}, {19, .25f, 1.4f}, gold);
-        sign(signs[arena].texture, {0, 5.5f, 29.95f}, 17.6f, 3.7f);
-        for (float x : {-15.f, 15.f})
-            sign(arena == 9 ? ad.texture : signs[arena].texture, {x, 5.4f, 29.8f}, 7, 3.5f);
-        material(2);
-        box({0, 9, 39}, {66, 18, 1}, {91, 62, 48, 255});
-        material(0);
-        for (int i = -4; i <= 4; ++i) {
-            float x = i * 7.f;
-            box({x, 9.8f, 38.4f}, {3.9f, 6, .08f}, i % 2 ? team : Color{29, 92, 119, 255});
-            box({x, 6.7f, 38.3f}, {4.1f, .12f, .15f}, gold);
-        }
-        for (int side : {-1, 1}) {
-            material(2);
-            box({side * 23.f, 2.6f, 15}, {1.2f, 5.2f, 43}, {139, 69, 48, 255});
-            material(0);
-            box({side * 21.5f, 5.4f, 15}, {5, .38f, 43}, {92, 105, 111, 255});
-            for (float z : {-4.f, 6.f, 16.f, 26.f, 36.f}) {
-                box({side * 22.f, 8, z}, {.65f, 16, .65f}, {41, 72, 86, 255});
-                beam({side * 19.f, 5.9f, z}, {side * 19.f, 7.1f, z}, .055f, cream);
+        if (!mascot) {
+            loungeDetails(team);
+            box({0, 2, 30}, {46, 4.1f, 1.8f}, {8, 17, 28, 255});
+            for (int i = -3; i <= 3; ++i) {
+                float x = i * 7.2f;
+                box({x, 1.35f, 28.98f}, {6.9f, 2.7f, .15f}, {2, 8, 13, 255});
+                box({x, 2.85f, 28.7f}, {7, .20f, .35f}, team);
+                box({x, 2.71f, 28.65f}, {6.5f, .06f, .12f}, aqua);
             }
-            beam({side * 19.f, 7.1f, -5}, {side * 19.f, 7.1f, 37}, .07f, cream);
-            for (int row = 0; row < 4; ++row) {
-                box({side * (25.f + row * 1.5f), 5.8f + row * .75f, 17}, {1.6f, 1, 42},
-                    {32, 65, 91, 255});
-                for (int seat = 0; seat < 20; ++seat) {
-                    float x = side * (25.f + row * 1.5f), y = 6.5f + row * .75f, z = -2 + seat * 2;
-                    Color shirt = (seat + row) % 3 == 0 ? team : Color{181, 154, 98, 255};
-                    orb({x, y, z}, {.24f, .33f, .18f}, shirt);
-                    orb({x, y + .43f, z}, {.17f, .20f, .17f}, {220, 169, 121, 255});
+            box({0, 5.5f, 30.5f}, {18, 3.9f, 1}, ink);
+            box({0, 7.65f, 30.5f}, {19, .25f, 1.4f}, gold);
+            sign(signs[arena].texture, {0, 5.5f, 29.95f}, 17.6f, 3.7f);
+            for (float x : {-15.f, 15.f})
+                sign(arena == 9 ? ad.texture : signs[arena].texture, {x, 5.4f, 29.8f}, 7, 3.5f);
+            material(2);
+            box({0, 9, 39}, {66, 18, 1}, {91, 62, 48, 255});
+            material(0);
+            for (int i = -4; i <= 4; ++i) {
+                float x = i * 7.f;
+                box({x, 9.8f, 38.4f}, {3.9f, 6, .08f}, i % 2 ? team : Color{29, 92, 119, 255});
+                box({x, 6.7f, 38.3f}, {4.1f, .12f, .15f}, gold);
+            }
+            for (int side : {-1, 1}) {
+                material(2);
+                box({side * 23.f, 2.6f, 15}, {1.2f, 5.2f, 43}, {139, 69, 48, 255});
+                material(0);
+                box({side * 21.5f, 5.4f, 15}, {5, .38f, 43}, {92, 105, 111, 255});
+                for (float z : {-4.f, 6.f, 16.f, 26.f, 36.f}) {
+                    box({side * 22.f, 8, z}, {.65f, 16, .65f}, {41, 72, 86, 255});
+                    beam({side * 19.f, 5.9f, z}, {side * 19.f, 7.1f, z}, .055f, cream);
+                }
+                beam({side * 19.f, 7.1f, -5}, {side * 19.f, 7.1f, 37}, .07f, cream);
+                for (int row = 0; row < 4; ++row) {
+                    box({side * (25.f + row * 1.5f), 5.8f + row * .75f, 17}, {1.6f, 1, 42},
+                        {32, 65, 91, 255});
+                    for (int seat = 0; seat < 20; ++seat) {
+                        float x = side * (25.f + row * 1.5f), y = 6.5f + row * .75f, z = -2 + seat * 2;
+                        Color shirt = (seat + row) % 3 == 0 ? team : Color{181, 154, 98, 255};
+                        orb({x, y, z}, {.24f, .33f, .18f}, shirt);
+                        orb({x, y + .43f, z}, {.17f, .20f, .17f}, {220, 169, 121, 255});
+                    }
+                }
+                for (float z : {-1.f, 10.f, 21.f}) {
+                    float x = side * 20.f;
+                    cyl({x, 0, z}, .12f, 1.3f, {86, 101, 111, 255});
+                    cyl({x, 1.3f, z}, .85f, .13f, {151, 78, 45, 255});
+                    cyl({x - .35f, 1.45f, z}, .13f, .35f, red);
+                    cyl({x - .35f, 1.8f, z}, .15f, .035f, WHITE);
+                    beam({x - .35f, 1.8f, z}, {x - .3f, 2.05f, z}, .012f, cream);
+                    orb({x + .3f, 1.58f, z}, {.13f, .13f, .13f}, cream);
                 }
             }
-            for (float z : {-1.f, 10.f, 21.f}) {
-                float x = side * 20.f;
-                cyl({x, 0, z}, .12f, 1.3f, {86, 101, 111, 255});
-                cyl({x, 1.3f, z}, .85f, .13f, {151, 78, 45, 255});
-                cyl({x - .35f, 1.45f, z}, .13f, .35f, red);
-                cyl({x - .35f, 1.8f, z}, .15f, .035f, WHITE);
-                beam({x - .35f, 1.8f, z}, {x - .3f, 2.05f, z}, .012f, cream);
-                orb({x + .3f, 1.58f, z}, {.13f, .13f, .13f}, cream);
+            for (float z : {-3.f, 9.f, 21.f, 33.f}) {
+                beam({-23, 12, z}, {23, 12, z}, .14f, {89, 123, 146, 255});
+                beam({-23, 13.3f, z}, {23, 13.3f, z}, .11f, {89, 123, 146, 255});
+                for (int x = -22; x < 22; x += 4)
+                    beam({float(x), 12, z}, {float(x + 2), 13.3f, z}, .065f, {115, 145, 160, 255});
+                for (float x : {-12.f, 0.f, 12.f}) {
+                    box({x, 11.7f, z}, {5, .2f, 1.6f}, ink);
+                    box({x, 11.55f, z}, {4.6f, .035f, 1.35f}, {245, 232, 190, 255});
+                }
             }
+            box({0, 16, 17}, {70, .45f, 52},
+                arena == 9 ? Color{126, 164, 185, 255} : Color{51, 72, 91, 255});
+            rlPushMatrix();
+            rlTranslatef(0, 7, 18);
+            rlScalef(1.5f, .6f, .65f);
+            landmarks(time);
+            rlPopMatrix();
+        } else {
+            mascotScenery(time, team);
         }
-        for (float z : {-3.f, 9.f, 21.f, 33.f}) {
-            beam({-23, 12, z}, {23, 12, z}, .14f, {89, 123, 146, 255});
-            beam({-23, 13.3f, z}, {23, 13.3f, z}, .11f, {89, 123, 146, 255});
-            for (int x = -22; x < 22; x += 4)
-                beam({float(x), 12, z}, {float(x + 2), 13.3f, z}, .065f, {115, 145, 160, 255});
-            for (float x : {-12.f, 0.f, 12.f}) {
-                box({x, 11.7f, z}, {5, .2f, 1.6f}, ink);
-                box({x, 11.55f, z}, {4.6f, .035f, 1.35f}, {245, 232, 190, 255});
-            }
-        }
-        box({0, 16, 17}, {70, .45f, 52},
-            arena == 9 ? Color{126, 164, 185, 255} : Color{51, 72, 91, 255});
-        rlPushMatrix();
-        rlTranslatef(0, 7, 18);
-        rlScalef(1.5f, .6f, .65f);
-        landmarks(time);
-        rlPopMatrix();
         for (const auto &p : sim.pins)
             drawPin(p, team, time);
         if (ballPos.z < 31) {
             if (mascot)
-                rider({ballPos.x, .57f, ballPos.z}, time, aim);
+                rider({ballPos.x, .57f, ballPos.z}, time, aim, sim.active ? sim.ball.vx : 0);
             else
                 bowlingBall({ballPos.x, sim.gutter ? .28f : .6f, ballPos.z},
                             sim.hasBall ? ballPos.z * 110 : time * 12, sim.hasBall ? sim.ball.r : .51f);
+        }
+        if (aim && mascot) {
+            float pull = .55f + shot.power * .70f;
+            Vector3 center{ballPos.x, .70f, ballPos.z - pull};
+            for (int side : {-1, 1}) {
+                cyl({side * 4.8f, .04f, 2.4f}, .24f, 1.3f, {24, 69, 110, 255});
+                orb({side * 4.8f, 1.4f, 2.4f}, {.31f, .34f, .31f}, gold);
+                beam({side * 4.8f, 1.15f, 2.4f}, center, .095f, {220, 44, 60, 255});
+            }
         }
         if (aim)
             for (int i = 0; i < 20; ++i) {
@@ -549,7 +768,7 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         EndMode3D();
     }
     void close() {
-        for (Model m : {cube, sphere, cylinder, pin, wing})
+        for (Model m : {cube, sphere, cylinder, pin, wing, tube, course})
             UnloadModel(m);
         for (auto t : skins)
             UnloadTexture(t);
