@@ -1,3 +1,5 @@
-Scoreboard and neon wall build. Source commit 4a78205d0d1f8b45db65cf49c85f21d3371ba80a on codex/big-league-bowling.
+# Stadium / Rays adventure backup
 
-Extract the Windows ZIP fully and run Big League Bowling.exe. Keep assets beside it. Windows execution remains unverified. Linux rules/campaign suites and a full graphical match passed. Source archive includes actual gameplay screenshots and validation notes. The Git bundle contains full source-branch history.
+Source commit: 9cce46c86823c048900e2efad819d72d5fa9c913 on codex/big-league-bowling.
+
+Includes shared 80-unit lane geometry, stadium field scenery, Rays sling controls and live ballpark scoreboards. Linux rules/campaign tests and both native full matches passed. Windows cross-build and ZIP checks passed; Windows execution remains unverified. Source ZIP and full development branch Git bundle accompany the Windows ZIP. Verify SHA256SUMS.txt before extraction.
