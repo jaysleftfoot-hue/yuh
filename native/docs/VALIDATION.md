@@ -1,3 +1,11 @@
+# Illustrated title / pacing / floor shader milestone
+
+- Original illustrated title-screen texture is packaged, with native menu hit targets. Real X11 mouse navigation verified Help → Back, Scores → Back, Locker → Back, Single Player → Setup → Gameplay, and Mascot Adventure → Setup → Gameplay. Preview tracing confirmed screen and mode transitions. F12 captures/exits when using --screenshot for interactive verification.
+- Physics tests measure full-power travel to the head pin within 3–4 seconds (nominal 3.5) and verify actual rack contact at low, medium and full power. Lane size and camera presets unchanged. Rules and campaign suites pass.
+- Full native stadium match completed: 38 rolls, 63–122. Launch/impact screenshots inspected in both modes; floor renders on both sides in Linux.
+- Fixed undefined GLSL pow() calls with signed bases in floor reflection and edge highlights. This is a plausible cause of the reported half-black lane on Windows; confirmation on the affected GPU remains outstanding.
+- Windows cross-build, ZIP CRC, complete source-to-package asset comparison and warning-free NSIS installer compile passed. Windows runtime is unverified.
+
 # Long-lane arcade frame milestone
 
 - Intentional playable run increase: 80 to 160 units; width, bodies and camera constants unchanged. Projection tests lock distant rack to 38–46px at 1280×800. Physics/campaign tests use geometry-derived time budgets and pass.

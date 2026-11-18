@@ -81,3 +81,7 @@ Blue title panels have been replaced with ballpark scoreboards. Wrigley uses pai
 Run Big-League-Bowling-Setup.exe, choose Install, then Play on the finish screen. The installer adds desktop and Start menu shortcuts and a Windows Installed Apps uninstaller. No admin rights required. Career saves survive uninstall. See installer/README.md for rebuilding. This build is unsigned and Windows execution remains unverified here.
 
 Latest visual reference pass: 160-unit lane run with unchanged width and body sizes. A distant-rack projection test protects the reference composition. Decorative baseball framing, left power strip, player portraits, Bangers arcade lettering and unboxed menu actions replace application-like controls.
+
+## Opening menu and pacing
+
+The illustrated title screen opens Single Player or Mascot Adventure setup. Ball Locker, Scores, Sound, Help and Quit are functional native menu actions; Escape returns from submenus. Enter selects Single Player. Full power reaches the pins in about 3.5 seconds, with unchanged lane size. The floor shader uses defined signed arithmetic to avoid a driver-dependent black-lane artifact.

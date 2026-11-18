@@ -988,10 +988,13 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         }
         if (aim)
             for (int i = 0; i < 20; ++i) {
-                float t = i * .07f, x = geo::renderX(shot.position + std::sin(shot.aim * .16f) * 22 * t +
-                                                     .5f * shot.curve * .85f * t * t);
+                float t = i * .07f,
+                      x = geo::renderX(shot.position +
+                                       std::sin(shot.aim * .16f) * geo::launchSpeed(shot.power) * t +
+                                       .5f * shot.curve * .85f * t * t);
                 if (std::abs(x) < 4.7f)
-                    orb({x, .07f, geo::foulLine + t * 22}, {.045f, .015f, .10f}, gold);
+                    orb({x, .07f, geo::foulLine + t * geo::launchSpeed(shot.power)},
+                        {.045f, .015f, .10f}, gold);
             }
         EndMode3D();
     }

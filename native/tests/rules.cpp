@@ -84,6 +84,19 @@ int main() {
         b.step(1.f / 120);
     }
     check(!a.active && a.knocked() > 0 && a.knocked() == b.knocked(), "deterministic collisions");
+    for (float power : {0.f, .5f, 1.f}) {
+        Simulation timed;
+        timed.launch({5, 0, power, 0});
+        float seconds = 0;
+        while (timed.ball.z < geometry::headPin && seconds < 10) {
+            timed.step(1.f / 120);
+            seconds += 1.f / 120;
+        }
+        if (power == 1)
+            check(seconds >= 3 && seconds <= 4, "full power reaches head pin in 3-4 seconds");
+        check(seconds < 6.1f, "low power still reaches rack promptly");
+        check(timed.impacts > 0, "faster straight shot does not tunnel through rack");
+    }
     Simulation miss;
     miss.launch({1, -1, .7f, 0});
     for (int i = 0; i < int(geometry::shotTimeout * 120 + 240); ++i)

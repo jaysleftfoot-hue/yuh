@@ -108,7 +108,7 @@ struct Simulation {
     bool launch(Shot s) {
         if (active)
             return false;
-        float speed = 11 + std::clamp(s.power, 0.f, 1.f) * 13,
+        float speed = geometry::launchSpeed(std::clamp(s.power, 0.f, 1.f)),
               angle = std::clamp(s.aim, -1.f, 1.f) * .16f;
         ball = {std::clamp(s.position, geometry::launchMin, geometry::launchMax), geometry::foulLine,
                 std::sin(angle) * speed, std::cos(angle) * speed, geometry::ballRadius};

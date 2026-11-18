@@ -11,6 +11,10 @@ uniform vec3 pinShadows[10];
 uniform vec3 ballShadow;
 uniform float sceneTime;
 out vec4 finalColor;
+// GLSL pow(x,n) is undefined for x<0, even for integer-valued n.
+// Signed floor reflections previously produced NaNs on some Windows drivers.
+float square(float x) {return x*x;}
+float fourth(float x) {float q=x*x;return q*q;}
 float hash(float n) { return fract(sin(n)*43758.5453); }
 float noise(vec3 p) {
     vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
@@ -23,7 +27,7 @@ void main() {
     vec3 tex=texture(texture0,uv).rgb*colDiffuse.rgb*color.rgb;
     vec3 key=normalize(vec3(-.35,.85,-.4));
     float diffuse=max(dot(n,key),0.0);
-    float rim=pow(1.0-max(dot(n,v),0.0),3.0);
+    float rim=pow(1.0-clamp(dot(n,v),0.0,1.0),3.0);
     bool floorMaterial=woodMode==1 || woodMode==5;
     float broad=noise(world*.42), detail=noise(world*2.4);
     if(woodMode==3) {
@@ -67,12 +71,12 @@ void main() {
         vec3 r=reflect(-v,n);
         if(r.y>.01) {
             vec3 hit=world+r*((7.0-world.y)/r.y);
-            float bands=exp(-pow(sin((hit.z-1.0)*3.14159/11.0)*5.0,2.0));
-            float across=exp(-pow(hit.x/2.0,4.0));
-            float fresnel=.12+.35*pow(1.0-max(dot(n,v),0.0),4.0);
+            float bands=exp(-square(sin((hit.z-1.0)*3.14159/11.0)*5.0));
+            float across=exp(-fourth(hit.x/2.0));
+            float fresnel=.12+.35*pow(1.0-clamp(dot(n,v),0.0,1.0),4.0);
             lit+=vec3(1.0,.87,.62)*bands*across*fresnel;
         }
-        float edge=exp(-pow((abs(world.x)-4.8)/.6,2.0));
+        float edge=exp(-square((abs(world.x)-4.8)/.6));
         lit+=vec3(.03,.16,.22)*edge;
     }
     if(woodMode==2) {

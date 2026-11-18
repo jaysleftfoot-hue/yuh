@@ -96,6 +96,12 @@ int main(int argc, char **argv) {
     art.init();
     art.makeSkins();
     art.makeSigns();
+    Texture2D titleArt =
+        LoadTexture((std::string(GetApplicationDirectory()) + "assets/title-screen.png").c_str());
+    if (!titleArt.id)
+        throw std::runtime_error("Missing title-screen.png beside executable");
+    GenTextureMipmaps(&titleArt);
+    SetTextureFilter(titleArt, TEXTURE_FILTER_TRILINEAR);
     Audio audio;
     audio.init();
     const char *dir = std::getenv("APPDATA");
@@ -133,6 +139,7 @@ int main(int argc, char **argv) {
         result = "MAKE SOME NOISE!";
     };
     restart();
+    int lastLoggedScreen = -1;
     auto launch = [&]() {
         if (state == 0 && !paused) {
             match.launch(shot);
@@ -173,7 +180,7 @@ int main(int argc, char **argv) {
             if (screen == 1) {
                 paused = !paused;
                 charge = false;
-            } else if (screen == 2)
+            } else if (screen != 0)
                 screen = 0;
             else
                 done = true;
@@ -338,7 +345,8 @@ int main(int argc, char **argv) {
         BeginTextureMode(scene);
         ClearBackground({45, 92, 129, 255});
         DrawRectangleGradientV(0, 0, W, 550, {17, 39, 75, 255}, {140, 182, 193, 255});
-        art.world(view, shot, state == 0 && screen == 1, arenas[arena].team, camera, time);
+        if (screen == 1 || screen == 3)
+            art.world(view, shot, state == 0 && screen == 1, arenas[arena].team, camera, time);
         EndTextureMode();
         BeginTextureMode(target);
         ClearBackground(BLACK);
@@ -346,7 +354,11 @@ int main(int argc, char **argv) {
         DrawTexturePro(scene.texture, {0, 0, float(W), -float(H)}, {0, 0, float(W), float(H)}, {0, 0}, 0,
                        WHITE);
         EndShaderMode();
-        if (screen != 1) {
+        if (screen == 0 || screen == 4 || screen == 5) {
+            DrawTexturePro(titleArt, {0, 0, float(titleArt.width), float(titleArt.height)},
+                           {0, 0, float(W), float(H)}, {0, 0}, 0, WHITE);
+        }
+        if (screen == 2 || screen == 3) {
             DrawRectangle(0, 0, W, 76, ink);
             DrawRectangle(0, 74, W, 3, gold);
             text("BIG LEAGUE BOWLING", 24, 16, 27, cream);
@@ -358,6 +370,56 @@ int main(int argc, char **argv) {
         }
         uiBlocked = paused;
         if (screen == 0) {
+            title("WELCOME TO THE BIG LEAGUES!", 565, 16, 20, cream);
+            if (button({282, 650, 320, 52}, "SINGLE PLAYER", true) || IsKeyPressed(KEY_ENTER)) {
+                match.mascot = false;
+                screen = 3;
+                audio.play(audio.click);
+            }
+            if (button({660, 650, 320, 52}, "MASCOT ADVENTURE", true)) {
+                match.mascot = true;
+                screen = 3;
+                audio.play(audio.click);
+            }
+            if (button({145, 718, 190, 42}, "BALL LOCKER")) {
+                selectedSkin = skin;
+                screen = 2;
+            }
+            if (button({350, 718, 145, 42}, "SCORES"))
+                screen = 4;
+            if (button({515, 718, 215, 42}, audio.muted ? "SOUND OFF" : "SOUND ON"))
+                audio.toggle();
+            if (button({750, 718, 140, 42}, "HELP"))
+                screen = 5;
+            if (button({920, 718, 140, 42}, "QUIT"))
+                done = true;
+        } else if (screen == 4 || screen == 5) {
+            // A theatrical full-screen interlude, not a dashboard over the title art.
+            DrawRectangle(0, 0, W, H, {5, 15, 23, 215});
+            if (screen == 4) {
+                title("HALL OF FAME", 460, 180, 65, gold);
+                center(std::to_string(profile.wins) + " WINS  /  " + std::to_string(profile.matches) +
+                           " MATCHES",
+                       640, 302, 27, cream);
+                center("BEST GAME  " + std::to_string(profile.best), 640, 360, 29, cream);
+                center(std::to_string(profile.xp) + " XP   |   " + std::to_string(profile.balls()) +
+                           " / 64 BALLS",
+                       640, 419, 24, gold);
+                center(std::to_string(profile.stadiums()) + " / 10 STADIUMS", 640, 471, 24, aqua);
+            } else {
+                title("HOW TO BOWL", 455, 160, 65, gold);
+                center("STADIUM BOWLING", 640, 277, 28, gold);
+                center("Move the mouse to line up. Hold to power up.", 640, 324, 23, cream);
+                center("Drag up for power, sideways to aim. Release to bowl.", 640, 361, 23, cream);
+                center("MASCOT ADVENTURE", 640, 428, 28, aqua);
+                center("Grab the tube. Pull back and sideways, then release.", 640, 475, 23, cream);
+                center("A / D or arrows to steer. Space to boost.", 640, 512, 23, cream);
+                center("1 / 2 / 3: power-ups     Escape: pause     F11: fullscreen", 640, 570, 19,
+                       cream);
+            }
+            if (button({470, 680, 340, 60}, "BACK TO MAIN MENU", true))
+                screen = 0;
+        } else if (screen == 3) {
             DrawRectangleGradientH(0, 77, 800, 723, {7, 18, 33, 250}, {7, 18, 33, 0});
             title("BOWL LIKE", 40, 105, 55, cream);
             title("A BIG LEAGUER.", 40, 161, 57, gold);
@@ -405,6 +467,8 @@ int main(int argc, char **argv) {
             center(std::to_string(profile.xp) + " XP  /  Best " + std::to_string(profile.best), 1047,
                    615, 19, aqua);
             center("80 XP unlocks the next ball", 1047, 655, 16, cream);
+            if (button({930, 720, 300, 50}, "BACK TO MAIN MENU"))
+                screen = 0;
         } else if (screen == 2) {
             DrawRectangle(0, 78, W, H - 78, {7, 18, 33, 245});
             text("THE BALL LOCKER", 30, 96, 32, gold);
@@ -510,7 +574,14 @@ int main(int argc, char **argv) {
                         match.equip(Power(i + 1));
             }
         }
-        if(screen==1 && button({8,724,144,64},"MENU")) {paused=true;charge=false;}
+        if (screen == 1 && button({8, 724, 144, 64}, "MENU")) {
+            paused = true;
+            charge = false;
+        }
+        if (!screenshot.empty() && screen != lastLoggedScreen) {
+            std::cout << "UI preview: screen=" << screen << " mascot=" << match.mascot << std::endl;
+            lastLoggedScreen = screen;
+        }
         uiBlocked = false;
         if (paused) {
             DrawRectangle(0, 77, W, 723, {3, 10, 20, 210});
@@ -538,12 +609,13 @@ int main(int argc, char **argv) {
             capture();
             done = true;
         }
-        if (!smoke && !screenshot.empty() && ticks == captureFrame) {
+        if (!smoke && !screenshot.empty() && (ticks == captureFrame || IsKeyPressed(KEY_F12))) {
             capture();
             done = true;
         }
     }
     audio.close();
+    UnloadTexture(titleArt);
     UnloadFont(arcadeFont);
     UnloadFont(uiFont);
     art.close();

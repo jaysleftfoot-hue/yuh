@@ -15,7 +15,12 @@ inline constexpr float gutterWidth = .7f, gutterCenter = halfWidth + gutterWidth
 inline constexpr float arrowZ = 12.f, dotsZ = 4.6f;
 inline constexpr float sceneryDepthScale = 2.f; // decoration coordinates only
 inline constexpr float sceneryExtension = (headPin - 44.f) / sceneryDepthScale;
-inline constexpr float shotTimeout = (deckEnd - foulLine) / 11.f + 4.f;
+inline constexpr float minLaunchSpeed = (headPin - foulLine) / 6.f;
+inline constexpr float maxLaunchSpeed = (headPin - foulLine) / 3.5f;
+inline constexpr float launchSpeed(float power) {
+    return minLaunchSpeed + (maxLaunchSpeed - minLaunchSpeed) * power;
+}
+inline constexpr float shotTimeout = (deckEnd - foulLine) / minLaunchSpeed + 4.f;
 inline constexpr float renderX(float x) {
     return halfWidth - x;
 }
