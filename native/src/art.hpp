@@ -1,5 +1,6 @@
 #pragma once
 #include "campaign.hpp"
+#include "ray_model.hpp"
 #include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
@@ -7,7 +8,7 @@
 namespace geo = bowling::geometry;
 inline constexpr float sceneryDepthScale = geo::sceneryDepthScale;
 struct Art {
-    Model cube{}, sphere{}, cylinder{}, pin{}, wing{}, tube{}, course{};
+    Model cube{}, sphere{}, cylinder{}, pin{}, wing{}, tube{}, course{}, rayBody{};
     Shader shader{};
     std::array<Texture2D, 64> skins{};
     RenderTexture2D scoreboard{};
@@ -162,9 +163,10 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         cylinder = LoadModelFromMesh(GenMeshCylinder(1, 1, 16));
         pin = LoadModelFromMesh(pinMesh());
         wing = LoadModelFromMesh(wingMesh());
+        rayBody = LoadModelFromMesh(makeRayBody());
         tube = LoadModelFromMesh(tubeMesh());
         course = LoadModelFromMesh(courseMesh());
-        for (Model *m : {&cube, &sphere, &cylinder, &pin, &wing, &tube, &course})
+        for (Model *m : {&cube, &sphere, &cylinder, &pin, &wing, &tube, &course, &rayBody})
             m->materials[0].shader = shader;
     }
     void box(Vector3 p, Vector3 scale, Color c) {
@@ -466,53 +468,57 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
             for (float z : {-.20f, .20f})
                 orb({side * .96f, .12f, z}, {.11f, .07f, .08f}, gold);
         }
-        orb({0, .19f, 0}, {.58f, .50f, .69f}, {31, 155, 176, 255});
-        orb({0, .16f, -.30f}, {.49f, .39f, .42f}, cream);
-        box({0, .20f, -.704f}, {.10f, .31f, .025f}, {18, 58, 97, 255});
-        box({-.10f, .35f, -.69f}, {.22f, .07f, .025f}, {18, 58, 97, 255});
-        for (int side : {-1, 1}) {
-            rlPushMatrix();
-            if (side < 0)
-                rlScalef(-1, 1, 1);
-            rlDisableBackfaceCulling();
-            rlRotatef(10 + std::sin(time * 6) * 7, 0, 0, 1);
-            DrawModel(wing, {0, .05f, 0}, 1.08f, {32, 161, 182, 255});
-            rlEnableBackfaceCulling();
-            rlPopMatrix();
-        }
+        // Unified ray: swept fins, domed back and ivory underside, rather than a humanoid torso.
         rlPushMatrix();
-        rlTranslatef(0, .50f, .1f);
-        if (ready)
-            rlRotatef(155 + std::sin(time) * 8, 0, 1, 0);
-        orb({0, .05f, .03f}, {.45f, .31f, .46f}, {40, 164, 182, 255});
-        orb({0, -.06f, .32f}, {.34f, .15f, .24f}, {173, 222, 215, 255});
-        for (float x : {-.19f, .19f}) {
-            float blink = std::fmod(time + 1, 5) < .13f ? .03f : .14f;
-            orb({x, .19f, .36f}, {.145f, blink, .10f}, WHITE);
-            orb({x, .20f, .44f}, {.068f, blink * .8f, .03f}, {20, 48, 68, 255});
-            orb({x - .02f, .24f, .465f}, {.023f, .027f, .01f}, WHITE);
-            beam({x - .10f, .36f, .35f}, {x + .08f, .34f, .35f}, .022f, ink);
+        rlTranslatef(0, .12f, 0);
+        rlRotatef(ready ? 180.f + std::sin(time * 1.5f) * 5.f : bank * 2, 0, 1, 0);
+        rlRotatef(std::sin(time * 4) * 2.5f, 0, 0, 1);
+        rlDisableBackfaceCulling();
+        DrawModel(rayBody, {0, 0, 0}, 1, WHITE);
+        rlEnableBackfaceCulling();
+        // Almond eyes sit on the face, with small highlights and a soft lower eyelid.
+        for (int side : {-1, 1}) {
+            float x = side * .28f, blink = std::fmod(time + 1, 5) < .12f ? .025f : .115f;
+            orb({x, .55f, .57f}, {.205f, blink, .125f}, cream);
+            orb({x - side * .025f, .56f, .677f}, {.089f, blink * .8f, .043f}, {12, 47, 73, 255});
+            orb({x - side * .045f, .61f, .712f}, {.027f, .031f, .012f}, WHITE);
+            for (int i = 0; i < 12; ++i) {
+                float t = i / 11.f;
+                Vector3 a{x - .18f + t * .36f, .66f + .055f * std::sin(t * PI), .61f};
+                Vector3 b{x - .18f + (t + .09f) * .36f, .66f + .055f * std::sin((t + .09f) * PI), .61f};
+                beam(a, b, .018f, {16, 85, 105, 255});
+            }
         }
-        for (int i = 0; i < 8; ++i) {
-            float a = PI * .15f + i * PI * .7f / 7;
-            orb({std::cos(a) * .20f, -.04f - std::sin(a) * .055f, .53f}, {.04f, .018f, .015f}, ink);
+        // Wide curved smile follows the snout, with a continuous ivory teeth ribbon.
+        for (int i = 0; i < 24; ++i) {
+            float x = -.39f + i * .0325f, xx = x + .0325f;
+            float y = .39f - .09f * (1 - x * x / .1521f), yy = .39f - .09f * (1 - xx * xx / .1521f);
+            beam({x, y, .93f}, {xx, yy, .93f}, .032f, {12, 54, 73, 255});
+            beam({x, y + .022f, .95f}, {xx, yy + .022f, .95f}, .012f, cream);
         }
-        orb({0, .38f, 0}, {.47f, .18f, .44f}, {15, 42, 79, 255});
-        orb({0, .34f, .38f}, {.50f, .055f, .34f}, {19, 56, 94, 255});
-        orb({0, .56f, 0}, {.055f, .035f, .055f}, gold);
-        box({0, .43f, .41f}, {.09f, .15f, .02f}, cream);
-        box({0, .49f, .41f}, {.23f, .04f, .02f}, cream);
-        rlPopMatrix();
-        Vector3 last{0, 0, -.5f};
-        for (int i = 1; i <= 10; ++i) {
-            float t = i / 10.f;
-            Vector3 next{std::sin(time * 3 + t * 3) * t * .30f, -.04f - t * .1f, -.5f - t * 1.2f};
-            DrawCylinderEx(last, next, .12f * (1 - t) + .015f, .1f * (1 - t) + .008f, 10,
-                           {27, 129, 153, 255});
+        // Small backward-set cap keeps the face unobstructed.
+        orb({0, .83f, -.13f}, {.37f, .22f, .34f}, {12, 39, 75, 255});
+        orb({0, .72f, .12f}, {.41f, .035f, .29f}, {18, 56, 93, 255});
+        orb({0, 1.05f, -.13f}, {.035f, .025f, .035f}, gold);
+        sign(teamLogos[9], {0, .81f, .212f}, -.24f, .20f, true);
+        // Flexible, tapered whip tail trails behind the whole body.
+        Vector3 last{0, .09f, -.95f};
+        for (int i = 1; i <= 30; ++i) {
+            float t = i / 30.f;
+            Vector3 next{std::sin(time * 3 - t * 4) * t * .32f, .09f + .26f * t * t, -.95f - t * 1.65f};
+            DrawCylinderEx(last, next, .065f * (1 - (t - 1.f / 30)) + .008f, .065f * (1 - t) + .008f, 12,
+                           {26, 131, 157, 255});
             last = next;
         }
+        // Gill lines on the shoulders add readable anatomy without extra body lumps.
+        for (int side : {-1, 1})
+            for (int i = 0; i < 3; ++i)
+                beam({side * (.5f + i * .08f), .46f - i * .04f, .05f},
+                     {side * (.53f + i * .08f), .40f - i * .04f, -.16f}, .012f, {16, 104, 125, 255});
+        rlPopMatrix();
         rlPopMatrix();
     }
+
     void landmarks(float time) {
         Color brick = {145, 72, 48, 255};
         if (arena == 0)
@@ -979,7 +985,8 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         }
         if (aim && mascot) {
             float pull = slingPower * 2.7f;
-            Vector3 center{ballPos.x + shot.aim * 1.6f, .70f, ballPos.z - pull};
+            // Sling attaches to the front of the tube, below the ray's fins.
+            Vector3 center{ballPos.x + shot.aim * 1.6f, .40f, ballPos.z - pull - 1.f};
             for (int side : {-1, 1}) {
                 cyl({side * 4.8f, .04f, 2.4f}, .24f, 1.3f, {24, 69, 110, 255});
                 orb({side * 4.8f, 1.4f, 2.4f}, {.31f, .34f, .31f}, gold);
@@ -999,7 +1006,7 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         EndMode3D();
     }
     void close() {
-        for (Model m : {cube, sphere, cylinder, pin, wing, tube, course})
+        for (Model m : {cube, sphere, cylinder, pin, wing, tube, course, rayBody})
             UnloadModel(m);
         for (auto t : skins)
             UnloadTexture(t);

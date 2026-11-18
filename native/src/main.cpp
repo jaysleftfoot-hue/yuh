@@ -102,6 +102,12 @@ int main(int argc, char **argv) {
         throw std::runtime_error("Missing title-screen.png beside executable");
     GenTextureMipmaps(&titleArt);
     SetTextureFilter(titleArt, TEXTURE_FILTER_TRILINEAR);
+    Texture2D portraits =
+        LoadTexture((std::string(GetApplicationDirectory()) + "assets/baseball-portraits.png").c_str());
+    if (!portraits.id)
+        throw std::runtime_error("Missing baseball-portraits.png");
+    GenTextureMipmaps(&portraits);
+    SetTextureFilter(portraits, TEXTURE_FILTER_TRILINEAR);
     Audio audio;
     audio.init();
     const char *dir = std::getenv("APPDATA");
@@ -508,7 +514,7 @@ int main(int argc, char **argv) {
                 screen = 0;
             text("Equipped: " + ballName(skin), 30, 745, 20, aqua);
         } else {
-            baseballHud();
+            baseballHud(portraits, 1 + arena % 3);
             scoreCard(match.games[0], 16, gold, "YOU");
             scoreCard(match.games[1], 654, aqua, "RIVAL");
             title(match.mascot ? "RAYS ADVENTURE" : arenas[arena].name, 184, 122, 20, cream);
@@ -615,6 +621,7 @@ int main(int argc, char **argv) {
         }
     }
     audio.close();
+    UnloadTexture(portraits);
     UnloadTexture(titleArt);
     UnloadFont(arcadeFont);
     UnloadFont(uiFont);

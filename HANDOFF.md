@@ -1,3 +1,5 @@
+Latest character pass: vector-style baseball HUD portraits replace primitive faces; rivals cycle helmet batter/umpire/ball boy by stadium. Actual ray 3D body rebuilt in native/src/ray_model.hpp with swept fins and ivory underside; art.hpp supplies face, tail, cap and tube. No lane, speed or input changes. See native/assets/CHARACTER_ART.md.
+
 Latest: illustrated native title screen with real bottom menu controls. Screen0 title, 1 gameplay, 2 locker, 3 match setup, 4 career, 5 help. Enter/Single Player goes to setup; Escape returns to title from submenus. Full-power travel tuned to ~3.5s with lane dimensions unchanged. Signed floor pow() expressions replaced to address driver-dependent black half-lane. Windows graphics fix requires user-machine confirmation.
 
 Latest milestone uses the supplied graveyard screenshot as composition reference: 160-unit lane and original baseball arcade HUD, no boxed gameplay/menu buttons. Bangers display font and OFL are packaged. Read latest sections of native/PROPORTIONS.md and native/ART_DIRECTION.md before editing.

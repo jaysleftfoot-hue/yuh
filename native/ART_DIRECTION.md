@@ -1,3 +1,5 @@
+Character direction: use the illustrated baseball-portraits.png HUD atlas, not primitive geometric faces. Ray mascot uses the continuous 3D body in ray_model.hpp, with broad fins, cream underside and expressive face; do not replace it with a sprite.
+
 Authoritative latest visual reference: the user supplied Zombies graveyard screenshot. Long tapering lane, tiny distant rack, low cropped ball; decorative top frame, stitched score plaques, left-side power strip, portrait badges and free-standing arcade MENU lettering. No rectangular application-style buttons, including pause/results/clubhouse. Baseball theming remains. Lane run deliberately increased to 160 units; see PROPORTIONS.md latest section.
 
 Latest stadium identity pass: actual sourced stadium wordmarks and MLB marks in native/assets/parks (provenance in SOURCES.md), layered video graphics and steel trusses. Tropicana has a wide screen, catwalk and orange landmark. Stadium ready camera intentionally reframed; world geometry remains 80×10. See native/PROPORTIONS.md for the projected-view regression guard. Existing ten-park roster unchanged; Citi, Comerica and Rate photos inform presentation only.

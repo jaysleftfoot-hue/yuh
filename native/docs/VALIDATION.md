@@ -1,3 +1,10 @@
+# Character artwork and ray model milestone
+
+- Native scoring, geometry, pacing, physics and campaign tests pass. Lane dimensions, cameras, throw speed, physics body and input mappings are unchanged.
+- The ray uses a new closed 3D mesh with smooth normals, continuous swept fins and colored upper/lower surfaces. Face, cap, tapered animated tail, banking and tube are rendered in 3D. Sling attachment was lowered to the tube to avoid crossing the fins.
+- Launch and pin-impact views inspected in both modes. Umpire and ball-boy stadium previews verify portrait atlas selection; the helmet batter and Rays player also display correctly. Portraits are vector-style raster artwork, not editable SVGs.
+- Windows build and NSIS installer compile checked; ZIP CRC and packaged artwork compared to source. Windows runtime remains unverified.
+
 # Illustrated title / pacing / floor shader milestone
 
 - Original illustrated title-screen texture is packaged, with native menu hit targets. Real X11 mouse navigation verified Help → Back, Scores → Back, Locker → Back, Single Player → Setup → Gameplay, and Mascot Adventure → Setup → Gameplay. Preview tracing confirmed screen and mode transitions. F12 captures/exits when using --screenshot for interactive verification.

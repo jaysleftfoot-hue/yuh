@@ -48,7 +48,7 @@ inline void panel(Rectangle r, Color c) {
         DrawLine(x, y, x + 3, y + 1, {0, 0, 0, 30});
     }
 }
-inline void baseballHud() {
+inline void baseballHud(Texture2D portraits, int rival) {
     // Interlocking leather pads and crossed bats frame the scene below the scores.
     for (int i = 0; i < 26; ++i) {
         float x = i * 50.f;
@@ -67,20 +67,16 @@ inline void baseballHud() {
             DrawCircle(640 + (col - row * .5f) * 19, 139 - row * 15, 5, {150, 242, 77, 255});
     panel({8, 130, 145, 566}, {49, 64, 70, 255});
     title("POWER UPS", 14, 274, 30, gold);
-    // Original baseball character portraits, framed like collectible player cards.
+    // Vector-style illustrated busts replace the primitive oval/rectangle faces.
+    const char *names[] = {"YOU", "SLUGGER", "UMPIRE", "BALL BOY"};
     for (int side = 0; side < 2; ++side) {
         float x = side ? 1206 : 80;
+        int who = side ? rival : 0;
         panel({x - 68, 128, 136, 138}, {54, 70, 76, 255});
-        DrawCircleGradient(x, 194, 51, {224, 183, 130, 255}, {126, 77, 44, 255});
-        DrawEllipse(x, 162, 51, 21, side ? Color{116, 37, 39, 255} : Color{16, 53, 88, 255});
-        DrawEllipse(x - 12, 176, 54, 8, side ? red : aqua);
-        DrawCircle(x - 18, 194, 9, cream);
-        DrawCircle(x + 18, 194, 9, cream);
-        DrawCircle(x - 16, 196, 4, ink);
-        DrawCircle(x + 20, 196, 4, ink);
-        DrawEllipse(x, 217, 25, 10, {75, 39, 27, 255});
-        DrawRectangle(x - 17, 210, 34, 7, cream);
-        title(side ? "RIVAL" : "YOU", x - 28, 236, 23, cream);
+        float w = portraits.width / 2.f, h = portraits.height / 2.f;
+        DrawTexturePro(portraits, {(who % 2) * w, (who / 2) * h, w, h}, {x - 63, 130, 126, 119}, {0, 0},
+                       0, WHITE);
+        title(names[who], x - 42, 244, 20, cream);
     }
 }
 inline void arcadeMeter(float x, float y, float power, Color c) {
