@@ -1,3 +1,3 @@
-# Stadium identity backup
+# Arcade installer milestone
 
-Source commit 1a91cb13dafa6d5b9d906d657dfc5c5b42f24f4b on codex/big-league-bowling. Includes sourced stadium artwork, camera framing regression guards and Tropicana video wall. Linux rules/campaign tests and full native match passed. Windows cross-build, all logo equality and ZIP CRC verified; Windows execution unverified.
+Source e55b29ea02af0f787e507443a0bdfc829655591f on codex/big-league-bowling. Run Big-League-Bowling-Setup.exe on Windows x64 for user-level installation, shortcuts and uninstaller. Portable ZIP also available. Native Linux tests and mouse-input checks passed. Windows cross-build and NSIS compile passed; Windows install/play/uninstall is unverified. Unsigned installer. Verify SHA256SUMS.txt.
