@@ -11,12 +11,22 @@ int main() {
     Shot input{};
     input.position = 3;
     input.curve = .2f;
-    auto drag = alleyDrag(input, 120, 90);
-    require(std::abs(drag.power - .65f) < .001f && drag.aim == .5f, "drag sets power and aim");
-    require(drag.position == 3 && drag.curve == .2f, "drag locks position and preserves spin");
-    require(alleyDrag(input, -1000, 1000).power == 1 && alleyDrag(input, -1000, 1000).aim == -1,
-            "drag upper bounds");
-    require(alleyDrag(input, 1000, -1000).power == .15f, "downward drag minimum power");
+    StadiumSetup setup;
+    setup.adjust(input, 7, -.9f);
+    require(input.position == 7 && input.curve == .2f, "spot changes only position");
+    require(!setup.confirm() && setup.phase == ShotPhase::Curve, "first confirm cannot launch");
+    setup.adjust(input, 1, -.6f);
+    require(input.position == 7 && input.curve == -.6f, "curve locks spot");
+    require(!setup.confirm() && setup.phase == ShotPhase::Power, "second confirm cannot launch");
+    setup.adjust(input, 2, .9f);
+    setup.tick(input, .6f);
+    require(input.position == 7 && input.curve == -.6f && input.power > .8f,
+            "power locks spot and curve");
+    require(setup.confirm(), "only third confirm launches");
+    setup.back();
+    require(setup.phase == ShotPhase::Curve, "back edits curve before launch");
+    setup.reset();
+    require(setup.phase == ShotPhase::Spot && setup.seconds == 0, "new shot resets all phases");
     require(alleyPosition(-100) == geometry::launchMin && alleyPosition(2000) == geometry::launchMax,
             "placement clamps to lane");
     auto pull = mascotPull(input, 100, 80);
@@ -107,7 +117,7 @@ int main() {
     }
     require(coursePointer(640, 720), "tube itself accepts sling press");
     require(!coursePointer(1160, 260) && !coursePointer(80, 750), "HUD buttons cannot launch shots");
-    require(heldPower(.6f) > heldPower(.1f), "stationary stadium hold builds power");
+    require(heldPower(.6f) > heldPower(.1f), "timed power meter rises");
     std::cout << "Campaign tests passed: 64 designs, 10 stadiums, save/restore, powers, steering, "
                  "boost, AI matches\n";
 }

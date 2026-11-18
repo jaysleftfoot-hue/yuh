@@ -1,3 +1,5 @@
+Latest arcade UI / controls milestone (supersedes older UI and input notes below): all native panels now use original painted rock/turf, chipped slate and green organic actions. Compact versus setup replaces the rejected navy dashboard; locker, help, scores, HUD, pause and results follow the same art. Internet references and provenance: native/assets/ARCADE_UI.md. Stadium bowling now uses separate Spot → Curve → Power confirmations. Mouse motion / A-D place; click locks; mouse / arrows set curve; click locks; third click times the power meter and releases. Space/Enter confirms, Backspace goes back. Mascot slingshot remains separate. No geometry/camera/speed changes.
+
 # Control and scale reference review
 
 Reviewed the supplied Zombies Dropbox video (26.333s), its dense placement/power sequence, and the Polar Dropbox video (20.733s). Also inspected official screenshots and game description from https://store.steampowered.com/app/32160/ and its appdetails API. No exact world measurements or mouse events are exposed; mappings below are adaptations, not verified original source behavior.

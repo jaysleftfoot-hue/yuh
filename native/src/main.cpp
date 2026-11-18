@@ -108,6 +108,19 @@ int main(int argc, char **argv) {
         throw std::runtime_error("Missing baseball-portraits.png");
     GenTextureMipmaps(&portraits);
     SetTextureFilter(portraits, TEXTURE_FILTER_TRILINEAR);
+    auto uiTexture = [](const char *name) {
+        Texture2D t = LoadTexture((std::string(GetApplicationDirectory()) + "assets/" + name).c_str());
+        if (!t.id)
+            throw std::runtime_error(std::string("Missing UI asset: ") + name);
+        GenTextureMipmaps(&t);
+        SetTextureFilter(t, TEXTURE_FILTER_TRILINEAR);
+        return t;
+    };
+    uiBallShader =
+        LoadShader(nullptr, (std::string(GetApplicationDirectory()) + "assets/ui-ball.fs").c_str());
+    uiSlate = uiTexture("arcade-slate.png");
+    uiFrame = uiTexture("arcade-frame.png");
+    uiButton = uiTexture("arcade-button.png");
     Audio audio;
     audio.init();
     const char *dir = std::getenv("APPDATA");
@@ -122,11 +135,12 @@ int main(int argc, char **argv) {
     Match match;
     match.mascot = smokeMascot;
     Shot shot;
+    StadiumSetup stadiumSetup;
     int state = 0, screen = startInGame || smoke ? 1 : 0, arena = previewArena < 0 ? 0 : previewArena,
-        skin = 0, rolls = 0, ticks = 0, selectedSkin = 0;
+        skin = 0, rolls = 0, ticks = 0, selectedSkin = 0, lockerReturn = 0;
     float time = 0, accum = 0, reaction = 0, chargeTime = 0, aiWait = .9f, celebration = 0;
     Vector2 dragStart{};
-    bool mouseCharge = false;
+    bool mouseCharge = false, stadiumArmed = false;
     bool paused = false, charge = false, done = false, ok = false, awarded = false;
     std::string result = "WELCOME TO THE TOUR", reward;
     Camera3D camera{{0, 3.0f, -6.2f}, {0, 1.7f, 23}, {0, 1, 0}, 43, CAMERA_PERSPECTIVE};
@@ -141,6 +155,8 @@ int main(int argc, char **argv) {
         awarded = false;
         reward.clear();
         shot = Shot{};
+        stadiumSetup.reset();
+        stadiumArmed = false;
         aiWait = .9f;
         result = "MAKE SOME NOISE!";
     };
@@ -186,6 +202,7 @@ int main(int argc, char **argv) {
             if (screen == 1) {
                 paused = !paused;
                 charge = false;
+                stadiumArmed = false;
             } else if (screen != 0)
                 screen = 0;
             else
@@ -211,44 +228,63 @@ int main(int argc, char **argv) {
                         match.equip(Power(1 + rolls % 3));
                     launch();
                 } else {
-                    shot.position = std::clamp(
-                        shot.position +
-                            ((IsKeyDown(KEY_D) ? 1.f : 0) - (IsKeyDown(KEY_A) ? 1.f : 0)) * dt * 3,
-                        geometry::launchMin, geometry::launchMax);
-                    shot.aim = std::clamp(
-                        shot.aim +
-                            ((IsKeyDown(KEY_RIGHT) ? 1.f : 0) - (IsKeyDown(KEY_LEFT) ? 1.f : 0)) * dt,
-                        -1.f, 1.f);
-                    shot.curve = std::clamp(
-                        shot.curve + ((IsKeyDown(KEY_E) ? 1.f : 0) - (IsKeyDown(KEY_Q) ? 1.f : 0)) * dt,
-                        -1.f, 1.f);
                     bool alleyPointer = coursePointer(GetMouseX(), GetMouseY());
-                    if (!match.mascot && !charge && alleyPointer &&
-                        (GetMouseDelta().x != 0 || GetMouseDelta().y != 0))
-                        shot.position = alleyPosition(GetMouseX());
-                    if (IsKeyPressed(KEY_SPACE) ||
-                        (alleyPointer && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))) {
-                        charge = true;
-                        mouseCharge = alleyPointer && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-                        dragStart = GetMousePosition();
-                        chargeTime = 0;
-                    }
-                    if (charge) {
-                        chargeTime += dt;
-                        if (mouseCharge) {
-                            shot = match.mascot ? mascotPull(shot, GetMouseX() - dragStart.x,
-                                                             GetMouseY() - dragStart.y)
-                                                : alleyDrag(shot, GetMouseX() - dragStart.x,
-                                                            dragStart.y - GetMouseY());
-                            if (!match.mascot && std::abs(dragStart.y - GetMouseY()) < 8)
+                    if (!match.mascot) {
+                        float position =
+                            shot.position + (float(IsKeyDown(KEY_D)) - float(IsKeyDown(KEY_A))) * dt * 3;
+                        float curve = shot.curve + (float(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_E)) -
+                                                    float(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_Q))) *
+                                                       dt;
+                        if (alleyPointer && GetMouseDelta().x != 0) {
+                            position = alleyPosition(GetMouseX());
+                            curve = std::clamp((GetMouseX() - 640.f) / 350.f, -1.f, 1.f);
+                        }
+                        if (IsKeyPressed(KEY_BACKSPACE))
+                            stadiumSetup.back();
+                        stadiumSetup.adjust(shot, position, curve);
+                        stadiumSetup.tick(shot, dt);
+                        // Confirm on release, so a click cannot carry into the next phase.
+                        if (!stadiumArmed) {
+                            stadiumArmed = !IsKeyDown(KEY_SPACE) && !IsKeyDown(KEY_ENTER) &&
+                                           !IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+                        } else if (IsKeyReleased(KEY_SPACE) || IsKeyReleased(KEY_ENTER) ||
+                                   (alleyPointer && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))) {
+                            if (stadiumSetup.confirm())
+                                launch();
+                            else
+                                audio.play(audio.click);
+                            if (!screenshot.empty())
+                                std::cout << "Shot phase: " << int(stadiumSetup.phase)
+                                          << " state=" << state << " position=" << shot.position
+                                          << " curve=" << shot.curve << " power=" << shot.power
+                                          << std::endl;
+                        }
+                    } else {
+                        shot.position = std::clamp(
+                            shot.position + (float(IsKeyDown(KEY_D)) - float(IsKeyDown(KEY_A))) * dt * 3,
+                            geometry::launchMin, geometry::launchMax);
+                        shot.aim = std::clamp(
+                            shot.aim + (float(IsKeyDown(KEY_RIGHT)) - float(IsKeyDown(KEY_LEFT))) * dt,
+                            -1.f, 1.f);
+                        if (IsKeyPressed(KEY_SPACE) ||
+                            (alleyPointer && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))) {
+                            charge = true;
+                            mouseCharge = alleyPointer && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+                            dragStart = GetMousePosition();
+                            chargeTime = 0;
+                        }
+                        if (charge) {
+                            chargeTime += dt;
+                            shot = mouseCharge ? mascotPull(shot, GetMouseX() - dragStart.x,
+                                                            GetMouseY() - dragStart.y)
+                                               : shot;
+                            if (!mouseCharge)
                                 shot.power = heldPower(chargeTime);
-                        } else
-                            shot.power = heldPower(chargeTime);
+                        }
+                        if (charge && ((!mouseCharge && IsKeyReleased(KEY_SPACE)) ||
+                                       (mouseCharge && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))))
+                            launch();
                     }
-                    if (((!mouseCharge && IsKeyReleased(KEY_SPACE)) ||
-                         (mouseCharge && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))) &&
-                        charge)
-                        launch();
                     for (int i = 0; i < 3; ++i)
                         if (IsKeyPressed(KEY_ONE + i))
                             match.equip(Power(i + 1));
@@ -297,6 +333,8 @@ int main(int argc, char **argv) {
                     state = match.complete() ? 3 : 0;
                     aiWait = smoke ? 0 : .9f;
                     shot = Shot{};
+                    stadiumSetup.reset();
+                    stadiumArmed = false;
                 }
             }
             if (state == 3 && !awarded) {
@@ -360,19 +398,9 @@ int main(int argc, char **argv) {
         DrawTexturePro(scene.texture, {0, 0, float(W), -float(H)}, {0, 0, float(W), float(H)}, {0, 0}, 0,
                        WHITE);
         EndShaderMode();
-        if (screen == 0 || screen == 4 || screen == 5) {
+        if (screen != 1) {
             DrawTexturePro(titleArt, {0, 0, float(titleArt.width), float(titleArt.height)},
                            {0, 0, float(W), float(H)}, {0, 0}, 0, WHITE);
-        }
-        if (screen == 2 || screen == 3) {
-            DrawRectangle(0, 0, W, 76, ink);
-            DrawRectangle(0, 74, W, 3, gold);
-            text("BIG LEAGUE BOWLING", 24, 16, 27, cream);
-            text("BALLPARK TOUR", 27, 48, 14, aqua);
-            text(arenas[arena].name, 568, 15, 24, gold);
-            text(arenas[arena].theme, 570, 46, 14, cream);
-            if (button({1110, 18, 142, 36}, audio.muted ? "SOUND OFF" : "SOUND ON"))
-                audio.toggle();
         }
         uiBlocked = paused;
         if (screen == 0) {
@@ -389,6 +417,7 @@ int main(int argc, char **argv) {
             }
             if (button({145, 718, 190, 42}, "BALL LOCKER")) {
                 selectedSkin = skin;
+                lockerReturn = 0;
                 screen = 2;
             }
             if (button({350, 718, 145, 42}, "SCORES"))
@@ -400,119 +429,104 @@ int main(int argc, char **argv) {
             if (button({920, 718, 140, 42}, "QUIT"))
                 done = true;
         } else if (screen == 4 || screen == 5) {
-            // A theatrical full-screen interlude, not a dashboard over the title art.
-            DrawRectangle(0, 0, W, H, {5, 15, 23, 215});
+            modal({184, 35, 912, 730}, screen == 4 ? "HALL OF FAME" : "HOW TO BOWL");
             if (screen == 4) {
-                title("HALL OF FAME", 460, 180, 65, gold);
-                center(std::to_string(profile.wins) + " WINS  /  " + std::to_string(profile.matches) +
-                           " MATCHES",
-                       640, 302, 27, cream);
-                center("BEST GAME  " + std::to_string(profile.best), 640, 360, 29, cream);
-                center(std::to_string(profile.xp) + " XP   |   " + std::to_string(profile.balls()) +
-                           " / 64 BALLS",
-                       640, 419, 24, gold);
-                center(std::to_string(profile.stadiums()) + " / 10 STADIUMS", 640, 471, 24, aqua);
+                portraitCard(portraits, 0, {290, 242, 200, 270}, "THE BIG LEAGUER");
+                arcadeCenter(std::to_string(profile.wins) + " WINS  /  " +
+                                 std::to_string(profile.matches) + " GAMES",
+                             770, 267, 32);
+                arcadeCenter("BEST GAME  " + std::to_string(profile.best), 770, 325, 34, gold);
+                arcadeCenter(std::to_string(profile.xp) + " CAREER XP", 770, 388, 29);
+                arcadeCenter(std::to_string(profile.balls()) + " / 64 BALLS UNLOCKED", 770, 440, 26);
+                arcadeCenter(std::to_string(profile.stadiums()) + " / 10 BALLPARKS", 770, 487, 26);
+                arcadeCenter("FINAL DESTINATION: TROPICANA FIELD", 640, 574, 26, gold);
             } else {
-                title("HOW TO BOWL", 455, 160, 65, gold);
-                center("STADIUM BOWLING", 640, 277, 28, gold);
-                center("Move the mouse to line up. Hold to power up.", 640, 324, 23, cream);
-                center("Drag up for power, sideways to aim. Release to bowl.", 640, 361, 23, cream);
-                center("MASCOT ADVENTURE", 640, 428, 28, aqua);
-                center("Grab the tube. Pull back and sideways, then release.", 640, 475, 23, cream);
-                center("A / D or arrows to steer. Space to boost.", 640, 512, 23, cream);
-                center("1 / 2 / 3: power-ups     Escape: pause     F11: fullscreen", 640, 570, 19,
-                       cream);
+                arcadeCenter("STADIUM: THREE STEPS TO A STRIKE", 640, 210, 32, gold);
+                arcadeCenter("1. SPOT: MOVE THE BALL, CLICK TO LOCK", 640, 260, 26);
+                arcadeCenter("2. CURVE: MOVE LEFT / RIGHT, CLICK TO LOCK", 640, 304, 26);
+                arcadeCenter("3. POWER: CLICK WHEN THE METER IS RIGHT", 640, 348, 26);
+                center("A / D: spot   |   Arrows: curve   |   Space: confirm   |   Backspace: go back",
+                       640, 394, 16, cream);
+                arcadeCenter("MASCOT: GRAB THE TUBE AND PULL BACK", 640, 450, 30, gold);
+                arcadeCenter("PULL SIDEWAYS TO AIM. RELEASE TO LAUNCH.", 640, 493, 25);
+                arcadeCenter("A / D OR ARROWS: STEER. SPACE: BOOST.", 640, 533, 25);
+                center("1 / 2 / 3: power-ups   |   Escape: pause   |   M: sound   |   F11: fullscreen",
+                       640, 589, 16, cream);
             }
-            if (button({470, 680, 340, 60}, "BACK TO MAIN MENU", true))
+            if (plaqueButton({516, 650, 248, 64}, "BACK"))
                 screen = 0;
         } else if (screen == 3) {
-            DrawRectangleGradientH(0, 77, 800, 723, {7, 18, 33, 250}, {7, 18, 33, 0});
-            title("BOWL LIKE", 40, 105, 55, cream);
-            title("A BIG LEAGUER.", 40, 161, 57, gold);
-            if (button({45, 245, 275, 49}, "STADIUM BOWLING", !match.mascot)) {
-                match.mascot = false;
-                audio.play(audio.click);
-            }
-            if (button({332, 245, 275, 49}, "MASCOT RIDE", match.mascot)) {
-                match.mascot = true;
-                audio.play(audio.click);
-            }
-            text(match.mascot ? "Ride the ray. Steer after launch. Boost into the rack."
-                              : "Time the release. Shape your shot. Outsmart your rival.",
-                 46, 315, 17, cream);
-            panel({43, 355, 565, 158}, {16, 34, 54, 245});
-            text("STADIUM " + std::to_string(arena + 1) + " / 10", 65, 369, 16, aqua);
-            center(arenas[arena].name, 326, 402, 28, cream);
-            center(arenas[arena].theme, 326, 439, 18, gold);
-            if (button({57, 405, 43, 38}, "<"))
+            modal({180, 24, 920, 752}, "BALLPARK SHOWDOWN");
+            // Compact versus composition: park preview above two portrait plaques.
+            panel({486, 154, 308, 180});
+            DrawTexturePro(scene.texture, {0, 0, float(W), -float(H)}, {502, 172, 276, 143}, {0, 0}, 0,
+                           WHITE);
+            if (button({425, 211, 54, 58}, "<"))
                 arena = (arena + 9) % 10;
-            if (button({552, 405, 43, 38}, ">"))
+            if (button({801, 211, 54, 58}, ">"))
                 arena = (arena + 1) % 10;
-            center(arena < profile.stadiums()
-                       ? "UNLOCKED"
-                       : std::string("Win at ") + arenas[arena - 1].name + " to unlock",
-                   326, 477, 15, arena < profile.stadiums() ? aqua : gold);
-            if (button({45, 538, 563, 60}, "TAKE ON THE RIVAL", true, arena < profile.stadiums()) ||
-                (IsKeyPressed(KEY_ENTER) && arena < profile.stadiums())) {
+            arcadeCenter(arenas[arena].name, 640, 341, 28);
+            portraitCard(portraits, 0, {275, 343, 212, 246}, "PLAYER ONE");
+            portraitCard(portraits, 1 + arena % 3, {793, 343, 212, 246}, "THE RIVAL");
+            arcadeCenter("VS", 640, 387, 76, {170, 255, 64, 255});
+            if (plaqueButton({495, 487, 290, 68}, match.mascot ? "MASCOT RIDE" : "STADIUM BOWLING"))
+                match.mascot = !match.mascot;
+            arcadeCenter("CLICK TO CHANGE MODE", 640, 560, 18);
+            bool unlocked = arena < profile.stadiums();
+            arcadeCenter(unlocked ? (match.mascot ? "PULL BACK. LET FLY. RIDE THE RAY!"
+                                                  : "SPOT. CURVE. POWER. TAKE ON THE RIVAL!")
+                                  : "WIN AT " + std::string(arenas[arena - 1].name) + " TO UNLOCK",
+                         640, 608, 24, unlocked ? cream : gold);
+            if (plaqueButton({395, 650, 226, 65}, unlocked ? "START" : "LOCKED", unlocked) ||
+                (IsKeyPressed(KEY_ENTER) && unlocked)) {
                 screen = 1;
                 restart();
                 audio.play(audio.cheer);
             }
-            if (button({45, 624, 275, 48}, "BALL LOCKER")) {
+            if (plaqueButton({659, 650, 226, 65}, "BACK"))
+                screen = 0;
+            if (button({275, 594, 212, 35}, "BALL LOCKER")) {
                 selectedSkin = skin;
+                lockerReturn = 3;
                 screen = 2;
             }
-            text(std::to_string(profile.balls()) + " / 64 unlocked", 344, 638, 18, gold);
-            text("30 TEAM BALLS + 30 FUN DESIGNS + 4 RAYS SPECIALS", 45, 700, 16, cream);
-            text("Final destination: TROPICANA FIELD", 45, 738, 20, aqua);
-            panel({860, 521, 374, 180}, {12, 29, 47, 238});
-            center("YOUR CAREER", 1047, 539, 23, gold);
-            center(std::to_string(profile.wins) + " wins  /  " + std::to_string(profile.matches) +
-                       " matches",
-                   1047, 579, 19, cream);
-            center(std::to_string(profile.xp) + " XP  /  Best " + std::to_string(profile.best), 1047,
-                   615, 19, aqua);
-            center("80 XP unlocks the next ball", 1047, 655, 16, cream);
-            if (button({930, 720, 300, 50}, "BACK TO MAIN MENU"))
-                screen = 0;
+            arcadeCenter("PARK " + std::to_string(arena + 1) + " / 10", 900, 598, 20, gold);
         } else if (screen == 2) {
-            DrawRectangle(0, 78, W, H - 78, {7, 18, 33, 245});
-            text("THE BALL LOCKER", 30, 96, 32, gold);
-            text("30 clubs. 30 playful remixes. 4 for Tampa Bay.", 500, 110, 19, cream);
+            modal({74, 12, 1132, 778}, "THE BALL LOCKER");
+            arcadeCenter("30 CLUBS. 30 FUN DESIGNS. 4 RAYS SPECIALS.", 640, 134, 23);
+            // Display balls on a single stone cabinet, without individual dashboard cards.
             for (int id = 0; id < 64; ++id) {
                 int col = id % 8, row = id / 8;
-                Rectangle cell{29 + col * 112.f, 153 + row * 70.f, 104, 62};
+                Rectangle cell{139 + col * 84.f, 193 + row * 58.f, 78, 55};
                 bool unlocked = id < profile.balls();
-                panel(cell, id == selectedSkin ? Color{58, 88, 106, 255} : Color{21, 37, 56, 255});
-                DrawTexturePro(art.skins[id], {0, 0, 256, 128}, {cell.x + 25, cell.y + 3, 54, 36},
-                               {0, 0}, 0, unlocked ? WHITE : Color{70, 70, 70, 255});
-                center(std::to_string(id + 1) + (unlocked ? "" : " LOCK"), cell.x + 52, cell.y + 43, 12,
-                       unlocked ? cream : GRAY);
+                if (id == selectedSkin)
+                    DrawRing({cell.x + 39, cell.y + 23}, 24, 27, 0, 360, 40, gold);
+                ballIcon(art.skins[id], cell.x + 16, cell.y, 46, unlocked);
+                arcadeCenter(std::to_string(id + 1) + (unlocked ? "" : " X"), cell.x + 39, cell.y + 43,
+                             13, unlocked ? cream : GRAY);
                 if (CheckCollisionPointRec(GetMousePosition(), cell) &&
                     IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
                     selectedSkin = id;
             }
-            panel({950, 167, 300, 457}, ink);
-            center("BALL " + std::to_string(selectedSkin + 1), 1100, 189, 23, gold);
-            DrawTexturePro(art.skins[selectedSkin], {0, 0, 256, 128}, {977, 243, 246, 123}, {0, 0}, 0,
-                           WHITE);
-            center(selectedSkin < 30   ? teams[selectedSkin].id
-                   : selectedSkin < 60 ? teams[selectedSkin - 30].id
-                                       : "RAYS SPECIAL",
-                   1100, 393, 25, aqua);
+            panel({855, 208, 278, 403});
+            arcadeCenter("BALL " + std::to_string(selectedSkin + 1), 994, 237, 31, gold);
+            ballIcon(art.skins[selectedSkin], 926, 290, 136);
             std::string name = ballName(selectedSkin);
-            float fontSize = std::min(19.f, 255.f / std::max(1.f, tw(name, 19)) * 19);
-            center(name, 1100, 439, fontSize, cream);
-            center(selectedSkin < profile.balls() ? "UNLOCKED"
-                                                  : std::to_string(selectedSkin * 80) + " career XP",
-                   1100, 479, 18, gold);
-            if (button({980, 542, 240, 49}, "EQUIP", true, selectedSkin < profile.balls())) {
+            float size = std::min(
+                24.f, 230.f / std::max(1.f, MeasureTextEx(arcadeFont, name.c_str(), 24, 1).x) * 24);
+            arcadeCenter(name, 994, 439, size);
+            arcadeCenter(selectedSkin < profile.balls()
+                             ? "UNLOCKED"
+                             : std::to_string(selectedSkin * 80) + " CAREER XP",
+                         994, 484, 22, gold);
+            if (plaqueButton({892, 533, 204, 57}, skin == selectedSkin ? "EQUIPPED" : "EQUIP",
+                             selectedSkin < profile.balls())) {
                 skin = selectedSkin;
                 audio.play(audio.click);
             }
-            if (button({970, 690, 260, 51}, "BACK TO CLUBHOUSE"))
-                screen = 0;
-            text("Equipped: " + ballName(skin), 30, 745, 20, aqua);
+            arcadeCenter("EQUIPPED: " + ballName(skin), 475, 676, 22, gold);
+            if (plaqueButton({891, 657, 216, 64}, "BACK"))
+                screen = lockerReturn;
         } else {
             baseballHud(portraits, 1 + arena % 3);
             scoreCard(match.games[0], 16, gold, "YOU");
@@ -523,11 +537,10 @@ int main(int argc, char **argv) {
                   : match.player == 0 ? "YOUR TURN"
                                       : "RIVAL'S TURN",
                   184, 148, 19, gold);
-            if (state == 2 || state == 3) {
+            if (state == 2) {
                 title(result, 260, 245, 46, gold);
             }
-            if (state == 3)
-                center(reward, 640, 429, 18, cream);
+
             if (celebration > 0)
                 for (int i = 0; i < 65; ++i) {
                     float phase = 2 - celebration;
@@ -536,16 +549,19 @@ int main(int argc, char **argv) {
                                   i % 2 ? gold : aqua);
                 }
             bool enabled = state == 0 && match.player == 0 && !paused;
-            if ((state != 1 && state != 2) && state == 3) {
-
-                if (button({790, 706, 219, 48}, state == 3 ? "REMATCH" : "BOWL", true,
-                           enabled || state == 3)) {
-                    if (state == 3)
-                        restart();
-                    else
-                        launch();
-                }
-                if (button({1030, 706, 209, 48}, "CLUBHOUSE")) {
+            if (state == 3) {
+                DrawRectangle(0, 0, W, H, {0, 0, 0, 110});
+                panel({292, 187, 696, 458});
+                arcadeCenter(result, 640, 231, 39, {170, 255, 64, 255});
+                portraitCard(portraits,
+                             *match.games[0].scores()[9] >= *match.games[1].scores()[9] ? 0
+                                                                                        : 1 + arena % 3,
+                             {548, 296, 184, 210}, "TOP BOWLER");
+                center(reward, 640, 526, std::min(18.f, 600.f / std::max(1.f, tw(reward, 18)) * 18),
+                       cream);
+                if (plaqueButton({382, 568, 225, 60}, "REMATCH"))
+                    restart();
+                if (plaqueButton({673, 568, 225, 60}, "CLUBHOUSE")) {
                     screen = 0;
                     paused = false;
                     charge = false;
@@ -561,16 +577,37 @@ int main(int argc, char **argv) {
             if (!match.mascot && state == 0 && human) {
                 float x = 240 + (shot.position - geometry::launchMin) /
                                     (geometry::launchMax - geometry::launchMin) * 800;
-                if (!charge) {
+                const char *labels[] = {"1. SPOT - MOVE THE BALL", "2. CURVE - SHAPE YOUR SHOT",
+                                        "3. POWER - TIME YOUR RELEASE"};
+                title(labels[int(stadiumSetup.phase)], 180, 194, 27, gold);
+                title(stadiumSetup.phase == ShotPhase::Power ? "CLICK / SPACE TO BOWL!"
+                                                             : "CLICK / SPACE TO LOCK",
+                      180, 227, 22, cream);
+                if (stadiumSetup.phase != ShotPhase::Spot)
+                    title("BACKSPACE: PREVIOUS STEP", 180, 258, 17, cream);
+                if (stadiumSetup.phase == ShotPhase::Spot) {
                     DrawLineEx({x - 28, 535}, {x + 28, 535}, 5, aqua);
                     DrawTriangle({x - 39, 535}, {x - 23, 548}, {x - 23, 522}, aqua);
                     DrawTriangle({x + 39, 535}, {x + 23, 522}, {x + 23, 548}, aqua);
-                    title("MOVE TO LINE UP", 180, 194, 25, gold);
-                    text("HOLD TO POWER UP / RELEASE TO BOWL", 180, 225, 16, cream);
+                } else if (stadiumSetup.phase == ShotPhase::Curve) {
+                    // A bent flight arrow, not an application slider.
+                    Vector2 start{640, 610}, previous = start;
+                    for (int i = 1; i <= 24; ++i) {
+                        float t = i / 24.f;
+                        Vector2 next{640 + shot.curve * 155 * t * t, 610 - 145 * t};
+                        DrawLineEx(previous, next, 5, gold);
+                        previous = next;
+                    }
+                    DrawTriangle({previous.x, previous.y - 12}, {previous.x - 10, previous.y + 6},
+                                 {previous.x + 10, previous.y + 6}, gold);
+                    arcadeCenter(std::abs(shot.curve) < .03f
+                                     ? "STRAIGHT"
+                                     : std::string(shot.curve < 0 ? "LEFT " : "RIGHT ") +
+                                           std::to_string(int(std::abs(shot.curve) * 100)) + "%",
+                                 640, 642, 25, cream);
                 } else {
-                    arcadeMeter(x, 510, shot.power, gold);
-                    title("RELEASE TO BOWL!", 180, 194, 25, gold);
-                    center(std::to_string(int(shot.power * 100)) + "%", x, 596, 17, aqua);
+                    arcadeMeter(1045, 510, shot.power, gold);
+                    arcadeCenter(std::to_string(int(shot.power * 100)) + "%", 1045, 559, 26, gold);
                 }
             }
             {
@@ -583,6 +620,7 @@ int main(int argc, char **argv) {
         if (screen == 1 && button({8, 724, 144, 64}, "MENU")) {
             paused = true;
             charge = false;
+            stadiumArmed = false;
         }
         if (!screenshot.empty() && screen != lastLoggedScreen) {
             std::cout << "UI preview: screen=" << screen << " mascot=" << match.mascot << std::endl;
@@ -592,10 +630,10 @@ int main(int argc, char **argv) {
         if (paused) {
             DrawRectangle(0, 77, W, 723, {3, 10, 20, 210});
             panel({421, 260, 438, 258}, ink);
-            center("TIME OUT!", 640, 294, 42, gold);
-            if (button({463, 376, 354, 57}, "RESUME", true) || IsKeyPressed(KEY_ENTER))
+            arcadeCenter("TIME OUT!", 640, 294, 42, {170, 255, 64, 255});
+            if (plaqueButton({500, 365, 280, 62}, "RESUME") || IsKeyPressed(KEY_ENTER))
                 paused = false;
-            if (button({463, 450, 354, 43}, "LEAVE MATCH")) {
+            if (plaqueButton({500, 442, 280, 62}, "LEAVE MATCH")) {
                 screen = 0;
                 paused = false;
             }
@@ -621,6 +659,10 @@ int main(int argc, char **argv) {
         }
     }
     audio.close();
+    UnloadShader(uiBallShader);
+    UnloadTexture(uiSlate);
+    UnloadTexture(uiFrame);
+    UnloadTexture(uiButton);
     UnloadTexture(portraits);
     UnloadTexture(titleArt);
     UnloadFont(arcadeFont);

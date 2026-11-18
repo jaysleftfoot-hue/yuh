@@ -1,32 +1,13 @@
-Character direction: use the illustrated baseball-portraits.png HUD atlas, not primitive geometric faces. Ray mascot uses the continuous 3D body in ray_model.hpp, with broad fins, cream underside and expressive face; do not replace it with a sprite.
+# Current art and control direction
 
-Authoritative latest visual reference: the user supplied Zombies graveyard screenshot. Long tapering lane, tiny distant rack, low cropped ball; decorative top frame, stitched score plaques, left-side power strip, portrait badges and free-standing arcade MENU lettering. No rectangular application-style buttons, including pause/results/clubhouse. Baseball theming remains. Lane run deliberately increased to 160 units; see PROPORTIONS.md latest section.
+The user's newest setup and trophy screenshots govern ALL native UI. Use original hand-painted rock/turf frames, chipped slate, illustrated baseball portraits and organic green action plaques in a compact arcade composition. No navy website headers, marketing slogans, two-column dashboards or generic cards. The rejected setup layout and its procedural polygon panel renderer have been removed; do not restore them. Title art remains the illustrated baseball poster. See assets/ARCADE_UI.md for the official internet screenshots actually inspected and the original UI textures.
 
-Latest stadium identity pass: actual sourced stadium wordmarks and MLB marks in native/assets/parks (provenance in SOURCES.md), layered video graphics and steel trusses. Tropicana has a wide screen, catwalk and orange landmark. Stadium ready camera intentionally reframed; world geometry remains 80×10. See native/PROPORTIONS.md for the projected-view regression guard. Existing ten-park roster unchanged; Citi, Comerica and Rate photos inform presentation only.
+Stadium shot order is explicitly **Spot → Curve → Power**. Confirm each stage separately; position and spin lock before timing release. Backspace edits the previous step. Mascot retains backward-pull/sideways slingshot and in-motion steering/boost. These input mappings must remain distinct.
 
-# Current direction — stadium bowling and Rays adventure
+Preserve native/src/lane_geometry.hpp during graphics work: width 10, foul line 2, head pin 162, run 160. Full power reaches the rack in about 3.5 seconds. Camera presets and regression bounds stay fixed; never shrink the lane to fit new art. See PROPORTIONS.md. Decoration transforms exclude playable lane/ball/rack.
 
-The references specify the rendering style and gameplay feel, not literal scenery to transplant into every mode. The user explicitly corrected the indoor-hall approach: stadium mode must feel like a baseball-themed Zombie Bowl-a-Rama, with a bowling lane in the middle of the selected stadium. Mascot mode should feel like a Tampa Bay Rays-inspired Polar/Shrek bowling game.
+Stadium mode takes place on the field inside the selected baseball stadium. Keep actual sourced stadium/team marks, scoreboards and park landmarks. Mascot mode is a separate Rays fantasy course; the mascot is a continuous three-dimensional ray mesh with swept fins, ivory underside, expressive face and tube, not a sprite. HUD and versus rivals use the baseball-portraits.png atlas (cap player, helmet batter, umpire, ball boy), never primitive object-based faces.
 
-## Current implementation
+Keep all 64 ball unlocks (30 team, 30 fun, 4 Rays), ten stadiums ending with Tropicana, AI, powers and profile persistence. Commit/push/verify finished work per AGENTS.md. Windows runtime still requires testing on Windows.
 
-- Stadium mode: single lane on a baseball diamond, turf and base paths, dugouts, continuous stands, crowd, floodlights, outfield walls and stadium-specific landmark silhouettes. Wrigley ivy/brick and Tropicana roof/touch-tank features are examples. The former enclosed hall has been removed.
-- Mascot mode: a distinct navy/aqua Rays fantasy course, tube rider, water, rays/bubbles, vegetation variants and a visible slingshot. Pull backward for power, sideways to aim opposite the pull, release to launch. Steering and boost remain available after launch.
-- The slim score strips and stadium drag-to-power control remain. Stadium mouse drag goes upward; mascot sling drag goes downward. Do not accidentally merge the two mappings.
-- Canonical playable dimensions and camera presets live in `src/lane_geometry.hpp`. Simulation and rendering now share world coordinates. Scenery transforms exclude the lane, ball and rack. The user requested farther pins; foul-line-to-head-pin distance is now 80 units, up from 42, with width and body sizes fixed. Read PROPORTIONS.md before changing geometry.
-
-## References actually inspected
-
-The user's Polar Dropbox clip is 20.733 seconds; the Zombies Dropbox clip is 26.333 seconds. Frames from both were inspected, including dense samples of Zombies' placement/power sequence. The Polar clip shows the inflatable rider, sling presentation, following camera and enclosed themed scenery. The Zombies clip shows lateral placement indicators, a vertical power meter and following camera. Neither recording exposes button events; exact mouse semantics are inferred. Full YouTube videos remain unviewed. No original meshes, game textures, private sharing URLs or MP4s are shipped.
-
-## Requirements retained
-
-Exactly 30 MLB team balls, 30 fun team-based designs and four special Rays balls. Ten stadium unlocks with Tropicana Field last. AI opponent, powers and saved progression. Preserve completed source/assets/tests/docs by commit, push and remote-HEAD verification per AGENTS.md.
-
-## Remaining work
-
-This is still procedural art, not a finished visual clone. Add authored stadium/character assets, better animation, lighting/shadows, illustrated UI and varied mascot courses. Keep proportion changes separate and intentional: do not change lane scale to compensate for a background or camera problem. Historical notes in docs/ describe earlier experiments and must not override this current direction.
-
-## Stadium scoreboards
-
-Blue title panels have been replaced with ballpark scoreboards. Wrigley uses painted green manual panels, white league grids, a clock, flags and lamps inspired by the supplied photograph. Fenway uses a green manual face; other parks and Rays Adventure use dark LED faces with amber numbers. Bowling frame scores and totals update with the match; the decorative baseball grids do not represent live MLB results.
+Both short Dropbox reference clips and official Steam screenshots have been inspected. Full YouTube inspection and exact original mouse-event semantics have not been verified. Latest three-phase stadium order is the user's explicit instruction. Authored stadium models, course variety and animation remain future work; the prototype is not a finished visual replica.

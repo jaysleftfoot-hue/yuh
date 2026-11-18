@@ -15,7 +15,14 @@ C++17 + raylib 5.5 desktop prototype. The native work lost in the cloud refresh 
 
 ## Controls
 
-Traditional alley: move the mouse over the lane to position the ball, hold left mouse to build power (or drag upward to set it directly) / sideways for aim, then release to bowl. The position locks during a drag. A/D position; arrows aim; Q/E curve; Hold Space to time power and release to bowl, or press LET IT RIP. In Mascot Ride, arrows/A/D steer after launch and Space boosts once. Keys 1/2/3 select a power before launch. Escape pauses, M toggles sound, F11 toggles fullscreen. The clubhouse selects mode, stadium and ball. A rematch is available after scoring.
+Stadium bowling has three separate phases:
+
+1. **Spot:** move the mouse over the lane (or A/D) to place the ball. Click or release Space/Enter to lock.
+2. **Curve:** move left/right (or arrows/Q/E) to set hook. Click or release Space/Enter to lock.
+3. **Power:** watch the cycling vertical meter. Click or release Space/Enter to bowl at that power.
+
+Backspace returns to the previous step before launch. Locked position and curve do not change while timing power. Each new shot starts at Spot. Mascot Ride keeps its separate pull-back slingshot: grab the course, pull backward and sideways, release; steer with A/D or arrows, boost with Space. Keys 1/2/3 select powers. Escape pauses, M toggles sound, F11 toggles fullscreen.
+
 
 ## Graphics and proportions
 
@@ -85,3 +92,7 @@ Latest visual reference pass: 160-unit lane run with unchanged width and body si
 ## Opening menu and pacing
 
 The illustrated title screen opens Single Player or Mascot Adventure setup. Ball Locker, Scores, Sound, Help and Quit are functional native menu actions; Escape returns from submenus. Enter selects Single Player. Full power reaches the pins in about 3.5 seconds, with unchanged lane size. The floor shader uses defined signed arithmetic to avoid a driver-dependent black-lane artifact.
+
+## Painted arcade menus
+
+All native menus use authored rock/turf frames, chipped slate plaques, illustrated baseball portraits and organic green actions. Match setup follows the compact versus composition of the supplied/official Zombies references. The earlier navy stadium/career dashboard is removed, including its shared panel drawing code. See assets/ARCADE_UI.md for artwork and inspected internet references.

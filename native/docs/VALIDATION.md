@@ -1,3 +1,15 @@
+# Painted arcade UI and three-phase stadium shots
+
+- Linux build and native rules/campaign checks passed, including independent Spot/Curve/Power transitions, locked fields, back/reset behavior, lane projection/geometry and launch timing regressions.
+- Real native X11 mouse input: first confirmation entered Curve without launching; second entered Power without launching; third launched. Position 4.595 and curve 0.4 remained unchanged through power. Keyboard Space confirmations passed; entering gameplay or resuming via Enter does not accidentally advance a phase. Backspace returned to Curve before a later launch.
+- Real menu flows checked: title to setup, locked park prevented start, mascot entry, ball locker including final locked ball, help, scores and pause. Visual captures: arcade-setup.png, arcade-locker.png, arcade-help.png, arcade-scores.png, arcade-pause.png, arcade-power.png, arcade-curve.png and arcade-results.png. Reproduce input checks with `python3 native/tests/ui_flow.py phases` or `keyboard` after building Linux; other documented scenarios capture menu screens.
+- Complete traditional AI smoke: 38 rolls, player 63 / rival 122. Complete mascot AI smoke: 41 rolls, player 93 / rival 138. Screenshot/smoke modes do not save progression.
+- Visually checked launch and pin-impact scenes in both modes. Canonical geometry/camera/speed files unchanged. Actual ray 3D mesh retained. Locker uses sphere-shaded skins instead of rectangular swatches; UI shader compiled and rendered on Linux.
+- Windows x64 cross-build and per-user NSIS installer rebuilt. ZIP CRC/asset equality verified. Installer/ZIP hashes in WINDOWS_BUILD.sha256. Windows execution, installation and GPU appearance remain unverified on an actual Windows machine.
+- Internet references were fetched from the official Steam screenshot catalog, and setup/overlay screenshots inspected. URLs/provenance in ../assets/ARCADE_UI.md. New frame/slate/button textures are original artwork, not extracted commercial assets.
+
+Earlier milestone checks follow; newer controls/art notes above supersede conflicting history.
+
 # Character artwork and ray model milestone
 
 - Native scoring, geometry, pacing, physics and campaign tests pass. Lane dimensions, cameras, throw speed, physics body and input mappings are unchanged.

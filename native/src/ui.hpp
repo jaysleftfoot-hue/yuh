@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <string>
 inline Font uiFont{}, arcadeFont{};
+inline Texture2D uiSlate{}, uiFrame{}, uiButton{};
+inline Shader uiBallShader{};
 inline bool uiBlocked = false;
 inline const Color ink = {13, 24, 45, 255}, cream = {255, 241, 204, 255}, gold = {255, 194, 64, 255},
                    red = {216, 53, 57, 255}, aqua = {69, 223, 206, 255};
@@ -21,41 +23,48 @@ inline void title(const std::string &s, float x, float y, float size, Color c) {
             DrawTextEx(arcadeFont, s.c_str(), {x + dx + 2, y + dy + 3}, size, 1, {15, 21, 20, 230});
     DrawTextEx(arcadeFont, s.c_str(), {x, y}, size, 1, c);
 }
-// Irregular stitched leather, never a rounded application card.
-inline void panel(Rectangle r, Color c) {
-    Vector2 middle{r.x + r.width / 2, r.y + r.height / 2};
-    const int edges = 24;
-    Vector2 points[edges];
-    for (int i = 0; i < edges; ++i) {
-        float a = i * 2 * PI / edges;
-        float sx = std::cos(a), sy = std::sin(a);
-        float scale = 1 / std::max(std::abs(sx), std::abs(sy));
-        float wear = 1 - .025f * (i % 3);
-        points[i] = {middle.x + sx * scale * r.width * .5f * wear,
-                     middle.y + sy * scale * r.height * .5f * wear};
-    }
-    for (int i = 0; i < edges; ++i) {
-        auto a = points[i], b = points[(i + 1) % edges];
-        DrawTriangle(middle, b, a, c);
-        DrawLineEx(a, b, 3, {116, 106, 75, 255});
-        Vector2 aa{middle.x + (a.x - middle.x) * .96f, middle.y + (a.y - middle.y) * .88f};
-        Vector2 bb{middle.x + (b.x - middle.x) * .96f, middle.y + (b.y - middle.y) * .88f};
-        DrawLineEx(aa, bb, 1, {183, 164, 119, 170});
-    }
-    for (int i = 0; i < 55; ++i) {
-        float x = r.x + 10 + std::fmod(i * 73.f, std::max(1.f, r.width - 20)),
-              y = r.y + 8 + std::fmod(i * 31.f, std::max(1.f, r.height - 16));
-        DrawLine(x, y, x + 3, y + 1, {0, 0, 0, 30});
-    }
+inline void arcadeCenter(const std::string &s, float x, float y, float size, Color c = cream) {
+    title(s, x - MeasureTextEx(arcadeFont, s.c_str(), size, 1).x / 2, y, size, c);
+}
+inline void sprite(Texture2D t, Rectangle r, Color tint = WHITE) {
+    DrawTexturePro(t, {0, 0, float(t.width), float(t.height)}, r, {0, 0}, 0, tint);
+}
+inline void ballIcon(Texture2D skin, float x, float y, float size, bool unlocked = true) {
+    DrawEllipse(x + size / 2 + 2, y + size * .91f, size * .46f, size * .13f, {0, 0, 0, 140});
+    BeginShaderMode(uiBallShader);
+    sprite(skin, {x, y, size, size}, unlocked ? WHITE : Color{105, 105, 105, 255});
+    EndShaderMode();
+}
+// Authored stone texture with fixed-size bevels, even on shallow score strips.
+inline void panel(Rectangle r, Color = WHITE) {
+    float edge = std::min(26.f, r.height * .18f);
+    float sx[] = {0, uiSlate.width * .12f, uiSlate.width * .88f, float(uiSlate.width)};
+    float sy[] = {0, uiSlate.height * .15f, uiSlate.height * .85f, float(uiSlate.height)};
+    float dx[] = {r.x, r.x + edge, r.x + r.width - edge, r.x + r.width};
+    float dy[] = {r.y, r.y + edge, r.y + r.height - edge, r.y + r.height};
+    for (int y = 0; y < 3; ++y)
+        for (int x = 0; x < 3; ++x)
+            DrawTexturePro(uiSlate, {sx[x], sy[y], sx[x + 1] - sx[x], sy[y + 1] - sy[y]},
+                           {dx[x], dy[y], dx[x + 1] - dx[x], dy[y + 1] - dy[y]}, {0, 0}, 0, WHITE);
+}
+inline void modal(Rectangle r, const std::string &heading) {
+    DrawRectangle(0, 0, 1280, 800, {0, 0, 0, 170});
+    sprite(uiFrame, r);
+    arcadeCenter(heading, r.x + r.width / 2, r.y + 66, 46, {170, 255, 64, 255});
+}
+inline void portraitCard(Texture2D portraits, int who, Rectangle r, const char *caption) {
+    panel(r);
+    float w = portraits.width / 2.f, h = portraits.height / 2.f;
+    DrawTexturePro(portraits, {(who % 2) * w, (who / 2) * h, w, h},
+                   {r.x + 14, r.y + 42, r.width - 28, r.height - 92}, {0, 0}, 0, WHITE);
+    arcadeCenter(caption, r.x + r.width / 2, r.y + 16, 26, {170, 255, 64, 255});
+    const char *names[] = {"YOU", "SLUGGER", "UMPIRE", "BALL BOY"};
+    arcadeCenter(names[who], r.x + r.width / 2, r.y + r.height - 37, 23);
 }
 inline void baseballHud(Texture2D portraits, int rival) {
-    // Interlocking leather pads and crossed bats frame the scene below the scores.
-    for (int i = 0; i < 26; ++i) {
-        float x = i * 50.f;
-        DrawEllipse(x + 25, 87 + (i % 3) * 4, 36, 24, {43, 29, 18, 255});
-        DrawEllipse(x + 24, 82 + (i % 3) * 4, 32, 20, {(unsigned char)(111 + i % 3 * 12), 72, 37, 255});
-        DrawLineEx({x + 2, 75}, {x + 35, 94}, 2, {172, 127, 70, 255});
-    }
+    // Painted turf/rock cornice connects the shallow slate scoreboards.
+    DrawTexturePro(uiFrame, {0, 0, float(uiFrame.width), uiFrame.height * .135f}, {0, 58, 1280, 55},
+                   {0, 0}, 0, WHITE);
     DrawLineEx({558, 128}, {720, 65}, 12, {53, 33, 19, 255});
     DrawLineEx({560, 125}, {718, 62}, 7, {213, 170, 91, 255});
     DrawLineEx({561, 63}, {718, 128}, 12, {53, 33, 19, 255});
@@ -96,6 +105,17 @@ inline bool button(Rectangle r, const std::string &s, bool primary = false, bool
     float width = MeasureTextEx(arcadeFont, s.c_str(), size, 1).x;
     title(s, r.x + (r.width - width) / 2, r.y + (r.height - size) / 2, size,
           enabled ? (hover ? WHITE : (primary ? gold : Color{150, 242, 77, 255})) : GRAY);
+    if (hover)
+        SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+    return hover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
+}
+inline bool plaqueButton(Rectangle r, const std::string &s, bool enabled = true) {
+    bool hover = enabled && !uiBlocked && CheckCollisionPointRec(GetMousePosition(), r);
+    sprite(uiButton, r,
+           enabled ? (hover ? Color{255, 255, 210, 255} : WHITE) : Color{100, 110, 100, 255});
+    float size = std::min(30.f, (r.width - 46) /
+                                    std::max(1.f, MeasureTextEx(arcadeFont, s.c_str(), 30, 1).x) * 30);
+    arcadeCenter(s, r.x + r.width / 2, r.y + (r.height - size) / 2 - 2, size, enabled ? cream : GRAY);
     if (hover)
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
     return hover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
