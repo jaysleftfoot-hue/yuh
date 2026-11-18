@@ -1,56 +1,26 @@
-# Graphics and gameplay direction
+# Current direction — stadium bowling and Rays adventure
 
-Graphics is priority #1. The user wants the rich, playful 2005–2010 arcade bowling look in the supplied Polar/Shrek/Zombie screenshots: low following camera, visible rolling ball/mascot, deep themed scenery, expressive characters, glossy materials and chunky illustrated controls.
+The references specify the rendering style and gameplay feel, not literal scenery to transplant into every mode. The user explicitly corrected the indoor-hall approach: stadium mode must feel like a baseball-themed Zombie Bowl-a-Rama, with a bowling lane in the middle of the selected stadium. Mascot mode should feel like a Tampa Bay Rays-inspired Polar/Shrek bowling game.
 
-## Reference access — November 18, 2026
+## Current implementation
 
-- Traditional mode: https://www.youtube.com/watch?v=b8WkE56ZC9s — first minute (0:00–1:00).
-- Mascot mode: https://www.youtube.com/watch?v=CmlZsIFJ0sA — entire video.
-- Use both as graphics references too. Inspect aim/release controls, launch, steering, boost, obstacles, pickups, camera, scoring, AI/powers and reaction timing before claiming matching behavior.
+- Stadium mode: single lane on a baseball diamond, turf and base paths, dugouts, continuous stands, crowd, floodlights, outfield walls and stadium-specific landmark silhouettes. Wrigley ivy/brick and Tropicana roof/touch-tank features are examples. The former enclosed hall has been removed.
+- Mascot mode: a distinct navy/aqua Rays fantasy course, tube rider, water, rays/bubbles, vegetation variants and a visible slingshot. Pull backward for power, sideways to aim opposite the pull, release to launch. Steering and boost remain available after launch.
+- The slim score strips and stadium drag-to-power control remain. Stadium mouse drag goes upward; mascot sling drag goes downward. Do not accidentally merge the two mappings.
+- Canonical playable dimensions and camera presets live in `src/lane_geometry.hpp`. Simulation and rendering now share world coordinates. Scenery transforms exclude the lane, ball and rack. The user requested farther pins; foul-line-to-head-pin distance is now 80 units, up from 42, with width and body sizes fixed. Read PROPORTIONS.md before changing geometry.
 
-The user supplied a Dropbox MP4 that downloaded successfully: 20.733 seconds, 2868×1320, 60 fps. Extracted frames show Polar Bowler's Chill Pin Alley selection, tube rider, enclosed blue ice scenery, pin impacts and following camera. Only this short clip has been visually inspected; it is not the entire YouTube video. The second clip remains inaccessible (the original MP4 uploads exceeded the 32 MiB transfer cap, and YouTube requests returned proxy CONNECT 403). Traditional-mode art therefore uses the supplied Zombie Bowl-a-Rama screenshot, not a claim of having watched the Zombies video. Existing controls/AI/powers are not reference-verified mechanics. See docs/REFERENCE_REVIEW.md for observations and limits.
+## References actually inspected
 
-## Roster and progression requirements
+The user's Polar Dropbox clip is 20.733 seconds; the Zombies Dropbox clip is 26.333 seconds. Frames from both were inspected, including dense samples of Zombies' placement/power sequence. The Polar clip shows the inflatable rider, sling presentation, following camera and enclosed themed scenery. The Zombies clip shows lateral placement indicators, a vertical power meter and following camera. Neither recording exposes button events; exact mouse semantics are inferred. Full YouTube videos remain unviewed. No original meshes, game textures, private sharing URLs or MP4s are shipped.
 
-64 ball designs means exactly **30 MLB team balls + 30 fun team-inspired designs + 4 Rays specials**. The user is a Rays fan. Ten stadium alleys; Tropicana Field must be the final unlock. Traditional and mascot modes both need single-player AI competition and powers.
+## Requirements retained
 
-## Reconstructed graphics pass
+Exactly 30 MLB team balls, 30 fun team-based designs and four special Rays balls. Ten stadium unlocks with Tropicana Field last. AI opponent, powers and saved progression. Preserve completed source/assets/tests/docs by commit, push and remote-HEAD verification per AGENTS.md.
 
-- Multi-lane concourse, pinsetter masks, balconies/railings, brickwork, trusses, ceiling panels, snack tables and crowd.
-- Readable stadium marquees generated in-engine; Rays signs at Tropicana.
-- Material shader: warm key light/cool fill, view-dependent highlights, fog, wood grain/seams, approximate pin/ball contact shadows and stylized ceiling-light highlights. This is not ray tracing or full reflection rendering.
-- Original ray: curved volume wings, stitched sled and metal runners, jersey, cap, blinking eyes, head turn while aiming, segmented tail.
-- Pin jersey patches, eyebrows, cap, mitt hands and shoes.
-- Reduced bottom HUD, right-side power icons, framed scoreboard.
+## Remaining work
 
-## November 18 graphics pass
+This is still procedural art, not a finished visual clone. Add authored stadium/character assets, better animation, lighting/shadows, illustrated UI and varied mascot courses. Keep proportion changes separate and intentional: do not change lane scale to compensate for a background or camera problem. Historical notes in docs/ describe earlier experiments and must not override this current direction.
 
-- Mascot mode now has a separate enclosed single-lane environment: irregular curved walls, three illuminated archways, side water channels, animated water/caustic materials, rail lamps and stadium marquees. Wrigley/Fenway/Seattle add foliage; Tampa Bay/Oracle/Kauffman have decorative rays and rising bubbles. These are stadium-themed arcade courses, not real stadium replicas.
-- Ray mascot rides a modeled inflatable ring with a raised rim, two-tone rubber, grab handles and perimeter rope. Smoothed, mirrored wings and cosmetic banking follow horizontal velocity. A visible launch band stretches with selected power; controls/physics remain unchanged.
-- Traditional mode gains close brick columns, lower inset ceiling panels, pendant lights, lane-side tables/cups and neon accents. Existing neighboring lanes, concourse, crowd and stadium landmarks remain.
-- Revised wood grain/seams, broader floor highlights and mottled grotto materials. Highlights are stylized lighting, not true scene reflections. FXAA affects the 3D scene only; the interface remains crisp. Font/sign mipmaps reduce distant shimmer.
-- Wider following camera; launch framing keeps the tube above the controls. Two compact scoreboards replace the tall stacked scoreboard/header during play. Stadium signs use original baseball/bat artwork and a stronger title treatment.
+## Stadium scoreboards
 
-Remaining art work: authored character meshes/textures, varied course layouts beyond palette/decor changes, a better character rig and reactions, fuller environment shadows, more illustrated UI, and access to the second reference video. The result is closer in framing and environment density, but still not near-identical to the commercial games.
-
-## Recovery record
-
-A cloud refresh removed the prior uncommitted native files. The native implementation was reconstructed from code and requirements recorded in the conversation, then rebuilt/tested. It is not a byte-identical filesystem restore. Preserve this reconstruction in the remote Git branch; record current verification in docs/VALIDATION.md. Source screenshots in docs/ are newly captured evidence, not recovered old files.
-
-## Lane proportions and HUD follow-up
-
-The rendered foul-line-to-head-pin distance now uses 60 feet / 41.5 inches (17.35 lane widths). The simulation still uses normalized arcade coordinates and existing shot timing; this is a presentation conversion, not a regulation physics rewrite. Rack depth is preserved after the head pin to avoid stretching the pin triangle. Characters remain stylized. Small scenery props retain their depth while the lane and enclosing scenery extend longitudinally. The following camera uses converted positions.
-
-Removed riveted panel borders and the right-side power tower. Powers are compact buttons above the shot bar; shot controls disappear during travel/reaction. Menu panels share the simpler treatment. The launch camera pitches down to keep the rider clear of the bottom controls.
-
-## Zombies reference correction
-
-The second Dropbox clip is now accessible: 26.333 seconds. Sampled frames (including 0.5-second samples around 12–21 seconds) show lateral placement arrows, a vertical green meter, launch and following camera. This supersedes the earlier unavailable-reference notes. Mouse button events are not visible: upward drag for power, lateral drag for aim and release-to-launch are an inferred mapping, not verified original input internals. Space retains the timed keyboard alternative. Traditional uses the new on-lane UI instead of four sliders.
-
-The previous 17.35:1 presentation stretched the entire hall and was a poor match for this arcade reference. Traditional mode now deliberately compresses lane depth (1.55 times normalized coordinates), with restored close scenery and a 53-degree camera. It is not presented as a regulation simulation. Mascot presentation is unchanged.
-
-## Scoreboard / back wall detail pass
-
-Scorecards now use 49-pixel slate strips with fine frame dividers, roll marks above cumulative scores, and totals at the outside ends. Player labels sit below the strips. Empty frames no longer display placeholder dots/dashes. Both modes share the slim scorecards.
-
-The large center stadium billboards have been removed in both scenes. Original neon tube outlines of bowling pins and a ball replace them. Traditional's back wall has brick texture and wood trim; smaller side plaques retain stadium identity. Side plaque artwork is now a restrained wordmark rather than the baseball/bat billboard. The bowling controls and progression are unchanged.
+Blue title panels have been replaced with ballpark scoreboards. Wrigley uses painted green manual panels, white league grids, a clock, flags and lamps inspired by the supplied photograph. Fenway uses a green manual face; other parks and Rays Adventure use dark LED faces with amber numbers. Bowling frame scores and totals update with the match; the decorative baseball grids do not represent live MLB results.

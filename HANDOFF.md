@@ -1,3 +1,17 @@
+Latest signage: stadium scoreboards replace blue title panels. Wrigley follows the supplied green manual-board reference, with a 3D clock, flags and lamps; bowling scores update live. See native/docs/wrigley-scoreboard.png.
+
+# Current handoff
+
+Read AGENTS.md, native/ART_DIRECTION.md, native/PROPORTIONS.md and native/docs/VALIDATION.md first. The user wants stadium mode to be baseball-themed Zombie Bowl-a-Rama on the field of the referenced stadium, and mascot mode to be a Rays-inspired Polar/Shrek fantasy course. The previous indoor hall is gone. Mascot now has backward-pull sling aiming/power; stadium mode retains upward mouse drag power.
+
+The user repeatedly flagged inconsistent proportions. Physics and rendering now share the fixed dimensions in native/src/lane_geometry.hpp; decoration scaling excludes the lane/ball/rack. Latest requested change puts the head pin 80 units beyond the foul line with lane width 10. Preserve these dimensions/camera presets during art-only edits; geometry regression checks guard them. Stage scenery follows the deck position. Both game modes retain progression, AI and powers.
+
+Both short Dropbox videos have been visually inspected; mouse-button semantics remain inferred. Do not claim full YouTube inspection or exact gameplay replication. Windows cross-build is available, but Windows execution is unverified. Always commit, push and verify remote HEAD before calling work preserved.
+
+---
+
+# Historical handoff (superseded where it conflicts with the current notes)
+
 # Codex handoff: Big League Bowling
 
 ## Current native reconstruction

@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
     bool smoke = false, startInGame = false, smokeMascot = false, demoShot = false;
     int captureFrame = 90;
     int previewArena = -1;
-    std::string screenshot;
+    std::string screenshot, scoreboardScreenshot;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         if (a == "--demo-shot")
@@ -66,6 +66,8 @@ int main(int argc, char **argv) {
             startInGame = true;
         if (a == "--arena" && i + 1 < argc)
             previewArena = std::clamp(std::atoi(argv[++i]), 0, 9);
+        if (a == "--scoreboard-screenshot" && i + 1 < argc)
+            scoreboardScreenshot = argv[++i];
         if (a == "--screenshot" && i + 1 < argc)
             screenshot = argv[++i];
     }
@@ -136,6 +138,12 @@ int main(int argc, char **argv) {
         }
     };
     auto capture = [&]() {
+        if (!scoreboardScreenshot.empty()) {
+            Image board = LoadImageFromTexture(art.scoreboard.texture);
+            ImageFlipVertical(&board);
+            ExportImage(board, scoreboardScreenshot.c_str());
+            UnloadImage(board);
+        }
         if (!screenshot.empty()) {
             Image image = LoadImageFromScreen();
             ExportImage(image, screenshot.c_str());
@@ -189,7 +197,7 @@ int main(int argc, char **argv) {
                     shot.position = std::clamp(
                         shot.position +
                             ((IsKeyDown(KEY_D) ? 1.f : 0) - (IsKeyDown(KEY_A) ? 1.f : 0)) * dt * 3,
-                        .55f, 9.45f);
+                        geometry::launchMin, geometry::launchMax);
                     shot.aim = std::clamp(
                         shot.aim +
                             ((IsKeyDown(KEY_RIGHT) ? 1.f : 0) - (IsKeyDown(KEY_LEFT) ? 1.f : 0)) * dt,
@@ -197,7 +205,7 @@ int main(int argc, char **argv) {
                     shot.curve = std::clamp(
                         shot.curve + ((IsKeyDown(KEY_E) ? 1.f : 0) - (IsKeyDown(KEY_Q) ? 1.f : 0)) * dt,
                         -1.f, 1.f);
-                    bool alleyPointer = !match.mascot && GetMouseY() > 190 && GetMouseY() < 630;
+                    bool alleyPointer = GetMouseY() > 190 && GetMouseY() < 630;
                     if (!match.mascot && !charge && alleyPointer &&
                         (GetMouseDelta().x != 0 || GetMouseDelta().y != 0))
                         shot.position = alleyPosition(GetMouseX());
@@ -211,7 +219,10 @@ int main(int argc, char **argv) {
                     if (charge) {
                         chargeTime += dt;
                         if (mouseCharge) {
-                            shot = alleyDrag(shot, GetMouseX() - dragStart.x, dragStart.y - GetMouseY());
+                            shot = match.mascot ? mascotPull(shot, GetMouseX() - dragStart.x,
+                                                             GetMouseY() - dragStart.y)
+                                                : alleyDrag(shot, GetMouseX() - dragStart.x,
+                                                            dragStart.y - GetMouseY());
                         } else
                             shot.power = .15f + .85f * (.5f - .5f * std::cos(chargeTime * 4));
                     }
@@ -230,10 +241,14 @@ int main(int argc, char **argv) {
                         ? float(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) -
                               float(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))
                         : std::clamp((5 + std::sin(rolls * 2.37f) * (1.6f - arena * .09f) - sim.ball.x) *
-                                         .35f,
+                                             .65f -
+                                         sim.ball.vx * .35f,
                                      -1.f, 1.f);
-                if ((human && IsKeyPressed(KEY_SPACE)) || (!human && sim.ball.z > 12) ||
-                    (smoke && sim.ball.z > 12))
+                if ((human && IsKeyPressed(KEY_SPACE)) ||
+                    (!human &&
+                     sim.ball.z > geometry::foulLine + (geometry::headPin - geometry::foulLine) * .4f) ||
+                    (smoke &&
+                     sim.ball.z > geometry::foulLine + (geometry::headPin - geometry::foulLine) * .4f))
                     match.boost();
             }
             accum += dt;
@@ -290,21 +305,21 @@ int main(int argc, char **argv) {
         art.arena = arena;
         art.skin = skin;
         art.mascot = match.mascot;
-        // The alley reference uses a deliberately compressed arcade perspective.
-        laneDepthScale = match.mascot ? (720.f / 41.5f) * 10.f / 21.f : 1.55f;
-        camera.fovy = match.mascot ? 43.f : 53.f;
+        art.updateScoreboard(match);
+        const auto cameraStyle = match.mascot ? geometry::mascotCamera : geometry::stadiumCamera;
+        camera.fovy = cameraStyle.fov;
         const auto &view = match.lanes[match.player];
-        Vector3 desired{shot.position * .25f - 1.25f, match.mascot ? 4.5f : 2.8f,
-                        match.mascot ? -9.0f : -5.8f},
-            look{0, match.mascot ? -18.f : 1.2f, laneZ(23)};
+        Vector3 desired{geometry::renderX(shot.position) * .25f, cameraStyle.height, cameraStyle.back},
+            look{0, cameraStyle.targetHeight, geometry::headPin};
         if (screen != 1) {
             desired = match.mascot ? Vector3{-3.2f, 4.5f, -5} : Vector3{-9, 7, -4};
             look = {0, 1, match.mascot ? 13.f : 19.f};
         } else if (state == 1 || state == 2) {
-            float z = laneZ(std::min(view.ball.z, 24.f));
-            desired = {std::clamp((view.ball.x - 5) * .65f, -3.f, 3.f), match.mascot ? 3.1f : 2.0f,
-                       z - (match.mascot ? 5.3f : 5.8f)};
-            look = {std::clamp((view.ball.x - 5) * .3f, -1.5f, 1.5f), match.mascot ? 1.5f : .9f, z + 12};
+            float z = std::min(view.ball.z, geometry::headPin + 1);
+            desired = {std::clamp(geometry::renderX(view.ball.x) * .65f, -3.f, 3.f),
+                       match.mascot ? 3.1f : 2.0f, z - (match.mascot ? 5.3f : 5.8f)};
+            look = {std::clamp(geometry::renderX(view.ball.x) * .3f, -1.5f, 1.5f),
+                    match.mascot ? 1.5f : .9f, z + 12};
         }
         camera.position =
             Vector3Lerp(camera.position, desired, std::min(1.f, dt * (state == 1 ? 18 : 5)));
@@ -335,7 +350,7 @@ int main(int argc, char **argv) {
             DrawRectangleGradientH(0, 77, 800, 723, {7, 18, 33, 250}, {7, 18, 33, 0});
             title("BOWL LIKE", 40, 105, 55, cream);
             title("A BIG LEAGUER.", 40, 161, 57, gold);
-            if (button({45, 245, 275, 49}, "TRADITIONAL", !match.mascot)) {
+            if (button({45, 245, 275, 49}, "STADIUM BOWLING", !match.mascot)) {
                 match.mascot = false;
                 audio.play(audio.click);
             }
@@ -422,7 +437,7 @@ int main(int argc, char **argv) {
         } else {
             scoreCard(match.games[0], 16, gold, "YOU");
             scoreCard(match.games[1], 654, aqua, "RIVAL");
-            title(arenas[arena].name, 24, 81, 16, cream);
+            title(match.mascot ? "RAYS ADVENTURE" : arenas[arena].name, 24, 81, 16, cream);
 
             title(state == 3          ? "MATCH COMPLETE"
                   : match.player == 0 ? "YOUR TURN"
@@ -442,9 +457,10 @@ int main(int argc, char **argv) {
                                   i % 2 ? gold : aqua);
                 }
             bool enabled = state == 0 && match.player == 0 && !paused;
-            if ((state != 1 && state != 2) && (match.mascot || state == 3)) {
+            if ((state != 1 && state != 2) && state == 3) {
                 panel({24, 691, 1232, 66}, {10, 23, 37, 238});
-                slider("POSITION", 39, 702, 160, shot.position, .55f, 9.45f, enabled);
+                slider("POSITION", 39, 702, 160, shot.position, geometry::launchMin, geometry::launchMax,
+                       enabled);
                 slider("AIM", 223, 702, 160, shot.aim, -1, 1, enabled);
                 slider("POWER", 407, 702, 160, shot.power, .1f, 1, enabled && !charge);
                 slider("SPIN", 591, 702, 160, shot.curve, -1, 1, enabled);
@@ -461,8 +477,21 @@ int main(int argc, char **argv) {
                     charge = false;
                 }
             }
+            if (match.mascot && state == 0 && human) {
+                text(charge ? "RELEASE THE SLING!" : "PULL BACK TO LAUNCH", 24, 690, 18, cream);
+                text("PULL SIDEWAYS TO AIM  |  LONGER PULL = MORE POWER", 24, 715, 12, aqua);
+                if (charge) {
+                    panel({960, 604, 280, 20}, ink);
+                    DrawRectangleRounded({964, 608, 272 * shot.power, 12}, .5f, 8, aqua);
+                }
+                if (button({24, 737, 150, 38}, "CLUBHOUSE")) {
+                    screen = 0;
+                    charge = false;
+                }
+            }
             if (!match.mascot && state == 0 && human) {
-                float x = 240 + (shot.position - .55f) / 8.9f * 800;
+                float x = 240 + (shot.position - geometry::launchMin) /
+                                    (geometry::launchMax - geometry::launchMin) * 800;
                 if (!charge) {
                     DrawLineEx({x - 28, 535}, {x + 28, 535}, 5, aqua);
                     DrawTriangle({x - 39, 535}, {x - 23, 548}, {x - 23, 522}, aqua);
@@ -495,7 +524,7 @@ int main(int argc, char **argv) {
             center(match.mascot
                        ? "A / D  STEER     SPACE  BOOST"
                        : "MOUSE: POSITION / HOLD / RELEASE    |    SPACE: CHARGE    |    ARROWS: AIM",
-                   640, 770, 12, {166, 190, 207, 255});
+                   match.mascot ? 1030 : 640, 770, 12, {166, 190, 207, 255});
         }
         uiBlocked = false;
         if (paused) {

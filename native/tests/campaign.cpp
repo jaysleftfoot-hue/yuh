@@ -17,7 +17,16 @@ int main() {
     require(alleyDrag(input, -1000, 1000).power == 1 && alleyDrag(input, -1000, 1000).aim == -1,
             "drag upper bounds");
     require(alleyDrag(input, 1000, -1000).power == .15f, "downward drag minimum power");
-    require(alleyPosition(-100) == .55f && alleyPosition(2000) == 9.45f, "placement clamps to lane");
+    require(alleyPosition(-100) == geometry::launchMin && alleyPosition(2000) == geometry::launchMax,
+            "placement clamps to lane");
+    auto pull = mascotPull(input, 100, 80);
+    require(std::abs(pull.power - .65f) < .001f && pull.aim == -.5f,
+            "sling pulls opposite launch direction");
+    require(pull.position == input.position && pull.curve == 0,
+            "sling preserves launch position, clears hook");
+    require(mascotPull(input, -1000, 1000).power == 1 && mascotPull(input, -1000, 1000).aim == 1,
+            "sling limits");
+    require(mascotPull(input, 0, -90).power == .15f, "forward pull does not add power");
     Profile p;
     require(p.balls() == 1 && p.stadiums() == 1, "initial unlocks");
     std::set<std::string> names;
@@ -65,6 +74,13 @@ int main() {
     float speed = a.lanes[0].ball.vz;
     a.boost();
     require(speed == a.lanes[0].ball.vz && speed > b.lanes[0].ball.vz, "one boost per launch");
+    Match lateSteering;
+    lateSteering.mascot = true;
+    lateSteering.launch({5, 0, .7f, 0});
+    lateSteering.lanes[0].ball.z = geometry::headPin - 12;
+    lateSteering.steering = 1;
+    lateSteering.step(1.f / 120);
+    require(lateSteering.lanes[0].ball.vx > 0, "mascot steering remains active near distant pin deck");
     Match bumper;
     bumper.equip(Power::Bumpers);
     bumper.launch({.7f, -1, .7f, 0});

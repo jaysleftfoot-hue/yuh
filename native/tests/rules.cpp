@@ -42,6 +42,20 @@ int main() {
     check(rejected && tenth.frames[9].size() == 2, "invalid roll preserves state");
     tenth.roll(3);
     check(tenth.complete && tenth.scores()[9] == 20, "tenth bonus score");
+    check(geometry::width == 10 && geometry::headPin - geometry::foulLine == 80,
+          "fixed arcade lane proportion baseline");
+    check(geometry::ballRadius == .85f && geometry::pinRadius == .55f && geometry::pinSpacingX == 2.65f,
+          "fixed ball and rack proportion baseline");
+    check(geometry::stadiumCamera.fov == 55 && geometry::mascotCamera.fov == 53,
+          "art updates preserve camera framing presets");
+    check(geometry::renderX(geometry::launchMin) > geometry::renderX(geometry::launchMax),
+          "mouse right maps to camera right looking down positive Z");
+    Simulation dimensions;
+    for (const auto &pin : dimensions.pins)
+        check(pin.x - pin.r >= 0 && pin.x + pin.r <= 10 && pin.z < geometry::deckEnd,
+              "full rack fits playable deck");
+    dimensions.launch({0, 0, .7f, 0});
+    check(dimensions.ball.x >= dimensions.ball.r, "launch keeps ball inside lane");
     Simulation a, b;
     Shot shot;
     a.launch(shot);
@@ -73,5 +87,5 @@ int main() {
     }
     check(full.complete && *full.scores()[9] >= 0 && *full.scores()[9] <= 300,
           "complete simulated match");
-    std::cout << "9 native rules/physics scenarios passed\n";
+    std::cout << "Native scoring, geometry regression and physics checks passed\n";
 }

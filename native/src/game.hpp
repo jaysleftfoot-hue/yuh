@@ -1,4 +1,5 @@
 #pragma once
+#include "lane_geometry.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -76,7 +77,7 @@ struct Game {
     }
 };
 struct Body {
-    float x = 0, z = 0, vx = 0, vz = 0, r = .36f;
+    float x = 0, z = 0, vx = 0, vz = 0, r = geometry::pinRadius;
     bool down = false;
     int id = 0;
     float fall = 0;
@@ -97,8 +98,8 @@ struct Simulation {
         pins.clear();
         for (int row = 0; row < 4; ++row)
             for (int col = 0; col <= row; ++col)
-                pins.push_back({5 + (col - row * .5f) * 1.05f, 23 + row * .92f, 0, 0, .36f, false,
-                                int(pins.size()), 0});
+                pins.push_back({geometry::rackX(row, col), geometry::rackZ(row), 0, 0,
+                                geometry::pinRadius, false, int(pins.size()), 0});
     }
     void clearFallen() {
         pins.erase(std::remove_if(pins.begin(), pins.end(), [](const Body &p) { return p.down; }),
@@ -109,8 +110,8 @@ struct Simulation {
             return false;
         float speed = 11 + std::clamp(s.power, 0.f, 1.f) * 13,
               angle = std::clamp(s.aim, -1.f, 1.f) * .16f;
-        ball = {std::clamp(s.position, .55f, 9.45f), 2, std::sin(angle) * speed, std::cos(angle) * speed,
-                .5f};
+        ball = {std::clamp(s.position, geometry::launchMin, geometry::launchMax), geometry::foulLine,
+                std::sin(angle) * speed, std::cos(angle) * speed, geometry::ballRadius};
         curve = std::clamp(s.curve, -1.f, 1.f);
         active = hasBall = true;
         gutter = false;
@@ -147,14 +148,14 @@ struct Simulation {
         if (!active)
             return false;
         elapsed += dt;
-        if (ball.z < 30) {
+        if (ball.z < geometry::deckEnd) {
             if (!gutter)
                 ball.vx += curve * .85f * dt;
             ball.x += ball.vx * dt;
             ball.z += ball.vz * dt;
-            if (ball.x < ball.r || ball.x > 10 - ball.r) {
+            if (ball.x < ball.r || ball.x > geometry::width - ball.r) {
                 gutter = true;
-                ball.x = std::clamp(ball.x, .1f, 9.9f);
+                ball.x = std::clamp(ball.x, .1f, geometry::width - .1f);
                 ball.vx = 0;
             }
         }
@@ -164,11 +165,11 @@ struct Simulation {
             float drag = std::exp(-2.4f * dt);
             p.vx *= drag;
             p.vz *= drag;
-            if (p.x < .36f || p.x > 9.64f) {
-                p.x = std::clamp(p.x, .36f, 9.64f);
+            if (p.x < p.r || p.x > geometry::width - p.r) {
+                p.x = std::clamp(p.x, p.r, geometry::width - p.r);
                 p.vx *= -.3f;
             }
-            if (!gutter && ball.z < 30)
+            if (!gutter && ball.z < geometry::deckEnd)
                 collide(ball, p, true);
         }
         for (size_t i = 0; i < pins.size(); ++i)
@@ -178,7 +179,7 @@ struct Simulation {
         for (const auto &p : pins)
             if (std::hypot(p.vx, p.vz) > .08f)
                 moving = true;
-        if (elapsed > 7 || (ball.z > 29 && !moving)) {
+        if (elapsed > geometry::shotTimeout || (ball.z > geometry::deckEnd - 1 && !moving)) {
             active = false;
             return true;
         }

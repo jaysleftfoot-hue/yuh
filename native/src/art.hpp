@@ -4,25 +4,23 @@
 #include "raymath.h"
 #include "rlgl.h"
 #include "ui.hpp"
-inline float laneDepthScale = (720.f / 41.5f) * 10.f / 21.f;
-inline float laneZ(float z) {
-    return z <= 23.f ? 2.f + (z - 2.f) * laneDepthScale : 2.f + 21.f * laneDepthScale + (z - 23.f);
-}
+namespace geo = bowling::geometry;
+inline constexpr float sceneryDepthScale = geo::sceneryDepthScale;
 struct Art {
     Model cube{}, sphere{}, cylinder{}, pin{}, wing{}, tube{}, course{};
     Shader shader{};
     std::array<Texture2D, 64> skins{};
-    std::array<RenderTexture2D, 10> signs{};
-    RenderTexture2D ad{};
+    RenderTexture2D scoreboard{};
+    std::string scoreboardKey;
     int arena = 0, skin = 0;
-    bool mascot = false, stretched = false;
+    bool mascot = false, inSceneryTransform = false;
     // Continuous shaded tube and an irregular, inward-facing stadium grotto.
     Mesh tubeMesh() {
         Mesh m = GenMeshTorus(.30f, 1.0f, 24, 64);
         return m;
     }
     Mesh courseMesh() {
-        constexpr int rings = 26, sides = 24;
+        constexpr int rings = 26 + int(geo::sceneryExtension / 2) + 1, sides = 24;
         Mesh m{};
         m.vertexCount = rings * sides * 6;
         m.triangleCount = m.vertexCount / 3;
@@ -168,17 +166,18 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
             m->materials[0].shader = shader;
     }
     void box(Vector3 p, Vector3 scale, Color c) {
-        if (stretched && scale.z < 4)
-            scale.z /= laneDepthScale;
+        if (inSceneryTransform && scale.z < 4)
+            scale.z /= sceneryDepthScale;
         DrawModelEx(cube, p, {0, 1, 0}, 0, scale, c);
     }
     void orb(Vector3 p, Vector3 scale, Color c) {
-        if (stretched)
-            scale.z /= laneDepthScale;
+        if (inSceneryTransform)
+            scale.z /= sceneryDepthScale;
         DrawModelEx(sphere, p, {0, 1, 0}, 0, scale, c);
     }
     void cyl(Vector3 p, float r, float h, Color c) {
-        DrawModelEx(cylinder, p, {0, 1, 0}, 0, {r, h, stretched ? r / laneDepthScale : r}, c);
+        DrawModelEx(cylinder, p, {0, 1, 0}, 0, {r, h, inSceneryTransform ? r / sceneryDepthScale : r},
+                    c);
     }
     void beam(Vector3 a, Vector3 b, float r, Color c) {
         DrawCylinderEx(a, b, r, r, 8, c);
@@ -187,29 +186,112 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         SetShaderValue(shader, GetShaderLocation(shader, "woodMode"), &kind, SHADER_UNIFORM_INT);
     }
     void makeSigns() {
-        for (int a = 0; a < 10; ++a) {
-            signs[a] = LoadRenderTexture(1024, 256);
-            BeginTextureMode(signs[a]);
-            ClearBackground({7, 19, 38, 255});
-            DrawRectangleGradientV(0, 0, 1024, 256, {26, 83, 124, 255}, {8, 27, 61, 255});
-            DrawRectangleLinesEx({12, 12, 1000, 232}, 3, {82, 136, 151, 255});
-            float size = std::min(75.f, 900.f / std::max(1.f, tw(bowling::arenas[a].name, 75)) * 75);
-            center(bowling::arenas[a].name, 512, 56, size, cream);
-            center("B A L L P A R K   L A N E S", 512, 164, 26, {110, 189, 196, 255});
-            EndTextureMode();
-            GenTextureMipmaps(&signs[a].texture);
-            SetTextureFilter(signs[a].texture, TEXTURE_FILTER_TRILINEAR);
+        scoreboard = LoadRenderTexture(1024, 512);
+    }
+    void updateScoreboard(const bowling::Match &match) {
+        std::string key =
+            std::to_string(arena) + ":" + std::to_string(mascot) + ":" + std::to_string(match.player);
+        for (const auto &game : match.games) {
+            key += "/" + std::to_string(game.frame);
+            for (const auto &frame : game.frames) {
+                key += "|";
+                for (int roll : frame)
+                    key += std::to_string(roll) + ",";
+            }
         }
-        ad = LoadRenderTexture(512, 256);
-        BeginTextureMode(ad);
-        ClearBackground({11, 40, 64, 255});
-        DrawRectangleLinesEx({8, 8, 496, 240}, 5, gold);
-        center("RAYS UP!", 256, 34, 66, gold);
-        center("SUNSHINE. STRIKES.", 256, 124, 27, cream);
-        center("BALLPARK MAYHEM", 256, 177, 26, aqua);
+        if (key == scoreboardKey)
+            return;
+        scoreboardKey = key;
+        bool manual = !mascot && (arena == 0 || arena == 1);
+        Color paint = manual ? Color{58, 77, 51, 255} : Color{9, 13, 14, 255};
+        Color letters = manual ? Color{231, 232, 207, 255} : Color{249, 195, 70, 255};
+        auto total = [](const bowling::Game &game) {
+            int value = 0;
+            for (auto v : game.scores())
+                if (v)
+                    value = *v;
+            return value;
+        };
+        BeginTextureMode(scoreboard);
+        ClearBackground(paint);
+        if (manual) {
+            // Hand-operated painted panels, inspired by the supplied Wrigley board.
+            for (int row = 0; row < 16; ++row)
+                for (int col = 0; col < 32; ++col)
+                    DrawRectangleLines(col * 32, row * 32, 32, 32, {42, 58, 38, 150});
+            center("NATIONAL", 210, 16, 35, letters);
+            center("AMERICAN", 814, 16, 35, letters);
+            center("BALLPARK", 512, 24, 20, letters);
+            center("FRAME", 512, 99, 22, letters);
+            center(std::to_string(std::min(10, match.games[match.player].frame + 1)), 512, 132, 53,
+                   letters);
+            center("PINS", 512, 216, 19, letters);
+            center(std::to_string(match.games[match.player].standing()), 512, 245, 35, letters);
+            const char *names[2][8] = {{"COLORADO", "SAN DIEGO", "LOS ANGELES", "ARIZONA",
+                                        "PHILADELPHIA", "WASHINGTON", "PITTSBURGH", "CUBS"},
+                                       {"BALTIMORE", "TEXAS", "OAKLAND", "CLEVELAND", "BOSTON",
+                                        "TAMPA BAY", "SEATTLE", "NEW YORK"}};
+            for (int side = 0; side < 2; ++side) {
+                float left = side ? 610 : 20;
+                for (int row = 0; row < 8; ++row) {
+                    float y = 76 + row * 29.f;
+                    text(names[side][row], left + 8, y + 5, 16, letters);
+                    DrawLineEx({left, y}, {left + 390, y}, 2, letters);
+                }
+                DrawLineEx({left, 308}, {left + 390, 308}, 2, letters);
+                for (int col = 0; col <= 10; ++col) {
+                    float x = left + 180 + col * 21.f;
+                    DrawLineEx({x, 61}, {x, 308}, col == 0 ? 3 : 1, Fade(letters, .8f));
+                    if (col < 10)
+                        center(std::to_string(col + 1), x + 10, 59, 12, letters);
+                }
+            }
+            DrawLineEx({20, 310}, {410, 310}, 4, {158, 42, 35, 255});
+            DrawLineEx({610, 310}, {1000, 310}, 4, {158, 42, 35, 255});
+            center("BALLPARK BOWLING", 512, 317, 20, letters);
+        } else {
+            // Contemporary ballpark LED display: dark face, amber scoring, no blue title panel.
+            for (int y = 8; y < 340; y += 8)
+                for (int x = 8; x < 1024; x += 8)
+                    DrawCircle(x, y, .8f, {40, 45, 31, 150});
+            center(mascot ? "RAYS ADVENTURE" : bowling::arenas[arena].name, 512, 25, 45, WHITE);
+            DrawLineEx({36, 88}, {988, 88}, 3, letters);
+            center("YOU", 245, 117, 29, cream);
+            center("RIVAL", 779, 117, 29, cream);
+            center(std::to_string(total(match.games[0])), 245, 166, 108, letters);
+            center(std::to_string(total(match.games[1])), 779, 166, 108, letters);
+            center("FRAME", 512, 146, 25, cream);
+            center(std::to_string(std::min(10, match.games[match.player].frame + 1)), 512, 189, 65,
+                   letters);
+            center("BIG LEAGUE BOWLING", 512, 299, 22, cream);
+        }
+        // These frame scores are live game data, not invented real-world MLB results.
+        text("BOWLING", 25, 351, 17, letters);
+        for (int frame = 0; frame < 10; ++frame)
+            center(std::to_string(frame + 1), 245 + frame * 60, 349, 17, letters);
+        center("TOTAL", 945, 349, 16, letters);
+        for (int player = 0; player < 2; ++player) {
+            const auto &game = match.games[player];
+            auto scores = game.scores();
+            float y = 377 + player * 45.f;
+            text(player ? "RIVAL" : "YOU", 28, y + 6, 24, letters);
+            for (int frame = 0; frame < 10; ++frame) {
+                float x = 217 + frame * 60;
+                DrawRectangleLinesEx({x, y, 56, 37}, 1, Fade(letters, .55f));
+                if (frame == game.frame && player == match.player)
+                    DrawRectangleLinesEx({x, y, 56, 37}, 3, letters);
+                center(scores[frame] ? std::to_string(*scores[frame]) : "-", x + 28, y + 8, 23, letters);
+            }
+            center(std::to_string(total(game)), 945, y + 4, 30, letters);
+        }
+        DrawRectangle(0, 476, 1024, 36, {5, 8, 9, 255});
+        std::string welcome =
+            mascot ? "RAYS UP!" : std::string("WELCOME TO ") + bowling::arenas[arena].name;
+        float size = std::min(28.f, 960.f / std::max(1.f, tw(welcome, 28)) * 28);
+        center(welcome, 512, 480, size, cream);
         EndTextureMode();
-        GenTextureMipmaps(&ad.texture);
-        SetTextureFilter(ad.texture, TEXTURE_FILTER_TRILINEAR);
+        GenTextureMipmaps(&scoreboard.texture);
+        SetTextureFilter(scoreboard.texture, TEXTURE_FILTER_TRILINEAR);
     }
     void sign(Texture2D t, Vector3 p, float w, float h) {
         rlSetTexture(t.id);
@@ -302,12 +384,14 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         sphere.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = original;
         for (Vector3 hole :
              {Vector3{-.12f, .12f, -.47f}, Vector3{.12f, .12f, -.47f}, Vector3{0, -.12f, -.48f}})
-            orb(hole, {.065f, .065f, .025f}, ink);
+            orb(Vector3Scale(hole, radius / .51f), {.065f * radius / .51f, .065f * radius / .51f, .025f},
+                ink);
         rlPopMatrix();
     }
     void drawPin(const bowling::Body &p, Color team, float time) {
         rlPushMatrix();
-        rlTranslatef(p.x - 5, .06f, p.z);
+        rlTranslatef(geo::renderX(p.x), .06f, p.z);
+        rlScalef(geo::pinRadius / .40f, geo::pinHeight / 2.05f, geo::pinRadius / .40f);
         rlRotatef(p.down ? p.fall * 86 : std::sin(time * 3 + p.id) * 2, p.id % 2 ? 1.f : -1.f, 0, .4f);
         DrawModel(pin, {0, 0, 0}, 1, {250, 242, 220, 255});
         cyl({0, 1.35f, 0}, .16f, .10f, red);
@@ -492,23 +576,20 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         }
     }
     void mascotScenery(float time, Color team) {
-        const Color walls[] = {{64, 114, 60, 255},  {51, 119, 91, 255},   {49, 123, 155, 255},
-                               {91, 116, 157, 255}, {110, 112, 161, 255}, {54, 135, 162, 255},
-                               {172, 103, 66, 255}, {47, 115, 118, 255},  {87, 123, 168, 255},
-                               {56, 133, 186, 255}};
-        Color rock = walls[arena];
+        const float extra = geo::sceneryExtension;
+        Color rock = {45, 119, 165, 255};
         material(3);
         DrawModel(course, {0, 0, 0}, 1, rock);
-        box({0, 5.5f, 42.5f}, {20, 11, 1}, rock);
+        box({0, 5.5f, 42.5f + extra}, {20, 11, 1}, rock);
         material(0);
-        box({0, 1.3f, 30.8f}, {10, 2.6f, .5f}, {5, 17, 34, 255});
+        box({0, 1.3f, 30.8f + extra}, {10, 2.6f, .5f}, {5, 17, 34, 255});
         material(4);
         for (int side : {-1, 1})
-            box({side * 6.7f, -.13f, 15}, {2.45f, .10f, 46}, {27, 157, 193, 255});
+            box({side * 6.7f, -.13f, 15 + extra / 2}, {2.45f, .10f, 46 + extra}, {27, 157, 193, 255});
         material(0);
         // Layers of close scenery make the ride feel embedded in a themed course.
         for (int side : {-1, 1})
-            for (int i = 0; i < 9; ++i) {
+            for (int i = 0; i < 9 + int(extra / 4.7f) + 1; ++i) {
                 float z = -3 + i * 4.7f;
                 material(3);
                 orb({side * (8.4f + .3f * std::sin(i * 3.f)), 1.2f, z},
@@ -522,7 +603,7 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
                 cyl({side * 6.35f, .05f, z}, .18f, 1.1f, {22, 53, 86, 255});
                 orb({side * 6.35f, 1.2f, z}, {.22f, .25f, .22f}, {135, 246, 255, 255});
             }
-        for (float z : {4.f, 16.f, 29.f}) {
+        for (float z : {4.f, 16.f + extra / 2, 29.f + extra}) {
             arch(z, 8.1f, 9.3f, {24, 71, 109, 255}, .38f);
             arch(z - .42f, 7.95f, 9.18f, {109, 217, 224, 255}, .09f);
             for (int side : {-1, 1}) {
@@ -531,18 +612,17 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
             }
         }
         // A broad themed marquee above the rack, with a readable stadium identity.
-        neonMural(30.42f);
+        neonMural(30.42f + extra);
         for (int side : {-1, 1}) {
             for (int j = 0; j < 5; ++j)
-                orb({side * (5.4f + j * .18f), 2.2f + j * .5f, 30.4f}, {.23f, .23f, .23f}, gold);
-            sign(arena == 9 ? ad.texture : signs[arena].texture, {side * 7.0f, 4.1f, 14.5f}, 3.1f,
-                 1.55f);
+                orb({side * (5.4f + j * .18f), 2.2f + j * .5f, 30.4f + extra}, {.23f, .23f, .23f}, gold);
+            sign(scoreboard.texture, {side * 7.0f, 4.1f, 14.5f + extra / 2}, 3.1f, 1.55f);
         }
         // Tropicana's aquarium theme: suspended rays and bubbles beyond the rails.
-        if (arena == 9 || arena == 2 || arena == 5)
+        if (mascot)
             for (int side : {-1, 1}) {
                 for (int i = 0; i < 3; ++i) {
-                    float z = 8 + i * 9.f;
+                    float z = 8 + i * (9.f + extra / 3);
                     orb({side * 7.1f, 4.4f + .3f * std::sin(time + i), z}, {.65f, .12f, .6f},
                         {30, 70, 121, 255});
                     for (int d : {-1, 1})
@@ -641,157 +721,190 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
             }
         }
     }
+    void fieldPath(Vector3 a, Vector3 b, float width, Color tint) {
+        Vector3 d = Vector3Subtract(b, a);
+        rlPushMatrix();
+        rlTranslatef((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+        rlRotatef(std::atan2(d.x, d.z) * RAD2DEG, 0, 1, 0);
+        box({0, 0, 0}, {width, .035f, Vector3Length(d)}, tint);
+        rlPopMatrix();
+    }
+    void stadiumScenery(float time, Color team) {
+        // The playable lane sits on the diamond, with a full ballpark around it.
+        const float extra = geo::sceneryExtension;
+        material(0);
+        for (int stripe = 0; stripe < 18 + int(extra / 4) + 2; ++stripe)
+            box({0, -.24f, -12 + stripe * 4.f}, {118, .12f, 4.01f},
+                stripe % 2 ? Color{47, 111, 57, 255} : Color{58, 129, 65, 255});
+        for (int side : {-1, 1}) {
+            fieldPath({0, -.13f, -8}, {side * 21.f, -.13f, 10}, 2.8f, {166, 112, 67, 255});
+            fieldPath({side * 21.f, -.13f, 10}, {0, -.13f, 30}, 2.8f, {166, 112, 67, 255});
+            fieldPath({0, .01f, -8}, {side * 48.f, .01f, 34}, .10f, cream);
+            box({side * 21.f, .03f, 10}, {.8f, .08f, .8f}, cream);
+            // Field-level dugouts with padded rails.
+            box({side * 16.f, .6f, 0}, {5, 1.2f, 7}, {16, 51, 54, 255});
+            box({side * 16.f, 2.8f, 0}, {5.5f, .25f, 7.5f}, team);
+            beam({side * 13.5f, 1.3f, -3.5f}, {side * 13.5f, 1.3f, 3.5f}, .10f, team);
+        }
+        box({0, .03f, -8}, {.8f, .08f, .8f}, cream);
+        box({0, .03f, 30}, {.8f, .08f, .8f}, cream);
+        // Low pin return keeps the stadium visible above the deck.
+        box({0, .6f, 31 + extra}, {11, 1.2f, 1.2f}, {11, 28, 43, 255});
+        box({0, 1.25f, 31 + extra}, {11.3f, .12f, 1.3f}, team);
+        for (int section = 0; section < 19; ++section) {
+            float a = (-85 + section * 10) * DEG2RAD;
+            float x = std::sin(a) * 43, z = 13 + extra + std::cos(a) * 30;
+            rlPushMatrix();
+            rlTranslatef(x, 0, z);
+            rlRotatef(a * RAD2DEG, 0, 1, 0);
+            box({0, 2, 0}, {8.2f, 4, 1.0f}, arena == 1 ? Color{29, 95, 66, 255} : team);
+            box({0, 4.15f, 0}, {8.3f, .18f, 1.3f}, {226, 199, 139, 255});
+            for (int tier = 0; tier < 2; ++tier) {
+                for (int row = 0; row < 5; ++row) {
+                    float y = 4.6f + tier * 4.4f + row * .61f, depth = 1 + row * .8f + tier * 4;
+                    box({0, y * .5f, depth}, {8.2f, y, 1.0f}, {99, 112, 119, 255});
+                    for (int seat = 0; seat < 9; ++seat) {
+                        float sx = -3.3f + seat * .82f;
+                        DrawCubeV({sx, y, depth}, {.56f, .55f, .175f}, team);
+                        if ((seat + row + section) % 3) {
+                            DrawCubeV({sx, y + .45f, depth}, {.38f, .52f, .16f},
+                                      (seat + row) % 2 ? Color{145, 172, 184, 255} : team);
+                            DrawSphereEx({sx, y + .8f, depth}, .15f, 4, 6, {178, 138, 108, 255});
+                        }
+                    }
+                }
+                box({0, 8.1f + tier * 4.4f, 5 + tier * 4.f}, {8.3f, .3f, 1.4f}, cream);
+            }
+            rlPopMatrix();
+        }
+        for (int side : {-1, 1})
+            for (float z : {7.f, 37.f + extra}) {
+                cyl({side * 36.f, 0, z}, .18f, 22, {113, 133, 144, 255});
+                box({side * 36.f, 22, z}, {5.4f, 2.5f, .4f}, {32, 49, 60, 255});
+                for (int row = 0; row < 2; ++row)
+                    for (int col = 0; col < 5; ++col)
+                        orb({side * 36.f - 2 + col, 21.5f + row, z - .3f}, {.28f, .28f, .08f},
+                            {255, 235, 185, 255});
+            }
+        // Stadium identity belongs on the outfield infrastructure, not over the pins.
+        Color boardPaint = (arena == 0 || arena == 1) ? Color{58, 77, 51, 255} : Color{19, 23, 25, 255};
+        box({-15, 12, 42 + extra}, {19, 9.6f, .8f}, boardPaint);
+        sign(scoreboard.texture, {-15, 12, 41.5f + extra}, 18.6f, 9.3f);
+        for (float x : {-22.f, -8.f})
+            cyl({x, 0, 42 + extra}, .22f, 8, {66, 77, 72, 255});
+        for (int lamp = -3; lamp <= 3; ++lamp) {
+            float x = -15 + lamp * 2.8f;
+            beam({x, 16.8f, 42 + extra}, {x, 17.5f, 41.5f + extra}, .07f, {103, 116, 110, 255});
+            box({x, 17.5f, 41.4f + extra}, {.7f, .4f, .35f}, {31, 40, 36, 255});
+            box({x, 17.45f, 41.15f + extra}, {.52f, .24f, .06f}, cream);
+        }
+        if (arena == 0) {
+            // Wrigley's distinctive clock above its manual green scoreboard.
+            beam({-15, 16.8f, 42 + extra}, {-15, 19, 42 + extra}, .20f, boardPaint);
+            orb({-15, 19, 41.9f + extra}, {2, 2, .2f}, cream);
+            orb({-15, 19, 41.65f + extra}, {1.88f, 1.88f, .15f}, boardPaint);
+            for (int tick = 0; tick < 12; ++tick) {
+                float a = tick * 2 * PI / 12;
+                orb({-15 + std::sin(a) * 1.65f, 19 + std::cos(a) * 1.65f, 41.45f + extra},
+                    {.075f, .075f, .03f}, cream);
+            }
+            beam({-15, 19, 41.4f + extra}, {-16.1f, 20, 41.4f + extra}, .085f, cream);
+            beam({-15, 19, 41.4f + extra}, {-15.1f, 20.5f, 41.4f + extra}, .06f, cream);
+            for (float x : {-23.f, -7.f}) {
+                beam({x, 16.8f, 42 + extra}, {x, 21, 42 + extra}, .05f, cream);
+                DrawTriangle3D({x, 21, 42 + extra}, {x, 19.8f, 42 + extra},
+                               {x + 1.9f, 20.4f, 42 + extra + .1f * std::sin(time)}, team);
+            }
+        }
+        for (int side : {-1, 1}) {
+            cyl({side * 39.f, 0, 32 + extra}, .10f, 16, gold);
+            box({side * 39.f, 14.3f, 32 + extra}, {1.8f, 2.4f, .08f}, gold);
+        }
+        // Individual landmark silhouettes visible beyond the diamond.
+        rlPushMatrix();
+        rlTranslatef(0, 0, 18 + extra);
+        rlScalef(2.1f, 1.0f, .75f);
+        landmarks(time);
+        rlPopMatrix();
+        if (arena == 9) {
+            for (float z : {-2.f, 14.f + extra / 3, 30.f + extra * .66f, 46.f + extra})
+                arch(z, 49, 31, {155, 184, 200, 255}, .15f);
+            box({0, 32, 20 + extra / 2}, {115, .3f, 90 + extra}, {107, 147, 177, 255});
+            sign(scoreboard.texture, {17, 10, 42 + extra}, 7, 3.5f);
+        }
+    }
     void world(const bowling::Simulation &sim, const bowling::Shot &shot, bool aim, int selected,
                Camera3D cam, float time) {
-        Color team = GetColor(teams[selected].color);
+        Color team = mascot ? Color{16, 52, 94, 255} : GetColor(teams[selected].color);
         SetShaderValue(shader, GetShaderLocation(shader, "eye"), &cam.position, SHADER_UNIFORM_VEC3);
         Vector3 shadow[10];
         for (int i = 0; i < 10; ++i)
             shadow[i] = {1000, 0, 1000};
         for (size_t i = 0; i < sim.pins.size(); ++i)
-            shadow[i] = {sim.pins[i].x - 5, 0, laneZ(sim.pins[i].z)};
+            shadow[i] = {geo::renderX(sim.pins[i].x), 0, sim.pins[i].z};
         SetShaderValueV(shader, GetShaderLocation(shader, "pinShadows"), shadow, SHADER_UNIFORM_VEC3,
                         10);
-        Vector3 ballPos{(sim.hasBall ? sim.ball.x : shot.position) - 5, 0, sim.hasBall ? sim.ball.z : 2};
-        Vector3 shadowBall{ballPos.x, 0, laneZ(ballPos.z)};
+        Vector3 ballPos{geo::renderX(sim.hasBall ? sim.ball.x : shot.position), 0,
+                        sim.hasBall ? sim.ball.z : geo::foulLine};
+        Vector3 shadowBall{ballPos.x, 0, ballPos.z};
         SetShaderValue(shader, GetShaderLocation(shader, "ballShadow"), &shadowBall,
                        SHADER_UNIFORM_VEC3);
         SetShaderValue(shader, GetShaderLocation(shader, "sceneTime"), &time, SHADER_UNIFORM_FLOAT);
         BeginMode3D(cam);
         rlPushMatrix();
-        rlTranslatef(0, 0, 2.f - 2.f * laneDepthScale);
-        rlScalef(1, 1, laneDepthScale);
-        stretched = true;
+        rlTranslatef(0, 0, 2.f - 2.f * sceneryDepthScale);
+        rlScalef(1, 1, sceneryDepthScale);
+        inSceneryTransform = true;
         material(0);
         box({0, -.7f, 15}, {95, 1, 95}, {17, 39, 43, 255});
         if (!mascot)
-            for (int side : {-1, 1})
-                for (int lane = 0; lane < 2; ++lane) {
-                    float x = side * (9.4f + lane * 7.4f);
-                    material(1);
-                    box({x, -.03f, 14}, {6.3f, .18f, 32}, {205, 158, 94, 255});
-                    material(0);
-                    for (int edge : {-1, 1}) {
-                        box({x + edge * 3.3f, -.10f, 14}, {.35f, .13f, 32}, {21, 39, 57, 255});
-                        box({x + edge * 3.65f, .07f, 14}, {.16f, .3f, 32}, {20, 116, 151, 255});
-                    }
-                    for (int row = 0; row < 4; ++row)
-                        for (int col = 0; col <= row; ++col)
-                            DrawModel(pin, {x + (col - row * .5f) * .7f, .04f, 25 + row * .65f}, .7f,
-                                      cream);
-                }
+            stadiumScenery(time, team);
+        else
+            mascotScenery(time, {16, 52, 94, 255});
+        rlPopMatrix();
+        inSceneryTransform = false;
         material(mascot ? 5 : 1);
-        box({0, -.06f, 13.5f}, {10, .2f, 32},
+        box({0, -.06f, geo::surfaceCenter}, {geo::width, .2f, geo::surfaceLength},
             mascot ? Color{158, 213, 224, 255} : Color{222, 171, 103, 255});
         material(0);
-        for (float x : {-5.35f, 5.35f}) {
-            box({x, -.08f, 13.5f}, {.64f, .15f, 32}, {16, 37, 55, 255});
+        for (float x : {-geo::gutterCenter, geo::gutterCenter}) {
+            box({x, -.08f, geo::surfaceCenter}, {geo::gutterWidth, .15f, geo::surfaceLength},
+                {16, 37, 55, 255});
             for (float d : {-.30f, .30f})
-                beam({x + d, .10f, -2}, {x + d, .10f, 30}, .07f, {107, 156, 176, 255});
-            box({x + (x < 0 ? -.5f : .5f), .12f, 13.5f}, {.25f, .42f, 32}, team);
-            box({x + (x < 0 ? -.5f : .5f), .36f, 13.5f}, {.15f, .025f, 32}, aqua);
+                beam({x + d, .10f, geo::surfaceStart}, {x + d, .10f, geo::surfaceEnd}, .07f,
+                     {107, 156, 176, 255});
+            box({x + (x < 0 ? -.5f : .5f), .12f, geo::surfaceCenter}, {.25f, .42f, geo::surfaceLength},
+                team);
+            box({x + (x < 0 ? -.5f : .5f), .36f, geo::surfaceCenter}, {.15f, .025f, geo::surfaceLength},
+                aqua);
         }
-        box({0, .047f, 2}, {10, .013f, .13f}, red);
+        box({0, .047f, geo::foulLine}, {geo::width, .013f, .13f}, red);
         for (int i = -3; i <= 3; ++i) {
-            float z = 7 + std::abs(i) * .32f;
+            float z = geo::arrowZ + std::abs(i) * .64f;
             DrawTriangle3D({i * .95f - .12f, .051f, z}, {i * .95f, .051f, z + .32f},
                            {i * .95f + .12f, .051f, z}, ink);
         }
         for (int i = -2; i <= 2; ++i)
-            DrawSphere({i * 1.1f, .05f, 3.3f}, .045f, ink);
-        if (!mascot) {
-            loungeDetails(team);
-            box({0, 2, 30}, {46, 4.1f, 1.8f}, {8, 17, 28, 255});
-            for (int i = -3; i <= 3; ++i) {
-                float x = i * 7.2f;
-                box({x, 1.35f, 28.98f}, {6.9f, 2.7f, .15f}, {2, 8, 13, 255});
-                box({x, 2.85f, 28.7f}, {7, .20f, .35f}, team);
-                box({x, 2.71f, 28.65f}, {6.5f, .06f, .12f}, aqua);
-            }
-            material(2);
-            box({0, 5.4f, 30.5f}, {45, 5.1f, .7f}, {72, 56, 62, 255});
-            material(0);
-            box({0, 7.95f, 30.2f}, {45, .12f, .3f}, {128, 83, 62, 255});
-            neonMural(29.8f);
-            for (float x : {-14.f, 14.f}) {
-                box({x, 5.2f, 29.9f}, {5.1f, 1.4f, .2f}, {17, 30, 42, 255});
-                sign(signs[arena].texture, {x, 5.2f, 29.75f}, 4.8f, 1.2f);
-            }
-            material(2);
-            box({0, 9, 39}, {66, 18, 1}, {91, 62, 48, 255});
-            material(0);
-            for (int i = -4; i <= 4; ++i) {
-                float x = i * 7.f;
-                box({x, 9.8f, 38.4f}, {3.9f, 6, .08f}, i % 2 ? team : Color{29, 92, 119, 255});
-                box({x, 6.7f, 38.3f}, {4.1f, .12f, .15f}, gold);
-            }
-            for (int side : {-1, 1}) {
-                material(2);
-                box({side * 23.f, 2.6f, 15}, {1.2f, 5.2f, 43}, {139, 69, 48, 255});
-                material(0);
-                box({side * 21.5f, 5.4f, 15}, {5, .38f, 43}, {92, 105, 111, 255});
-                for (float z : {-4.f, 6.f, 16.f, 26.f, 36.f}) {
-                    box({side * 22.f, 8, z}, {.65f, 16, .65f}, {41, 72, 86, 255});
-                    beam({side * 19.f, 5.9f, z}, {side * 19.f, 7.1f, z}, .055f, cream);
-                }
-                beam({side * 19.f, 7.1f, -5}, {side * 19.f, 7.1f, 37}, .07f, cream);
-                for (int row = 0; row < 4; ++row) {
-                    box({side * (25.f + row * 1.5f), 5.8f + row * .75f, 17}, {1.6f, 1, 42},
-                        {32, 65, 91, 255});
-                    for (int seat = 0; seat < 20; ++seat) {
-                        float x = side * (25.f + row * 1.5f), y = 6.5f + row * .75f, z = -2 + seat * 2;
-                        Color shirt = (seat + row) % 3 == 0 ? team : Color{181, 154, 98, 255};
-                        orb({x, y, z}, {.24f, .33f, .18f}, shirt);
-                        orb({x, y + .43f, z}, {.17f, .20f, .17f}, {220, 169, 121, 255});
-                    }
-                }
-                for (float z : {-1.f, 10.f, 21.f}) {
-                    float x = side * 20.f;
-                    cyl({x, 0, z}, .12f, 1.3f, {86, 101, 111, 255});
-                    cyl({x, 1.3f, z}, .85f, .13f, {151, 78, 45, 255});
-                    cyl({x - .35f, 1.45f, z}, .13f, .35f, red);
-                    cyl({x - .35f, 1.8f, z}, .15f, .035f, WHITE);
-                    beam({x - .35f, 1.8f, z}, {x - .3f, 2.05f, z}, .012f, cream);
-                    orb({x + .3f, 1.58f, z}, {.13f, .13f, .13f}, cream);
-                }
-            }
-            for (float z : {-3.f, 9.f, 21.f, 33.f}) {
-                beam({-23, 12, z}, {23, 12, z}, .14f, {89, 123, 146, 255});
-                beam({-23, 13.3f, z}, {23, 13.3f, z}, .11f, {89, 123, 146, 255});
-                for (int x = -22; x < 22; x += 4)
-                    beam({float(x), 12, z}, {float(x + 2), 13.3f, z}, .065f, {115, 145, 160, 255});
-                for (float x : {-12.f, 0.f, 12.f}) {
-                    box({x, 11.7f, z}, {5, .2f, 1.6f}, ink);
-                    box({x, 11.55f, z}, {4.6f, .035f, 1.35f}, {245, 232, 190, 255});
-                }
-            }
-            box({0, 16, 17}, {70, .45f, 52},
-                arena == 9 ? Color{126, 164, 185, 255} : Color{51, 72, 91, 255});
-            rlPushMatrix();
-            rlTranslatef(0, 7, 18);
-            rlScalef(1.5f, .6f, .65f);
-            landmarks(time);
-            rlPopMatrix();
-        } else {
-            mascotScenery(time, team);
-        }
-        rlPopMatrix();
-        stretched = false;
+            DrawSphere({i * 1.1f, .05f, geo::dotsZ}, .045f, ink);
         for (const auto &p : sim.pins) {
             auto visible = p;
-            visible.z = laneZ(p.z);
+            visible.z = p.z;
             drawPin(visible, team, time);
         }
-        if (ballPos.z < 31) {
+        if (ballPos.z < geo::surfaceEnd) {
             if (mascot)
-                rider({ballPos.x, .57f, laneZ(ballPos.z)}, time, aim, sim.active ? sim.ball.vx : 0);
+                rider({ballPos.x + (aim ? shot.aim * 1.6f : 0), .57f,
+                       ballPos.z - (aim ? .3f + shot.power * 1.4f : 0)},
+                      time, aim, sim.active ? sim.ball.vx : 0);
             else
-                bowlingBall({ballPos.x, sim.gutter ? .28f : .6f, laneZ(ballPos.z)},
-                            sim.hasBall ? ballPos.z * 110 : time * 12, sim.hasBall ? sim.ball.r : .51f);
+                bowlingBall({ballPos.x, sim.gutter ? .28f : (sim.hasBall ? sim.ball.r : geo::ballRadius),
+                             ballPos.z},
+                            sim.hasBall ? ballPos.z * 110 : time * 12,
+                            sim.hasBall ? sim.ball.r : geo::ballRadius);
         }
         if (aim && mascot) {
-            float pull = .55f + shot.power * .70f;
-            Vector3 center{ballPos.x, .70f, ballPos.z - pull};
+            float pull = .3f + shot.power * 1.4f;
+            Vector3 center{ballPos.x + shot.aim * 1.6f, .70f, ballPos.z - pull};
             for (int side : {-1, 1}) {
                 cyl({side * 4.8f, .04f, 2.4f}, .24f, 1.3f, {24, 69, 110, 255});
                 orb({side * 4.8f, 1.4f, 2.4f}, {.31f, .34f, .31f}, gold);
@@ -800,10 +913,10 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
         }
         if (aim)
             for (int i = 0; i < 20; ++i) {
-                float t = i * .07f, x = shot.position - 5 + std::sin(shot.aim * .16f) * 22 * t +
-                                        .5f * shot.curve * .85f * t * t;
+                float t = i * .07f, x = geo::renderX(shot.position + std::sin(shot.aim * .16f) * 22 * t +
+                                                     .5f * shot.curve * .85f * t * t);
                 if (std::abs(x) < 4.7f)
-                    orb({x, .07f, laneZ(2 + t * 22)}, {.045f, .015f, .10f}, gold);
+                    orb({x, .07f, geo::foulLine + t * 22}, {.045f, .015f, .10f}, gold);
             }
         EndMode3D();
     }
@@ -812,9 +925,7 @@ void main(){uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);wor
             UnloadModel(m);
         for (auto t : skins)
             UnloadTexture(t);
-        for (auto s : signs)
-            UnloadRenderTexture(s);
-        UnloadRenderTexture(ad);
+        UnloadRenderTexture(scoreboard);
         UnloadShader(shader);
     }
 };

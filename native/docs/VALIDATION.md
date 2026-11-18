@@ -1,3 +1,15 @@
+# Current stadium / Rays / scoreboard validation
+
+- Linux build passes scoring, geometry regression, physics and campaign checks, including 64 designs, ten stadiums, save/restore, powers, steering, boost and AI matches.
+- Full native matches complete: stadium 38 rolls, 56–119; mascot 41 rolls, 87–127.
+- Playable length deliberately increased from 42 to 80 units; width remains 10. Shared geometry, camera and rack-fit regression checks prevent scenery edits from independently changing proportions.
+- Launch and pin-deck captures cover both modes. Wrigley manual scoreboard texture and in-world board visually checked; live bowling values replace static title signs.
+- Real X11 mouse press/backward-sideways drag and release exercised mascot sling controls.
+- Windows cross-build and ZIP verification recorded in WINDOWS_BUILD.sha256. Windows execution and audio playback remain unverified.
+- Visuals remain procedural, with authored art still needed to approach the commercial references. Both supplied Dropbox clips were sampled; full YouTube videos remain unviewed. Button semantics are inferred from footage.
+
+Earlier validation history follows; its dimensions and screenshots may describe superseded builds.
+
 # Native verification — November 18, 2026
 
 ## Graphics pass (November 18)

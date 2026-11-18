@@ -127,18 +127,23 @@ struct Match {
         if (!sim.launch(s))
             return;
         boostUsed = false;
+        if (mascot)
+            sim.curve = 0;
         if (equipped != Power::None) {
             --stock[player][int(equipped) - 1];
             if (equipped == Power::Heavy)
-                sim.ball.r = .85f;
+                sim.ball.r = geometry::heavyBallRadius;
         }
     }
     bool step(float dt) {
         auto &s = lanes[player];
         if (s.active) {
-            if (mascot && !s.gutter && s.ball.z < 22)
-                s.ball.vx = std::clamp(s.ball.vx + steering * 12 * dt, -7.f, 7.f);
-            if (equipped == Power::Magnet && !s.gutter && s.ball.z > 12 && !s.pins.empty()) {
+            if (mascot && !s.gutter && s.ball.z < geometry::headPin - 1)
+                s.ball.vx =
+                    std::clamp((s.ball.vx + steering * 12 * dt) * std::exp(-1.2f * dt), -7.f, 7.f);
+            if (equipped == Power::Magnet && !s.gutter &&
+                s.ball.z > geometry::foulLine + (geometry::headPin - geometry::foulLine) * .5f &&
+                !s.pins.empty()) {
                 auto p = std::min_element(s.pins.begin(), s.pins.end(), [&](auto &a, auto &b) {
                     return std::abs(a.x - s.ball.x) < std::abs(b.x - s.ball.x);
                 });
@@ -151,8 +156,8 @@ struct Match {
                     s.ball.vx = std::abs(s.ball.vx) * .7f;
                     s.gutter = false;
                 }
-                if (s.ball.x > 10 - edge) {
-                    s.ball.x = 10 - edge;
+                if (s.ball.x > geometry::width - edge) {
+                    s.ball.x = geometry::width - edge;
                     s.ball.vx = -std::abs(s.ball.vx) * .7f;
                     s.gutter = false;
                 }
@@ -196,8 +201,10 @@ struct Match {
         }
         std::uniform_real_distribution<float> error(-1, 1);
         float spread = .75f - stage * .055f;
-        return {std::clamp(target + error(rng) * spread, .7f, 9.3f), error(rng) * spread,
-                .55f + .03f * stage, error(rng) * .25f};
+        float distanceScale = 21.f / (geometry::headPin - geometry::foulLine);
+        return {std::clamp(target + error(rng) * spread, geometry::launchMin, geometry::launchMax),
+                error(rng) * spread * distanceScale, .55f + .03f * stage,
+                mascot ? 0.f : error(rng) * .25f * distanceScale * distanceScale};
     }
 };
 } // namespace bowling
