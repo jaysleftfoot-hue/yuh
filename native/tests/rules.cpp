@@ -57,19 +57,32 @@ int main() {
     check(geometry::stadiumCamera.fov == 55 && geometry::mascotCamera.fov == 53,
           "art updates preserve camera framing presets");
     check(geometry::stadiumCamera.height == 3.8f && geometry::stadiumCamera.back == -4.5f &&
-              geometry::stadiumCamera.targetHeight == 1.1f && geometry::mascotCamera.height == 4.f &&
-              geometry::mascotCamera.back == -7.f && geometry::mascotCamera.targetHeight == -1.f,
+              geometry::stadiumCamera.targetHeight == 1.1f,
           "full camera baseline stays fixed across stadium artwork updates");
     // Independent perspective projection: guard visible distance, not just world length.
-    auto projectedY = [](float z) {
-        const auto c = geometry::stadiumCamera;
-        float dz = geometry::headPin - c.back, dy = c.targetHeight - c.height;
+    auto projectedY = [](float z, geometry::CameraPreset c, geometry::LaneLayout lane) {
+        float dz = lane.headPin() - c.back, dy = c.targetHeight - c.height;
         float length = std::sqrt(dz * dz + dy * dy), fy = dy / length, fz = dz / length;
         float depth = -c.height * fy + (z - c.back) * fz;
         float up = -c.height * fz - (z - c.back) * fy;
         return 400.f - 400.f * up / (depth * std::tan(c.fov * 3.14159265f / 360.f));
     };
-    float visibleRun = projectedY(geometry::foulLine) - projectedY(geometry::headPin);
+    float visibleRun = projectedY(geometry::foulLine, geometry::stadiumCamera, geometry::stadiumLane) -
+                       projectedY(geometry::headPin, geometry::stadiumCamera, geometry::stadiumLane);
+    const auto mascotLane = geometry::mascotLane;
+    const float mascotRackY = projectedY(mascotLane.headPin(), geometry::mascotCamera, mascotLane);
+    const float mascotFoulY = projectedY(geometry::foulLine, geometry::mascotCamera, mascotLane);
+    check(mascotLane.run == 144 && mascotRackY > 324 && mascotRackY < 350 &&
+          mascotFoulY > 590 && mascotFoulY < 630, "Mascot opening projection follows the source clip");
+    const auto mastCam = geometry::mascotCamera;
+    const float pitch = std::atan2(mastCam.height - mastCam.targetHeight, mascotLane.headPin() - mastCam.back);
+    const float slingDepth = (2.4f - mastCam.back) * std::cos(pitch) +
+                             (mastCam.height - 1.4f) * std::sin(pitch);
+    const float slingPixels = 9.6f * 400 / (slingDepth * std::tan(mastCam.fov * 3.14159265f / 360.f));
+    check(slingPixels > 740 && slingPixels < 785, "Mascot sling spans the reference width at launch");
+    Simulation mascotRack(mascotLane);
+    check(mascotRack.pins.front().z == mascotLane.headPin() &&
+          mascotRack.pins.back().z < mascotLane.deckEnd(), "Mascot pins sit within the shortened course");
     check(visibleRun > 390 && visibleRun < 440, "launch view preserves lane run on an 800px display");
     float rackPixels = (3 * geometry::pinSpacingX + 2 * geometry::pinRadius) * 400.f /
                        ((geometry::headPin - geometry::stadiumCamera.back) *

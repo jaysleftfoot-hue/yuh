@@ -52,11 +52,10 @@ struct StadiumSetup {
         return true;
     }
 };
-// Pull the tube backward and to either side; release sends it opposite the pull.
-inline Shot mascotPull(Shot shot, float dx, float downward) {
+// Lock the starting spot when the sling is grabbed. Pull length sets speed.
+inline Shot mascotPull(Shot shot, float downward) {
     shot.power = std::clamp(.15f + downward / 160.f, .15f, 1.f);
-    shot.aim = std::clamp(-dx / 200.f, -1.f, 1.f);
-    shot.curve = 0;
+    shot.aim = shot.curve = 0;
     return shot;
 }
 } // namespace bowling

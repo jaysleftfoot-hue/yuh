@@ -29,14 +29,44 @@ int main() {
     require(setup.phase == ShotPhase::Spot && setup.seconds == 0, "new shot resets all phases");
     require(alleyPosition(-100) == geometry::launchMin && alleyPosition(2000) == geometry::launchMax,
             "placement clamps to lane");
-    auto pull = mascotPull(input, 100, 80);
-    require(std::abs(pull.power - .65f) < .001f && pull.aim == -.5f,
-            "sling pulls opposite launch direction");
-    require(pull.position == input.position && pull.curve == 0,
-            "sling preserves launch position, clears hook");
-    require(mascotPull(input, -1000, 1000).power == 1 && mascotPull(input, -1000, 1000).aim == 1,
-            "sling limits");
-    require(mascotPull(input, 0, -90).power == .15f, "forward pull does not add power");
+    input.aim = .7f;
+    auto pull = mascotPull(input, 80);
+    require(std::abs(pull.power - .65f) < .001f && pull.aim == 0,
+            "pull length sets speed and the sling launches straight");
+    require(pull.position == input.position && pull.curve == 0, "the sling locks the selected spot");
+    require(mascotPull(input, 1000).power == 1 && mascotPull(input, -90).power == .15f,
+            "sling pull is clamped in both directions");
+
+    std::mt19937 rideRng(61);
+    RidePickups route;
+    require(!route.route && route.bonus(10) == 0, "rider starts without a visible route or powers");
+    route.reveal(rideRng);
+    const auto first = route.route->front();
+    route.reveal(rideRng);
+    require(route.route->front().position.x == first.position.x && route.route->front().power == first.power,
+            "regrabbing uses the same route for the shot");
+    Simulation ride(geometry::mascotLane);
+    ride.launch(pull);
+    for (const auto &item : *route.route) {
+        auto before = ride.ball;
+        before.x = ride.ball.x = item.position.x;
+        before.z = item.position.z - 1;
+        ride.ball.z = item.position.z + 1;
+        ride.gutter = true;
+        require(route.sweep(before, ride) == RidePower::None, "gutter cannot claim ride power");
+        ride.gutter = false;
+        require(route.sweep(before, ride) == item.power && route.sweep(before, ride) == RidePower::None,
+                "crossing the coin claims it once");
+    }
+    require(route.bonus(6) == 6 && route.bonus(0) == 0, "2x adds only this shot's pin count");
+    ride.ball.x = geometry::halfWidth;
+    ride.ball.z = geometry::mascotLane.headPin();
+    require(!route.impact(ride, 0), "wave waits for contact");
+    ++ride.impacts;
+    require(route.impact(ride, 0) && ride.knocked() >= 2 && !route.impact(ride, 0),
+            "first impact triggers the wave once against nearby pins");
+    route = {};
+    require(route.bonus(6) == 0 && !route.impact(ride, 0), "ride powers expire before the next shot");
     Profile p;
     require(p.balls() == 1 && p.stadiums() == 1, "initial unlocks");
     std::set<std::string> names;
@@ -70,7 +100,10 @@ int main() {
                 restored.completed(Challenge::WrigleyWin), "restore challenge profile");
     p.xp += 80;
     p.avatar = 4;
-    require(p.save(path) && restored.load(path) && restored.avatar == 4 && restored.xp == p.xp, "save replacement");
+    p.bestStraightRide = 165;
+    p.bestPowerRide = 319;
+    require(p.save(path) && restored.load(path) && restored.avatar == 4 && restored.xp == p.xp &&
+                restored.bestStraightRide == 165 && restored.bestPowerRide == 319, "save replacement");
     {
         std::ofstream f(path);
         f << "BLB 1 80 1 2 100 1";
@@ -90,8 +123,7 @@ int main() {
     m.launch({5, 0, .7f, 0});
     require(m.stock[0][0] == 0 && m.lanes[0].ball.r > .8f, "heavy consumes one charge");
     require(!m.equip(Power::Magnet), "no equipping mid-flight");
-    Match a, b;
-    a.mascot = b.mascot = true;
+    Match a(true), b(true);
     a.launch({5, 0, .7f, 0});
     b.launch({5, 0, .7f, 0});
     a.steering = 1;
@@ -100,14 +132,10 @@ int main() {
         b.step(1.f / 120);
     }
     require(a.lanes[0].ball.x > b.lanes[0].ball.x, "mascot steering changes path");
-    a.boost();
-    float speed = a.lanes[0].ball.vz;
-    a.boost();
-    require(speed == a.lanes[0].ball.vz && speed > b.lanes[0].ball.vz, "one boost per launch");
-    Match lateSteering;
-    lateSteering.mascot = true;
+    require(a.lanes[0].ball.vz == b.lanes[0].ball.vz, "steering preserves sling speed");
+    Match lateSteering(true);
     lateSteering.launch({5, 0, .7f, 0});
-    lateSteering.lanes[0].ball.z = geometry::headPin - 12;
+    lateSteering.lanes[0].ball.z = geometry::mascotLane.headPin() - 12;
     lateSteering.steering = 1;
     lateSteering.step(1.f / 120);
     require(lateSteering.lanes[0].ball.vx > 0, "mascot steering remains active near distant pin deck");
@@ -268,8 +296,7 @@ int main() {
         for (auto difficulty :
              {RivalDifficulty::Rookie, RivalDifficulty::Pro, RivalDifficulty::AllStar,
               RivalDifficulty::HallOfFame}) {
-            Match match;
-            match.mascot = mascot;
+            Match match(mascot);
             match.difficulty = difficulty;
             int rolls = 0;
             while (!match.complete() && rolls++ < 43) {
@@ -281,12 +308,8 @@ int main() {
                     match.equipRivalPower();
                 match.launch(who ? match.aiShot() : Shot{4, .2f, .8f, .1f});
                 for (int i = 0; i < int(geometry::shotTimeout * 120 + 240) && lane.active; ++i) {
-                    if (mascot && who) {
-                        match.steering = match.rivalSteering();
-                        if (lane.ball.z >
-                            geometry::foulLine + (geometry::headPin - geometry::foulLine) * .4f)
-                            match.boost();
-                    }
+                    if (mascot && who)
+                        match.steering = match.rivalSteering(match.rivalTarget);
                     match.step(1.f / 120);
                 }
                 require(!lane.active, "shot settles");
@@ -306,5 +329,5 @@ int main() {
     require(!coursePointer(1160, 260) && !coursePointer(80, 750), "HUD buttons cannot launch shots");
     require(heldPower(.6f) > heldPower(.1f), "timed power meter rises");
     std::cout << "Campaign tests passed: 64 designs, 10 stadiums, save/restore, powers, steering, "
-                 "boost, AI matches\n";
+                 "ride pickups, AI matches\n";
 }

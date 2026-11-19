@@ -41,7 +41,7 @@ void scoreRail(const Game &game, Texture2D rail, bool rivalSide, const char *nam
 }
 int main(int argc, char **argv) {
     bool smoke = false, startInGame = false, smokeMascot = false, demoShot = false;
-    bool demoStrike = false, splitPreview = false;
+    bool demoStrike = false, splitPreview = false, powerRide = true;
     int captureFrame = 90;
     bool captureAtTick = false;
     int previewArena = -1;
@@ -63,6 +63,8 @@ int main(int argc, char **argv) {
             smoke = true;
         if (a == "--mascot")
             smokeMascot = true;
+        if (a == "--straight-ride")
+            powerRide = false;
         if (a == "--difficulty" && i + 1 < argc) {
             std::string difficulty = argv[++i];
             if (difficulty == "rookie")
@@ -157,13 +159,16 @@ int main(int argc, char **argv) {
     Profile profile;
     if (!profile.load(save))
         profile.load(save + ".bak");
-    Match match;
-    match.mascot = smokeMascot;
+    Match match(smokeMascot);
     Shot shot;
     StadiumSetup stadiumSetup;
     PinReplay replay;
     MascotMotion mascotMotion;
     MascotTokens tokens;
+    RidePickups ridePickups;
+    std::array<int, 2> rideBonus{};
+    std::mt19937 rideRng(smoke || !screenshot.empty() ? 628u : std::random_device{}());
+    float mouseSteering = 0;
     std::array<PowerPickups, 2> pickups;
     StadiumCue stadiumCue = StadiumCue::None;
     float cueSeconds = 0, pickupSeconds = 0;
@@ -187,6 +192,9 @@ int main(int argc, char **argv) {
     auto resetShot = [&]() {
         shot = Shot{};
         stadiumSetup.reset();
+        ridePickups = {};
+        mouseSteering = 0;
+        art.waveSeconds = 0;
         stadiumArmed = false;
     };
     auto saveCareer = [&]() {
@@ -203,15 +211,14 @@ int main(int argc, char **argv) {
     };
     auto preparePickups = [&]() {
         tokens = {};
-        if (!splitDrill)
+        if (!splitDrill && !match.mascot)
             pickups[match.player].enterFrame(match.games[match.player].frame);
         pickupSeconds = 0;
     };
     auto restart = [&]() {
-        bool mode = match.mascot;
-        match = Match{};
-        match.mascot = mode;
+        match = Match(match.mascot);
         match.stage = arena;
+        rideBonus = {};
         match.rival = roster[opponent].style;
         if (splitDrill)
             setSevenTenRack(match.lanes[0]);
@@ -242,8 +249,16 @@ int main(int argc, char **argv) {
     auto launch = [&]() {
         if (turn == Turn::Ready && !paused) {
             replay.reset();
-            if (match.mascot)
+            if (match.mascot) {
+                shot.aim = shot.curve = 0;
+                if (powerRide)
+                    ridePickups.reveal(rideRng);
                 mascotMotion.release();
+                if (!screenshot.empty())
+                    std::cout << "Mascot launch: position=" << shot.position << " aim=" << shot.aim
+                              << " power=" << shot.power << " pickups=" << bool(ridePickups.route)
+                              << std::endl;
+            }
             match.launch(shot);
             rivalLine.clear();
             turn = Turn::Rolling;
@@ -285,7 +300,7 @@ int main(int argc, char **argv) {
         if (IsKeyPressed(KEY_M))
             audio.toggle();
         const bool canBrowse = screen == Screen::Lane && match.player == 0 && turn == Turn::Ready &&
-                               !splitDrill && !paused;
+                               !splitDrill && !match.mascot && !paused;
         if (canBrowse && IsKeyPressed(KEY_P)) {
             equipmentOpen = !equipmentOpen;
             charge = stadiumArmed = false;
@@ -310,7 +325,8 @@ int main(int argc, char **argv) {
                     aiWait -= dt;
                     if (aiWait <= 0) {
                         shot = match.aiShot();
-                        match.equipRivalPower();
+                        if (!match.mascot)
+                            match.equipRivalPower();
                         launch();
                     }
                 } else if (smoke) {
@@ -353,34 +369,40 @@ int main(int argc, char **argv) {
                                           << std::endl;
                         }
                     } else {
-                        shot.position = std::clamp(
-                            shot.position + (float(IsKeyDown(KEY_D)) - float(IsKeyDown(KEY_A))) * dt * 3,
-                            geometry::launchMin, geometry::launchMax);
-                        shot.aim = std::clamp(
-                            shot.aim + (float(IsKeyDown(KEY_RIGHT)) - float(IsKeyDown(KEY_LEFT))) * dt,
-                            -1.f, 1.f);
-                        if (IsKeyPressed(KEY_SPACE) ||
-                            (alleyPointer && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))) {
-                            charge = true;
+                        if (IsKeyPressed(KEY_BACKSPACE))
+                            charge = false;
+                        if (!charge) {
+                            const float direction = float(IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) -
+                                                    float(IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT));
+                            shot.position = std::clamp(shot.position + direction * dt * 4,
+                                                       geometry::launchMin, geometry::launchMax);
+                            if (alleyPointer && GetMouseDelta().x != 0)
+                                shot.position = alleyPosition(GetMouseX());
                             mouseCharge = alleyPointer && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-                            dragStart = GetMousePosition();
-                            chargeTime = 0;
+                            charge = mouseCharge || IsKeyPressed(KEY_SPACE);
+                            if (charge) {
+                                dragStart = GetMousePosition();
+                                chargeTime = 0;
+                            }
                         }
                         if (charge) {
                             chargeTime += dt;
-                            shot = mouseCharge ? mascotPull(shot, GetMouseX() - dragStart.x,
-                                                            GetMouseY() - dragStart.y)
-                                               : shot;
-                            if (!mouseCharge)
-                                shot.power = heldPower(chargeTime);
-                        }
-                        mascotMotion.aim(charge ? std::clamp((shot.power - .15f) / .85f, 0.f, 1.f) : 0.f,
-                                         charge ? shot.aim : 0.f);
-                        if (charge && ((!mouseCharge && IsKeyReleased(KEY_SPACE)) ||
-                                       (mouseCharge && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))))
-                            launch();
+                            const float pull = mouseCharge ? GetMouseY() - dragStart.y : chargeTime * 155;
+                            shot = mascotPull(shot, pull);
+                            mascotMotion.aim((shot.power - .15f) / .85f);
+                            if (powerRide && pull >= 10)
+                                ridePickups.reveal(rideRng);
+                            if (mouseCharge ? IsMouseButtonReleased(MOUSE_BUTTON_LEFT)
+                                            : IsKeyReleased(KEY_SPACE)) {
+                                if (pull >= 10)
+                                    launch();
+                                else
+                                    charge = false;
+                            }
+                        } else
+                            mascotMotion.aim(0);
                     }
-                    if (!splitDrill)
+                    if (!splitDrill && !match.mascot)
                         for (int i = 0; i < powerCount; ++i)
                             if (IsKeyPressed(KEY_ONE + i))
                                 match.equip(Power(i + 1));
@@ -388,20 +410,35 @@ int main(int argc, char **argv) {
             }
             if (turn == Turn::Rolling && match.mascot) {
                 if (!human) {
-                    match.steering = match.rivalSteering();
+                    float target = match.rivalTarget;
+                    if (ridePickups.route && selectedDifficulty != RivalDifficulty::Rookie) {
+                        for (const auto &item : *ridePickups.route) {
+                            const bool pursue = selectedDifficulty != RivalDifficulty::Pro ||
+                                                item.power == RidePower::Double;
+                            if (pursue && item.position.z > sim.ball.z) {
+                                target = item.position.x;
+                                break;
+                            }
+                        }
+                    }
+                    match.steering = match.rivalSteering(target);
                 } else if (smoke) {
-                    float target = 5 + std::sin(rolls * 2.37f) * (1.6f - arena * .09f);
-                    match.steering =
-                        std::clamp((target - sim.ball.x) * .65f - sim.ball.vx * .35f, -1.f, 1.f);
+                    float target = geometry::halfWidth + std::sin(rolls * 2.37f) * 1.6f;
+                    if (ridePickups.route)
+                        for (const auto &item : *ridePickups.route)
+                            if (item.position.z > sim.ball.z) {
+                                target = item.position.x;
+                                break;
+                            }
+                    match.steering = std::clamp((target - sim.ball.x) * .65f - sim.ball.vx * .35f, -1.f, 1.f);
                 } else {
-                    match.steering = float(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) -
-                                     float(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A));
+                    const float keys = float(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) -
+                                       float(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A));
+                    // Motion made while drawing the sling ends at release.
+                    const float delta = sim.elapsed > 0 ? GetMouseDelta().x : 0.f;
+                    mouseSteering = std::clamp(mouseSteering * std::exp(-10.f * dt) + delta / 28.f, -1.f, 1.f);
+                    match.steering = keys != 0 ? keys : mouseSteering;
                 }
-                const float boostMark =
-                    geometry::foulLine + (geometry::headPin - geometry::foulLine) * .4f;
-                if ((human && !smoke && IsKeyPressed(KEY_SPACE)) ||
-                    ((!human || smoke) && sim.ball.z > boostMark))
-                    match.boost();
             }
             accum += dt;
             while (turn == Turn::Rolling && accum >= 1.f / 120) {
@@ -410,6 +447,18 @@ int main(int argc, char **argv) {
                 const int impacts = sim.impacts;
                 const bool finished = match.step(step);
                 if (match.mascot) {
+                    const auto picked = ridePickups.sweep(before, sim);
+                    if (picked != RidePower::None) {
+                        pickupMessage = picked == RidePower::Wave ? "WAVE CRASH ARMED" : "2X PINS ARMED";
+                        pickupSeconds = 1.2f;
+                        audio.play(audio.click);
+                    }
+                    if (ridePickups.impact(sim, impacts)) {
+                        art.waveCenter = {sim.ball.x, sim.ball.z};
+                        art.waveSeconds = .55f;
+                        pickupMessage = "WAVE CRASH!";
+                        pickupSeconds = 1.f;
+                    }
                     mascotMotion.update(step, sim);
                     if (human && !profile.completed(Challenge::MascotPickups)) {
                         tokens.sweep(before, sim);
@@ -417,9 +466,12 @@ int main(int argc, char **argv) {
                             completeChallenge(Challenge::MascotPickups);
                     }
                 }
-                if (Power picked = pickups[match.player].sweep(before, match); picked != Power::None && human) {
-                    pickupMessage = std::string(powerName(picked)) + " PICKED UP";
-                    pickupSeconds = 1.6f;
+                if (!match.mascot) {
+                    const Power picked = pickups[match.player].sweep(before, match);
+                    if (picked != Power::None && human) {
+                        pickupMessage = std::string(powerName(picked)) + " PICKED UP";
+                        pickupSeconds = 1.6f;
+                    }
                 }
                 if (!smoke)
                     replay.record(sim, finished);
@@ -430,6 +482,12 @@ int main(int argc, char **argv) {
                     continue;
 
                 const auto roll = match.outcome();
+                const int bonus = ridePickups.bonus(roll.knocked);
+                rideBonus[match.player] += bonus;
+                if (bonus > 0) {
+                    pickupMessage = "+" + std::to_string(bonus) + " RIDE BONUS";
+                    pickupSeconds = 2.5f;
+                }
                 const auto cue = strikeCue(arena, match.mascot, match.strikeStreak[match.player], roll);
                 if (cue != StadiumCue::None) {
                     stadiumCue = cue;
@@ -487,11 +545,16 @@ int main(int argc, char **argv) {
             if (turn == Turn::Complete && !awarded) {
                 if (!splitDrill) {
                     int yours = scoreTotal(match.games[0]), theirs = scoreTotal(match.games[1]);
-                    result = yours > theirs    ? "YOU WIN!"
-                             : yours == theirs ? "A TIE! REMATCH?"
+                    const int finalScore = yours + rideBonus[0], rivalScore = theirs + rideBonus[1];
+                    result = finalScore > rivalScore    ? "YOU WIN!"
+                             : finalScore == rivalScore ? "A TIE! REMATCH?"
                                                : "RIVAL WINS - KEEP SWINGING!";
                     int old = profile.balls(), oldA = profile.stadiums();
-                    int xp = profile.award(yours, theirs, arena);
+                    if (match.mascot) {
+                        int &record = powerRide ? profile.bestPowerRide : profile.bestStraightRide;
+                        record = std::max(record, finalScore);
+                    }
+                    int xp = profile.award(yours, theirs, arena, rideBonus[0], rideBonus[1]);
                     if (!match.mascot && arena == 0 && yours > theirs)
                         completeChallenge(Challenge::WrigleyWin);
                     reward = "+" + std::to_string(xp) + " XP | " + std::to_string(profile.balls()) +
@@ -505,7 +568,7 @@ int main(int argc, char **argv) {
                         } else
                             reward += " | NEXT STADIUM OPEN!";
                     }
-                    if (closeFinish(yours, theirs)) {
+                    if (closeFinish(finalScore, rivalScore)) {
                         constexpr const char *closeLines[] = {"THAT WENT RIGHT TO THE WIRE.",
                                                                "CLOSE CALL. LET'S GO AGAIN.",
                                                                "I WAS HOLDING MY BREATH!"};
@@ -520,6 +583,7 @@ int main(int argc, char **argv) {
                 awarded = true;
             }
             pickupSeconds = std::max(0.f, pickupSeconds - dt);
+            art.waveSeconds = std::max(0.f, art.waveSeconds - dt);
             if (turn != Turn::Replay)
                 cueSeconds = std::max(0.f, cueSeconds - dt);
             if (cueSeconds == 0 && stadiumCue == StadiumCue::Turkey)
@@ -535,7 +599,8 @@ int main(int argc, char **argv) {
         art.mascot = match.mascot;
         art.mascotPose = mascotMotion.pose;
         const auto &pickup = pickups[match.player].item;
-        art.powerPickup = !splitDrill && pickup ? &*pickup : nullptr;
+        art.powerPickup = !splitDrill && !match.mascot && pickup ? &*pickup : nullptr;
+        art.ridePickups = match.mascot && (charge || turn == Turn::Rolling) ? &ridePickups : nullptr;
         art.mascotTokens = match.mascot && match.player == 0 &&
                            !profile.completed(Challenge::MascotPickups) ? &tokens : nullptr;
         art.cue = screen == Screen::Lane ? stadiumCue : StadiumCue::None;
@@ -543,7 +608,8 @@ int main(int argc, char **argv) {
         const bool replaying = screen == Screen::Lane && turn == Turn::Replay;
         if (replaying) {
             // Use a deck-only render for the stadium board to avoid video feedback.
-            const Camera3D boardCamera{{-7, 6, geometry::headPin - 10}, {0, 1, geometry::headPin + 2},
+            const float rack = replay.view().layout.headPin();
+            const Camera3D boardCamera{{-7, 6, rack - 10}, {0, 1, rack + 2},
                                        {0, 1, 0}, 44, CAMERA_PERSPECTIVE};
             BeginTextureMode(replayFeed);
             ClearBackground({12, 30, 39, 255});
@@ -554,21 +620,22 @@ int main(int argc, char **argv) {
         const auto cameraStyle = match.mascot ? geometry::mascotCamera : geometry::stadiumCamera;
         camera.fovy = cameraStyle.fov;
         const auto &view = replaying ? replay.view() : match.lanes[match.player];
+        const float rack = view.layout.headPin();
         Vector3 desired{geometry::renderX(shot.position) * .25f, cameraStyle.height, cameraStyle.back},
-            look{0, cameraStyle.targetHeight, geometry::headPin};
+            look{0, cameraStyle.targetHeight, rack};
         if (screen != Screen::Lane) {
             desired = match.mascot ? Vector3{-3.2f, 4.5f, -5} : Vector3{-9, 7, -4};
             look = {0, 1, match.mascot ? 13.f : 19.f};
         } else if (turn == Turn::Rolling || turn == Turn::Reaction) {
-            float z = std::min(view.ball.z, geometry::headPin + 1);
+            float z = std::min(view.ball.z, rack + 1);
             desired = {std::clamp(geometry::renderX(view.ball.x) * .65f, -3.f, 3.f),
                        match.mascot ? 3.1f : 2.0f, z - (match.mascot ? 5.3f : 5.8f)};
             look = {std::clamp(geometry::renderX(view.ball.x) * .3f, -1.5f, 1.5f),
                     match.mascot ? 1.5f : .9f, z + 12};
         }
         if (replaying) {
-            desired = {-9, 5.4f, geometry::headPin - 13};
-            look = {1.f, 3.f, geometry::headPin + 7};
+            desired = {-9, 5.4f, rack - 13};
+            look = {1.f, 3.f, rack + 7};
         }
         if (screen == Screen::Lane && (turn == Turn::Ready || replaying)) {
             camera.position = desired;
@@ -599,13 +666,13 @@ int main(int argc, char **argv) {
         if (screen == Screen::Title) {
             title("WELCOME TO THE BIG LEAGUES!", 565, 16, 20, cream);
             if (button({282, 650, 320, 52}, "SINGLE PLAYER", true) || IsKeyPressed(KEY_ENTER)) {
-                match.mascot = false;
+                match = Match(false);
                 opponent = drawHomeRival(arena, rosterRng);
                 screen = Screen::Setup;
                 audio.play(audio.click);
             }
             if (button({660, 650, 320, 52}, "MASCOT ADVENTURE", true)) {
-                match.mascot = true;
+                match = Match(true);
                 opponent = drawHomeRival(arena, rosterRng);
                 screen = Screen::Setup;
                 audio.play(audio.click);
@@ -631,7 +698,9 @@ int main(int argc, char **argv) {
                 arcadeCenter(std::to_string(profile.wins) + " WINS  /  " +
                                  std::to_string(profile.matches) + " GAMES",
                              770, 267, 32);
-                arcadeCenter("BEST GAME  " + std::to_string(profile.best), 770, 325, 34, gold);
+                arcadeCenter("BEST GAME  " + std::to_string(profile.best), 770, 315, 31, gold);
+                arcadeCenter("STRAIGHT RIDE  " + std::to_string(profile.bestStraightRide) +
+                             "  /  POWER RIDE  " + std::to_string(profile.bestPowerRide), 770, 354, 21, aqua);
                 arcadeCenter(std::to_string(profile.xp) + " CAREER XP", 770, 388, 29);
                 arcadeCenter(std::to_string(profile.balls()) + " / 64 BALLS UNLOCKED", 770, 440, 26);
                 arcadeCenter(std::to_string(profile.stadiums()) + " / 10 BALLPARKS", 770, 487, 26);
@@ -644,9 +713,9 @@ int main(int argc, char **argv) {
                 center("A / D: spot   |   Arrows: curve   |   Space: confirm   |   Backspace: go back",
                        640, 394, 16, cream);
                 arcadeCenter("MASCOT: GRAB THE TUBE AND PULL BACK", 640, 450, 30, gold);
-                arcadeCenter("PULL SIDEWAYS TO AIM. RELEASE TO LAUNCH.", 640, 493, 25);
-                arcadeCenter("A / D OR ARROWS: STEER. SPACE: BOOST.", 640, 533, 25);
-                center("Collect lane pickups. Press 1–6 to equip one before your next shot.",
+                arcadeCenter("PULL STRAIGHT BACK. RELEASE TO LAUNCH.", 640, 493, 25);
+                arcadeCenter("MOUSE OR A / D: SPOT THE TUBE, THEN STEER", 640, 533, 24);
+                center("Power Ride coins affect this throw. In Stadium, use 1–6 to equip.",
                        640, 571, 16, cream);
                 center("Fastball: faster shot   |   Changeup: smaller rival ball   |   Wild Pitch: rival drift",
                        640, 596, 14, cream);
@@ -681,7 +750,7 @@ int main(int argc, char **argv) {
             portraitCard(portraits, opponent, {793, 343, 212, 246}, "HOME RIVAL");
             arcadeCenter("VS", 640, 387, 76, {170, 255, 64, 255});
             if (plaqueButton({495, 487, 290, 68}, match.mascot ? "MASCOT RIDE" : "STADIUM BOWLING"))
-                match.mascot = !match.mascot;
+                match = Match(!match.mascot);
             if (button({495, 554, 290, 40}, std::string("AI: ") + difficultyName(selectedDifficulty))) {
                 selectedDifficulty = static_cast<RivalDifficulty>((int(selectedDifficulty) + 1) % rivalDifficultyCount);
                 audio.play(audio.click);
@@ -716,6 +785,11 @@ int main(int argc, char **argv) {
                     splitDrill = true;
                     screen = Screen::Lane;
                     restart();
+                }
+            } else if (match.mascot) {
+                if (button({789, 585, 222, 39}, powerRide ? "POWER RIDE" : "STRAIGHT RIDE")) {
+                    powerRide = !powerRide;
+                    audio.play(audio.click);
                 }
             } else
                 arcadeCenter("PARK " + std::to_string(arena + 1) + " / 10", 900, 598, 20, gold);
@@ -772,8 +846,12 @@ int main(int argc, char **argv) {
             scoreRail(match.games[0], art.scoreRails[0], false, "YOU", match.player == 0, gold);
             scoreRail(match.games[1], art.scoreRails[1], true, roster[opponent].name, match.player == 1,
                       {142, 232, 220, 255});
-            title(splitDrill ? "FENWAY 7-10 DRILL" : match.mascot ? "RAYS ADVENTURE" : arenas[arena].name,
+            title(splitDrill ? "FENWAY 7-10 DRILL" : match.mascot ? (powerRide ? "POWER RIDE" : "STRAIGHT RIDE") : arenas[arena].name,
                   184, 122, 20, cream);
+            if (match.mascot && powerRide) {
+                arcadeCenter("BONUS +" + std::to_string(rideBonus[0]), 304, 76, 18, aqua);
+                arcadeCenter("BONUS +" + std::to_string(rideBonus[1]), 976, 76, 18, aqua);
+            }
             if (art.mascotTokens && turn != Turn::Complete)
                 arcadeCenter(std::to_string(tokens.count) + " / 3 TOUCH TANK TOKENS", 948, 142, 21, aqua);
             if (pickupSeconds > 0)
@@ -818,11 +896,15 @@ int main(int argc, char **argv) {
                     arcadeCenter("FENWAY 7-10 SPLIT", 640, 335, 35, cream);
                     arcadeCenter(reward, 640, 405, 24, gold);
                 } else {
-                    const int winner = scoreTotal(match.games[0]) >= scoreTotal(match.games[1])
-                                           ? profile.avatar : opponent;
+                    const int yours = scoreTotal(match.games[0]) + rideBonus[0];
+                    const int theirs = scoreTotal(match.games[1]) + rideBonus[1];
+                    const int winner = yours >= theirs ? profile.avatar : opponent;
                     portraitCard(portraits, winner, {548, 280, 184, 200}, "TOP BOWLER");
                     center(reward, 640, 506, std::min(18.f, 600.f * 18 / std::max(1.f, tw(reward, 18))), cream);
-                    if (!rivalLine.empty())
+                    if (match.mascot && powerRide)
+                        arcadeCenter("YOU " + std::to_string(yours) + "   /   RIVAL " + std::to_string(theirs),
+                                     640, 532, 23, aqua);
+                    else if (!rivalLine.empty())
                         center(rivalLine, 640, 532, 15, cream);
                 }
                 if (stadiumCue == StadiumCue::TropicanaUnlocked)
@@ -838,11 +920,11 @@ int main(int argc, char **argv) {
                                               turn == Turn::Reaction))
                 arcadeCenter(challengeMessage, 640, 677, 24, gold);
             if (match.mascot && turn == Turn::Ready && human) {
-                title(charge ? "LET IT FLY!" : "GRAB THE TUBE", 180, 194, 25, gold);
-                text("PULL BACK, AIM, RELEASE", 180, 225, 16, cream);
-                if (charge) {
+                title(charge ? "PULL STRAIGHT BACK" : "SLIDE THE TUBE TO YOUR SPOT", 180, 194, 25, gold);
+                text(charge ? "Release to ride. Backspace cancels."
+                            : "Drag back to load the sling, or hold Space.", 180, 225, 16, cream);
+                if (charge)
                     arcadeMeter(1045, 500, shot.power, aqua);
-                }
             }
             if (!match.mascot && turn == Turn::Ready && human) {
                 float x = 240 + (shot.position - geometry::launchMin) /
@@ -945,6 +1027,8 @@ int main(int argc, char **argv) {
             ok = match.complete() && rolls >= 24 && rolls <= 42;
             std::cout << "Native match smoke: mode=" << (match.mascot ? "mascot" : "traditional")
                       << " difficulty=" << difficultyName(match.difficulty)
+                      << " rules=" << (match.mascot ? (powerRide ? "power" : "straight") : "stadium")
+                      << " bonus=" << rideBonus[0] << ',' << rideBonus[1]
                       << " complete=" << match.complete() << " rolls=" << rolls
                       << " player=" << (match.complete() ? *match.games[0].scores()[9] : -1)
                       << " rival=" << (match.complete() ? *match.games[1].scores()[9] : -1) << '\n';

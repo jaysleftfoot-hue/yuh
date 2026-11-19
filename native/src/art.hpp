@@ -14,6 +14,7 @@ struct Art {
     std::array<Texture2D, 2> scoreRails{};
     std::array<Texture2D, 3> reactions{};
     std::array<Texture2D, bowling::powerCount> badges{};
+    std::array<Texture2D, 2> rideBadges{};
     void loadBallparkArt() {
         auto load = [](const std::string &name) {
             const auto path = std::string(GetApplicationDirectory()) + "assets/ballpark-art/" + name;
@@ -39,6 +40,7 @@ struct Art {
         sunburst = load("sunburst.jpg");
         reactions = {load("slugger.png"), load("umpire.png"), load("ballboy.png")};
         tokenMedal = load("token.png");
+        rideBadges = {load("wave-crash.png"), load("double-pins.png")};
         for (int i = 0; i < bowling::powerCount; ++i)
             badges[i] = load("power-" + std::to_string(i) + ".png");
     }
@@ -50,6 +52,9 @@ struct Art {
     bowling::MascotPose mascotPose;
     const bowling::PowerPickup *powerPickup = nullptr;
     const bowling::MascotTokens *mascotTokens = nullptr;
+    const bowling::RidePickups *ridePickups = nullptr;
+    float waveSeconds = 0;
+    Vector2 waveCenter{};
     bowling::StadiumCue cue = bowling::StadiumCue::None;
     float cueSeconds = 0, tileSeconds = 0;
     using Tiles = std::array<std::array<std::string, 10>, 2>;
@@ -81,7 +86,7 @@ struct Art {
     }
     bool mascot = false, inSceneryTransform = false;
     Mesh courseMesh() {
-        constexpr int rings = 26 + int(geo::sceneryExtension / 2) + 1, sides = 24;
+        constexpr int rings = 26 + int(geo::mascotLane.sceneryExtension() / 2) + 1, sides = 24;
         Mesh m{};
         m.vertexCount = rings * sides * 6;
         m.triangleCount = m.vertexCount / 3;
@@ -495,7 +500,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         }
     }
     void mascotScenery(float time, Color team) {
-        const float extra = geo::sceneryExtension;
+        const float extra = geo::mascotLane.sceneryExtension();
         Color rock = {45, 119, 165, 255};
         material(3);
         DrawModel(course, {0, 0, 0}, 1, WHITE);
@@ -865,7 +870,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         const float glow = cue == bowling::StadiumCue::Turkey
                                ? std::min(1.f, cueSeconds) * (.65f + .35f * std::sin(time * 6))
                                : 0.f;
-        const Vector2 boardLight{glow, geo::headPin};
+        const Vector2 boardLight{glow, sim.layout.headPin()};
         SetShaderValue(shader, GetShaderLocation(shader, "boardLight"), &boardLight, SHADER_UNIFORM_VEC2);
         BeginMode3D(cam);
         if (!deckOnly) {
@@ -883,18 +888,21 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
             inSceneryTransform = false;
         }
         material(mascot ? 5 : 1);
-        box({0, -.06f, geo::surfaceCenter}, {geo::width, .2f, geo::surfaceLength},
+        const float surfaceEnd = sim.layout.surfaceEnd();
+        const float surfaceLength = surfaceEnd - geo::surfaceStart;
+        const float surfaceCenter = (geo::surfaceStart + surfaceEnd) / 2;
+        box({0, -.06f, surfaceCenter}, {geo::width, .2f, surfaceLength},
             mascot ? Color{158, 213, 224, 255} : Color{222, 171, 103, 255});
         material(0);
         for (float x : {-geo::gutterCenter, geo::gutterCenter}) {
-            box({x, -.08f, geo::surfaceCenter}, {geo::gutterWidth, .15f, geo::surfaceLength},
+            box({x, -.08f, surfaceCenter}, {geo::gutterWidth, .15f, surfaceLength},
                 {16, 37, 55, 255});
             for (float d : {-.30f, .30f})
-                beam({x + d, .10f, geo::surfaceStart}, {x + d, .10f, geo::surfaceEnd}, .07f,
+                beam({x + d, .10f, geo::surfaceStart}, {x + d, .10f, surfaceEnd}, .07f,
                      {107, 156, 176, 255});
-            box({x + (x < 0 ? -.5f : .5f), .12f, geo::surfaceCenter}, {.25f, .42f, geo::surfaceLength},
+            box({x + (x < 0 ? -.5f : .5f), .12f, surfaceCenter}, {.25f, .42f, surfaceLength},
                 team);
-            box({x + (x < 0 ? -.5f : .5f), .36f, geo::surfaceCenter}, {.15f, .025f, geo::surfaceLength},
+            box({x + (x < 0 ? -.5f : .5f), .36f, surfaceCenter}, {.15f, .025f, surfaceLength},
                 aqua);
         }
         box({0, .047f, geo::foulLine}, {geo::width, .013f, .13f}, red);
@@ -912,6 +920,15 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                 const float y = 1.04f + .13f * std::sin(time * 3.2f + item.position.z);
                 floatingMedal(badges[int(item.power) - 1], {x, y, item.position.z}, 1.35f, time);
             }
+            if (ridePickups && ridePickups->route)
+                for (const auto &item : *ridePickups->route) {
+                    if (item.claimed)
+                        continue;
+                    const auto pos = item.position;
+                    floatingMedal(rideBadges[int(item.power)],
+                                  {geo::renderX(pos.x), 1.35f + .22f * std::sin(time * 4 + pos.z), pos.z},
+                                  2.08f, time);
+                }
             if (mascotTokens)
                 for (size_t i = 0; i < mascotTokens->layout.size(); ++i) {
                     if (mascotTokens->collected[i])
@@ -922,11 +939,16 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                                   1.5f, time);
                 }
         }
+        if (mascot && !deckOnly && waveSeconds > 0) {
+            const float progress = 1 - waveSeconds / .55f;
+            DrawCircle3D({geo::renderX(waveCenter.x), .16f, waveCenter.y}, .35f + progress * 4.1f,
+                         {1, 0, 0}, 90.f, Fade(aqua, waveSeconds / .55f));
+        }
         for (const auto &p : sim.pins)
             drawPin(p, time);
-        if (ballPos.z < geo::surfaceEnd) {
+        if (ballPos.z < surfaceEnd) {
             if (mascot)
-                rider({ballPos.x + (aim ? mascotPose.sideways * 1.6f : 0), .57f,
+                rider({ballPos.x, .57f,
                        ballPos.z - (aim ? mascotPose.pull * 2.7f : 0)},
                       time, aim, mascotPose, sim.gutter);
             else
@@ -938,7 +960,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         if (aim && mascot) {
             float pull = mascotPose.pull * 2.7f;
             // Sling attaches to the front of the tube, below the ray's fins.
-            Vector3 center{ballPos.x + mascotPose.sideways * 1.6f, .40f, ballPos.z - pull - 1.f};
+            Vector3 center{ballPos.x, .40f, ballPos.z - pull - 1.f};
             for (int side : {-1, 1}) {
                 cyl({side * 4.8f, .04f, 2.4f}, .24f, 1.3f, {24, 69, 110, 255});
                 for (int wrap = 0; wrap < 5; ++wrap)
@@ -979,6 +1001,8 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
             UnloadTexture(t);
         for (auto t : teamLogos)
             UnloadTexture(t);
+        for (auto texture : rideBadges)
+            UnloadTexture(texture);
         UnloadRenderTexture(scoreboard);
         UnloadShader(shader);
     }

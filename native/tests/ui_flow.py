@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Native X11 input regression: python3 native/tests/ui_flow.py phases (or keyboard/setup/locker/locked/pause/help/scores/mascot/curve/power). Build Linux first; requires Xorg dummy, libX11 and libXtst. Uses an isolated display and non-saving screenshot mode."""
+"""Native X11 input regression: python3 native/tests/ui_flow.py phases (or keyboard/setup/locker/locked/pause/help/scores/mascot/mascot-pull/mascot-shot/mascot-straight/curve/power). Build Linux first; requires Xorg dummy, libX11 and libXtst. Uses an isolated display and non-saving screenshot mode."""
 import ctypes as c,subprocess,time,sys,os
 from pathlib import Path
 x=c.CDLL('libX11.so.6');t=c.CDLL('libXtst.so.6')
@@ -11,7 +11,7 @@ t.XTestFakeMotionEvent.argtypes=[c.c_void_p,c.c_int,c.c_int,c.c_int,c.c_ulong]
 t.XTestFakeButtonEvent.argtypes=[c.c_void_p,c.c_uint,c.c_int,c.c_ulong]
 os.chdir(Path(__file__).resolve().parents[2])
 scenario=sys.argv[1]
-assert scenario in ['phases','keyboard','setup','locker','locked','pause','help','scores','mascot','curve','power','equipment']
+assert scenario in ['phases','keyboard','setup','locker','locked','pause','help','scores','mascot','mascot-pull','mascot-shot','mascot-straight','curve','power','equipment']
 old=set(Path('/tmp/.X11-unix').glob('X*'));log=Path('/tmp/arcade-'+scenario+'.log')
 with log.open('w') as f:
  p=subprocess.Popen(['python3','native/headless.py','--capture-frame','3600','--screenshot','artifacts/arcade-'+scenario+'.png'],stdout=f,stderr=f)
@@ -33,12 +33,25 @@ with log.open('w') as f:
  elif scenario=='help':click(810,739)
  elif scenario=='scores':click(420,739)
  else:
-  click(810 if scenario=='mascot' else 440,675)
+  click(810 if scenario.startswith('mascot') else 440,675)
   if scenario=='setup':
    for _ in range(3):key(0xff53)
   if scenario not in ['setup','locked']:
+   if scenario=='mascot-straight':click(900,606)
    if scenario=='keyboard':key(0xff0d)
    else:click(510,682)
+   if scenario in ['mascot-pull','mascot-shot','mascot-straight']:
+    click(415,542)
+    assert 'Mascot launch:' not in log.read_text(), 'A click without drawing the sling launched'
+    move(415,542)
+    t.XTestFakeButtonEvent(d,1,1,0);x.XFlush(d);time.sleep(.25)
+    move(615,682)
+    if scenario!='mascot-pull':
+     t.XTestFakeButtonEvent(d,1,0,0);x.XFlush(d);time.sleep(.5)
+     line=next(l for l in log.read_text().splitlines() if l.startswith('Mascot launch:'))
+     values=dict(part.split('=') for part in line.split()[2:])
+     assert 2.68<float(values['position'])<2.77 and float(values['aim'])==0, line
+     assert float(values['power'])==1 and int(values['pickups'])==(scenario!='mascot-straight'), line
    if scenario=='equipment':click(78,287)
    if scenario=='pause':key(0xff1b)
    if scenario=='keyboard':

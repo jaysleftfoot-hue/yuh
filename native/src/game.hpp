@@ -110,19 +110,20 @@ struct Shot {
     float position = 5, aim = 0, power = .72f, curve = 0;
 };
 struct Simulation {
+    geometry::LaneLayout layout;
     std::vector<Body> pins;
     Body ball{};
     bool active = false, hasBall = false, gutter = false;
     float elapsed = 0, curve = 0;
     int impacts = 0, bankedPin = -1;
-    Simulation() {
+    explicit Simulation(geometry::LaneLayout dimensions = geometry::stadiumLane) : layout(dimensions) {
         resetRack();
     }
     void resetRack() {
         pins.clear();
         for (int row = 0; row < 4; ++row)
             for (int col = 0; col <= row; ++col)
-                pins.push_back({geometry::rackX(row, col), geometry::rackZ(row), 0, 0,
+                pins.push_back({geometry::rackX(row, col), geometry::rackZ(row, layout), 0, 0,
                                 geometry::pinRadius, false, int(pins.size()), 0});
     }
     void clearFallen() {
@@ -173,7 +174,7 @@ struct Simulation {
         if (!active)
             return false;
         elapsed += dt;
-        if (ball.z < geometry::deckEnd) {
+        if (ball.z < layout.deckEnd()) {
             if (!gutter)
                 ball.vx += curve * .85f * dt;
             ball.x += ball.vx * dt;
@@ -194,7 +195,7 @@ struct Simulation {
                 p.x = std::clamp(p.x, p.r, geometry::width - p.r);
                 p.vx *= -.3f;
             }
-            if (!gutter && ball.z < geometry::deckEnd && p.id != bankedPin) {
+            if (!gutter && ball.z < layout.deckEnd() && p.id != bankedPin) {
                 const bool wasStanding = !p.down;
                 const float contactOffset = ball.x - p.x;
                 collide(ball, p, true);
@@ -218,7 +219,7 @@ struct Simulation {
         for (const auto &p : pins)
             if (std::hypot(p.vx, p.vz) > .08f)
                 moving = true;
-        if (elapsed > geometry::shotTimeout || (ball.z > geometry::deckEnd - 1 && !moving)) {
+        if (elapsed > geometry::shotTimeout || (ball.z > layout.deckEnd() - 1 && !moving)) {
             active = false;
             return true;
         }

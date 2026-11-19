@@ -54,7 +54,7 @@ inline const ChallengeReward *ballChallenge(int ball) {
 }
 
 struct Profile {
-    int avatar = 0;
+    int avatar = 0, bestStraightRide = 0, bestPowerRide = 0;
     int xp = 0, wins = 0, matches = 0, best = 0;
     unsigned cleared = 0, completedChallenges = 0;
     bool completed(Challenge challenge) const {
@@ -89,12 +89,16 @@ struct Profile {
         int version;
         Profile p;
         if (!(f >> magic >> version >> p.xp >> p.wins >> p.matches >> p.best >> p.cleared) ||
-            magic != "BLB" || (version < 1 || version > 3) || p.xp < 0 || p.xp > 100000000 || p.wins < 0 ||
+            magic != "BLB" || (version < 1 || version > 4) || p.xp < 0 || p.xp > 100000000 || p.wins < 0 ||
             p.matches < p.wins || p.best < 0 || p.best > 300 || p.cleared > 1023)
             return false;
         if (version >= 2 && (!(f >> p.completedChallenges) || p.completedChallenges > 7))
             return false;
-        if (version == 3 && (!(f >> p.avatar) || p.avatar < 0 || p.avatar >= 6))
+        if (version >= 3 && (!(f >> p.avatar) || p.avatar < 0 || p.avatar >= 6))
+            return false;
+        if (version >= 4 && (!(f >> p.bestStraightRide >> p.bestPowerRide) ||
+            p.bestStraightRide < 0 || p.bestStraightRide > 300 ||
+            p.bestPowerRide < 0 || p.bestPowerRide > 420))
             return false;
         *this = p;
         return true;
@@ -103,8 +107,8 @@ struct Profile {
         auto temp = path + ".tmp";
         {
             std::ofstream f(temp);
-            if (!(f << "BLB 3 " << xp << ' ' << wins << ' ' << matches << ' ' << best << ' ' << cleared
-                    << ' ' << completedChallenges << ' ' << avatar << '\n'))
+            if (!(f << "BLB 4 " << xp << ' ' << wins << ' ' << matches << ' ' << best << ' ' << cleared
+                    << ' ' << completedChallenges << ' ' << avatar << ' ' << bestStraightRide << ' ' << bestPowerRide << '\n'))
                 return false;
             f.flush();
             if (!f)
@@ -131,10 +135,10 @@ struct Profile {
         }
         return true;
     }
-    int award(int score, int opponent, int arena) {
+    int award(int score, int opponent, int arena, int bonus = 0, int opponentBonus = 0) {
         ++matches;
         best = std::max(best, score);
-        bool win = score > opponent;
+        bool win = score + bonus > opponent + opponentBonus;
         if (win) {
             ++wins;
             cleared |= 1u << arena;
@@ -260,9 +264,9 @@ inline RivalTuning rivalTuning(RivalDifficulty difficulty) {
 }
 struct Match {
     std::array<Game, 2> games{};
-    std::array<Simulation, 2> lanes{};
+    std::array<Simulation, 2> lanes;
     int player = 0, stage = 0;
-    bool mascot = false;
+    bool mascot;
     RivalDifficulty difficulty = RivalDifficulty::Pro;
     RivalStyle rival = RivalStyle::Slugger;
     std::array<int, 2> strikeStreak{};
@@ -273,9 +277,11 @@ struct Match {
     Power activeTrick = Power::None;
     float wildPitchDirection = 0;
     Power equipped = Power::None;
-    bool boostUsed = false;
     float steering = 0;
     std::mt19937 rng{981};
+    explicit Match(bool ride = false)
+        : lanes{Simulation(ride ? geometry::mascotLane : geometry::stadiumLane),
+                Simulation(ride ? geometry::mascotLane : geometry::stadiumLane)}, mascot(ride) {}
     bool complete() const {
         return games[0].complete && games[1].complete;
     }
@@ -298,16 +304,15 @@ struct Match {
         return true;
     }
     void launch(Shot s) {
+        if (mascot)
+            s.aim = s.curve = 0;
         auto &sim = lanes[player];
         if (!sim.launch(s))
             return;
-        boostUsed = false;
         startedOnSplit = sevenTen(sim);
         activeTrick = queuedTrick[player];
         queuedTrick[player] = Power::None;
         wildPitchDirection = sim.ball.x >= geometry::halfWidth ? -1.f : 1.f;
-        if (mascot)
-            sim.curve = 0;
         if (equipped != Power::None) {
             --stock[player][int(equipped) - 1];
             if (equipped == Power::Heavy)
@@ -327,11 +332,11 @@ struct Match {
         if (s.active) {
             if (activeTrick == Power::WildPitch && !s.gutter && s.elapsed < 1.15f)
                 s.ball.vx += wildPitchDirection * .85f * dt;
-            if (mascot && !s.gutter && s.ball.z < geometry::headPin - 1)
+            if (mascot && !s.gutter && s.ball.z < s.layout.headPin() - 1)
                 s.ball.vx =
                     std::clamp((s.ball.vx + steering * 12 * dt) * std::exp(-1.2f * dt), -7.f, 7.f);
             if (equipped == Power::Magnet && !s.gutter &&
-                s.ball.z > geometry::foulLine + (geometry::headPin - geometry::foulLine) * .5f &&
+                s.ball.z > s.layout.at(.5f) &&
                 !s.pins.empty()) {
                 auto p = std::min_element(s.pins.begin(), s.pins.end(), [&](auto &a, auto &b) {
                     return std::abs(a.x - s.ball.x) < std::abs(b.x - s.ball.x);
@@ -353,13 +358,6 @@ struct Match {
             }
         }
         return s.step(dt);
-    }
-    void boost() {
-        auto &s = lanes[player];
-        if (mascot && s.active && !boostUsed) {
-            s.ball.vz *= 1.25f;
-            boostUsed = true;
-        }
     }
     RollResult outcome() const {
         const auto &sim = lanes[player];
@@ -406,22 +404,22 @@ struct Match {
             }
             if (pins.size() == 10) {
                 // The faster Hall of Fame shots need their own pocket line.
-                const float pocket = difficulty == RivalDifficulty::HallOfFame
-                                         ? (mascot ? .46f : .54f) : .48f;
+                const float pocket = mascot ? .65f
+                                     : difficulty == RivalDifficulty::HallOfFame ? .54f : .48f;
                 target = geometry::halfWidth + pocket;
             }
         }
         std::uniform_real_distribution<float> error(-1, 1);
         const float spread = tuning.spread * (1.f - .025f * stage);
         rivalTarget = std::clamp(target + error(rng) * spread, geometry::launchMin, geometry::launchMax);
-        const float distance = geometry::headPin - geometry::foulLine;
+        const float distance = lanes[1].layout.run;
         const bool fullRack = pins.size() == 10;
         const bool slugger = rival == RivalStyle::Slugger;
         const float powerStyle = slugger && fullRack ? .10f : rival == RivalStyle::Umpire ? -.08f : 0.f;
         const float noise = error(rng);
         const float power = std::clamp(tuning.power + powerStyle + error(rng) * spread * .045f, .15f, 1.f);
         if (mascot)
-            return {rivalTarget, noise * spread / distance, power, 0};
+            return {rivalTarget, 0, power, 0};
 
         // A slugger starts wide and hooks toward the pocket. The umpire throws straight.
         const float curve = slugger && fullRack ? .62f : 0.f;
@@ -452,10 +450,10 @@ struct Match {
             if (equip(option))
                 return;
     }
-    float rivalSteering() const {
+    float rivalSteering(float target) const {
         const auto &ball = lanes[1].ball;
         float gain = rivalTuning(difficulty).steeringGain;
-        return std::clamp((rivalTarget - ball.x) * gain - ball.vx * .35f, -1.f, 1.f);
+        return std::clamp((target - ball.x) * gain - ball.vx * .35f, -1.f, 1.f);
     }
 };
 } // namespace bowling

@@ -83,7 +83,9 @@ struct PowerPickups {
 };
 
 struct MascotTokens {
-    static constexpr std::array<LaneToken, 3> layout{{{4.5f, 43.f}, {6.f, 87.f}, {4.f, 126.f}}};
+    static constexpr std::array<LaneToken, 3> layout{{
+        {4.5f, geometry::mascotLane.at(.26f)}, {6.f, geometry::mascotLane.at(.53f)},
+        {4.f, geometry::mascotLane.at(.78f)}}};
     static constexpr float reach = .7f;
     std::array<bool, layout.size()> collected{};
     int count = 0;
@@ -95,6 +97,61 @@ struct MascotTokens {
                 ++count;
             }
     }
+};
+
+enum class RidePower { Wave, Double, None };
+struct RidePickup {
+    RidePower power;
+    LaneToken position;
+    bool claimed = false;
+};
+
+struct RidePickups {
+    std::optional<std::array<RidePickup, 2>> route;
+    bool waveFired = false;
+
+    void reveal(std::mt19937 &rng) {
+        if (route)
+            return;
+        const float side = std::uniform_int_distribution<int>(0, 1)(rng) ? 2.35f : -2.35f;
+        const bool waveFirst = std::uniform_int_distribution<int>(0, 1)(rng) != 0;
+        route = std::array<RidePickup, 2>{{
+            {waveFirst ? RidePower::Wave : RidePower::Double,
+             {geometry::halfWidth + side, geometry::mascotLane.at(.38f)}},
+            {waveFirst ? RidePower::Double : RidePower::Wave,
+             {geometry::halfWidth - side, geometry::mascotLane.at(.72f)}}}};
+    }
+    RidePower sweep(const Body &before, const Simulation &lane) {
+        if (route)
+            for (auto &pickup : *route)
+                if (!pickup.claimed && crossedPickup(before, lane, pickup.position, .34f)) {
+                    pickup.claimed = true;
+                    return pickup.power;
+                }
+        return RidePower::None;
+    }
+    bool armed(RidePower power) const {
+        return route && std::any_of(route->begin(), route->end(), [power](const RidePickup &p) {
+            return p.claimed && p.power == power;
+        });
+    }
+    bool impact(Simulation &lane, int previousImpacts) {
+        if (waveFired || lane.impacts == previousImpacts || !armed(RidePower::Wave))
+            return false;
+        waveFired = true;
+        for (auto &pin : lane.pins) {
+            const float dx = pin.x - lane.ball.x, dz = pin.z - lane.ball.z;
+            const float distance = std::hypot(dx, dz);
+            if (pin.down || distance > 3.35f)
+                continue;
+            pin.vx += dx * 4;
+            pin.vz += dz * 4;
+            pin.down = true;
+            ++lane.impacts;
+        }
+        return true;
+    }
+    int bonus(int knocked) const { return armed(RidePower::Double) ? knocked : 0; }
 };
 
 inline void setSevenTenRack(Simulation &lane) {
@@ -133,7 +190,7 @@ struct PinReplay {
         seconds = 0;
     }
     void record(const Simulation &lane, bool finished) {
-        if (lane.ball.z < geometry::headPin - 15.f)
+        if (lane.ball.z < lane.layout.headPin() - 15.f)
             return;
         if (++ticksToSample == 4 || frames.empty() || finished) {
             const int newCount = lane.knocked();
@@ -167,7 +224,6 @@ struct PinReplay {
 
 struct MascotPose {
     float pull = 0;     // 0 at rest, 1 fully drawn.
-    float sideways = 0; // Lateral displacement as a fraction of maximum.
     float recoil = 0;   // Signed damped release spring.
     float bank = 0;     // Lateral roll intent, -1 to 1.
     float wipeout = 0;  // Progress from upright to wiped out.
@@ -176,10 +232,9 @@ struct MascotMotion {
     MascotPose pose;
     float releaseSeconds = 0, releaseFrom = 0;
 
-    void aim(float pull, float sideways) {
+    void aim(float pull) {
         pose = {};
         pose.pull = pull;
-        pose.sideways = sideways;
     }
     void release() {
         releaseFrom = pose.pull;
