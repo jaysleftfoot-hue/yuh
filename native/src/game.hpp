@@ -5,17 +5,41 @@
 #include <cmath>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <vector>
 namespace bowling {
 struct Game {
     std::array<std::vector<int>, 10> frames{};
     int frame = 0;
     bool complete = false;
+    // Both the scorekeeper and the lane need to know when a new rack starts.
+    bool startsRack(int f, size_t ball) const {
+        const auto &r = frames[f];
+        if (ball == 0)
+            return true;
+        if (f != 9)
+            return false;
+        if (ball == 1)
+            return r[0] == 10;
+        return ball == 2 && (r[0] == 10 ? r[1] == 10 : r[0] + r[1] == 10);
+    }
     bool freshRack() const {
-        const auto &r = frames[frame];
-        return r.empty() ||
-               (frame == 9 && ((r.size() == 1 && r[0] == 10) ||
-                               (r.size() == 2 && (r[0] + r[1] == 10 || (r[0] == 10 && r[1] == 10)))));
+        return startsRack(frame, frames[frame].size());
+    }
+    std::string marks(int f) const {
+        const auto &r = frames[f];
+        std::string result;
+        for (size_t i = 0; i < r.size(); ++i) {
+            if (i)
+                result += ' ';
+            if (!startsRack(f, i) && r[i - 1] + r[i] == 10)
+                result += '/';
+            else if (r[i] == 10)
+                result += 'X';
+            else
+                result += r[i] ? std::to_string(r[i]) : "-";
+        }
+        return result;
     }
     int standing() const {
         if (complete)

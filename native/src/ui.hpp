@@ -63,23 +63,43 @@ inline void portraitCard(Texture2D portraits, int who, Rectangle r, const char *
     const char *names[] = {"YOU", "SLUGGER", "UMPIRE", "BALL BOY"};
     arcadeCenter(names[who], r.x + r.width / 2, r.y + r.height - 37, 23);
 }
-inline void baseballHud(Texture2D portraits, int rival, const std::array<bool, 10> &standing) {
+// Incandescent stadium numerals. Pitch controls both the bulb and the spacing.
+inline void scoreboardLights(const std::string &value, float cx, float top, float pitch, Color lamp) {
+    static constexpr unsigned char rows[10][7] = {
+        {14,17,19,21,25,17,14}, {4,12,4,4,4,4,14}, {14,17,1,2,4,8,31},
+        {30,1,1,14,1,1,30}, {2,6,10,18,31,2,2}, {31,16,16,30,1,1,30},
+        {14,16,16,30,17,17,14}, {31,1,2,4,4,8,8}, {14,17,17,14,17,17,14},
+        {14,17,17,15,1,1,14}
+    };
+    float left = cx - (value.size() * 6.f - 2.f) * pitch / 2;
+    for (char digit : value) {
+        for (int row = 0; row < 7; ++row)
+            for (int col = 0; col < 5; ++col) {
+                if (!(rows[digit - '0'][row] & (16 >> col)))
+                    continue;
+                Vector2 p{left + col * pitch, top + row * pitch};
+                DrawCircleV(p, pitch * .54f, ColorAlpha(lamp, .32f));
+                DrawCircleV(p, pitch * .41f, lamp);
+            }
+        left += 6 * pitch;
+    }
+}
+inline void baseballHud(Texture2D portraits, Texture2D pinGauge, int rival, const std::array<bool, 10> &standing) {
     // Painted turf/rock cornice connects the shallow slate scoreboards.
     DrawTexturePro(uiFrame, {0, 0, float(uiFrame.width), uiFrame.height * .135f}, {0, 58, 1280, 55},
                    {0, 0}, 0, WHITE);
-    DrawLineEx({558, 128}, {720, 65}, 12, {53, 33, 19, 255});
-    DrawLineEx({560, 125}, {718, 62}, 7, {213, 170, 91, 255});
-    DrawLineEx({561, 63}, {718, 128}, 12, {53, 33, 19, 255});
-    DrawLineEx({563, 60}, {716, 125}, 7, {213, 170, 91, 255});
-    DrawTriangle({640, 160}, {699, 83}, {581, 83}, {36, 52, 48, 255});
-    DrawTriangleLines({640, 160}, {699, 83}, {581, 83}, gold);
+    sprite(pinGauge, {543, 61, 194, 103});
     // The back row is at the top of the display, viewed from the approach.
     int pin = 0;
     for (int row = 0; row < 4; ++row)
         for (int col = 0; col <= row; ++col) {
             const float x = 640 + (row * .5f - col) * 19;
             const float y = 139 - row * 15;
-            DrawCircle(x, y, 5, standing[pin++] ? Color{150, 242, 77, 255} : Color{78, 86, 77, 255});
+            const bool lit = standing[pin++];
+            DrawCircleV({x, y}, 6.5f, {41, 31, 17, 255});
+            DrawCircleV({x, y - .5f}, 5.f, lit ? Color{154, 225, 74, 255} : Color{65, 70, 55, 255});
+            if (lit)
+                DrawCircleV({x - 1, y - 1.5f}, 2.f, {233, 255, 173, 255});
         }
     arcadeCenter(std::to_string(std::count(standing.begin(), standing.end(), true)) + " STANDING", 640,
                  164, 19);

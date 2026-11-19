@@ -8,52 +8,42 @@ using namespace bowling;
 constexpr int W = 1280, H = 800;
 enum class Screen { Title, Lane, Locker, Setup, Scores, Help };
 enum class Turn { Ready, Rolling, Reaction, Complete, Replay };
-std::string marks(const std::vector<int> &r, int f) {
-    std::string s;
-    for (size_t j = 0; j < r.size(); ++j) {
-        if (j)
-            s += ' ';
-        bool fresh =
-            j == 0 || (f == 9 && ((j == 1 && r[0] == 10) ||
-                                  (j == 2 && (r[0] + r[1] == 10 || (r[0] == 10 && r[1] == 10)))));
-        if (r[j] == 10 && fresh)
-            s += 'X';
-        else if (j && !fresh && r[j - 1] + r[j] == 10)
-            s += '/';
-        else
-            s += r[j] ? std::to_string(r[j]) : "-";
-    }
-    return s;
-}
-void scoreCard(const Game &g, float x, const char *who) {
-    // One shallow score strip per player, like a classic arcade bowling display.
-    DrawRectangleGradientV(int(x), 0, 610, 64, {46, 70, 58, 255}, {18, 33, 29, 255});
-    DrawRectangleLinesEx({x+1, 1, 608, 62}, 2, {167, 149, 99, 255});
-
-    auto scores = g.scores();
-    for (int i = 0; i < 10; ++i) {
-        float left = x + 9 + i * 51.f;
-        if (i == g.frame)
-            DrawRectangle(int(left), 3, 49, 43, {88, 123, 132, 125});
-        DrawLine(int(left + 50), 6, int(left + 50), 44, {117, 143, 150, 130});
-        std::string rolls = marks(g.frames[i], i);
-        center(std::to_string(i+1), left+24, 3, 11, cream);
-        center(rolls, left + 24, 17, 16, {211, 230, 224, 255});
-        if (scores[i])
-            center(std::to_string(*scores[i]), left + 24, 36, 21, {150, 242, 77, 255});
-    }
+// Each stitched rail carries a complete ten-frame scorebook.
+void scoreRail(const Game &game, Texture2D rail, bool rivalSide, const char *name, bool atBat, Color inkColor) {
+    const float x = rivalSide ? 652 : 4;
+    sprite(rail, {x, 0, 624, 77});
+    const auto scores = game.scores();
     int total = 0;
-    for (auto score : scores)
-        if (score)
-            total = *score;
-    center("TOTAL", x+566, 4, 13, cream);
-    center(std::to_string(total), x + 566, 20, 29, Color{150, 242, 77, 255});
-    title(who, x + 4, 68, 18, cream);
+    for (int frame = 0; frame < 10; ++frame) {
+        const float cx = x + 51 + frame * 48;
+        const bool current = atBat && !game.complete && frame == game.frame;
+        const Color number = current ? gold : Color{192, 181, 152, 255};
+        arcadeCenter(std::to_string(frame + 1), cx, 8, 15, number);
+        if (current) {
+            DrawCircleV({cx - 14, 15}, 4.5f, {93, 62, 24, 255});
+            DrawCircleV({cx - 14, 14}, 2.8f, gold);
+        }
+        const auto rolls = game.marks(frame);
+        if (!rolls.empty())
+            arcadeCenter(rolls, cx, 23, 18, cream);
+        else
+            DrawLineEx({cx - 4, 34}, {cx + 4, 33}, 2, {106, 112, 102, 235});
+        if (scores[frame]) {
+            total = *scores[frame];
+            arcadeCenter(std::to_string(total), cx, 40, 23, inkColor);
+        }
+        // Short scorekeeper's ticks leave the face a single continuous surface.
+        DrawLineEx({cx + 25, 25}, {cx + 23, 54}, 1.5f, {142, 137, 116, 128});
+    }
+    arcadeCenter("TOTAL", x + 556, 10, 14, cream);
+    scoreboardLights(std::to_string(total), x + 556, 31, 3.25f, inkColor);
+    arcadeCenter(name, x + (rivalSide ? 553 : 68), 73, 20, atBat ? gold : cream);
 }
 int main(int argc, char **argv) {
     bool smoke = false, startInGame = false, smokeMascot = false, demoShot = false;
     bool demoStrike = false, splitPreview = false;
     int captureFrame = 90;
+    bool captureAtTick = false;
     int previewArena = -1;
     RivalDifficulty selectedDifficulty = RivalDifficulty::Pro;
     std::string screenshot, scoreboardScreenshot;
@@ -65,8 +55,10 @@ int main(int argc, char **argv) {
             demoShot = demoStrike = true;
         if (a == "--preview-split")
             splitPreview = true;
-        if (a == "--capture-frame" && i + 1 < argc)
+        if (a == "--capture-frame" && i + 1 < argc) {
             captureFrame = std::clamp(std::atoi(argv[++i]), 1, 3600);
+            captureAtTick = true;
+        }
         if (a == "--smoke")
             smoke = true;
         if (a == "--mascot")
@@ -533,7 +525,8 @@ int main(int argc, char **argv) {
         }
         audio.update();
         celebration = std::max(0.f, celebration - dt);
-        if (smoke && ticks % 12 && !match.complete())
+        const bool previewTick = captureAtTick && ticks == captureFrame;
+        if (smoke && ticks % 12 && !match.complete() && !previewTick)
             continue;
         art.arena = arena;
         art.skin = skin;
@@ -760,9 +753,10 @@ int main(int argc, char **argv) {
             if (plaqueButton({891, 657, 216, 64}, "BACK"))
                 screen = lockerReturn;
         } else {
-            baseballHud(portraits, rivalPortrait(match.rival), view.standingPins());
-            scoreCard(match.games[0], 16, "YOU");
-            scoreCard(match.games[1], 654, rivalName(match.rival));
+            baseballHud(portraits, art.pinGauge, rivalPortrait(match.rival), view.standingPins());
+            scoreRail(match.games[0], art.scoreRails[0], false, "YOU", match.player == 0, gold);
+            scoreRail(match.games[1], art.scoreRails[1], true, rivalName(match.rival), match.player == 1,
+                      {142, 232, 220, 255});
             title(splitDrill ? "FENWAY 7-10 DRILL" : match.mascot ? "RAYS ADVENTURE" : arenas[arena].name,
                   184, 122, 20, cream);
             if (art.mascotTokens && turn != Turn::Complete)
@@ -937,6 +931,8 @@ int main(int argc, char **argv) {
         DrawTexturePro(target.texture, {0, 0, float(W), -float(H)},
                        {offset.x, offset.y, W * scale, H * scale}, {0, 0}, 0, WHITE);
         EndDrawing();
+        if (smoke && previewTick)
+            capture();
         if (smoke && (match.complete() || ticks > int(42 * (geometry::shotTimeout + 3) * 60))) {
             ok = match.complete() && rolls >= 24 && rolls <= 42;
             std::cout << "Native match smoke: mode=" << (match.mascot ? "mascot" : "traditional")
@@ -944,7 +940,8 @@ int main(int argc, char **argv) {
                       << " complete=" << match.complete() << " rolls=" << rolls
                       << " player=" << (match.complete() ? *match.games[0].scores()[9] : -1)
                       << " rival=" << (match.complete() ? *match.games[1].scores()[9] : -1) << '\n';
-            capture();
+            if (!captureAtTick || ticks < captureFrame)
+                capture();
             done = true;
         }
         if (!smoke && !screenshot.empty() && (ticks == captureFrame || IsKeyPressed(KEY_F12))) {

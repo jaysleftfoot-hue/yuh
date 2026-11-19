@@ -97,7 +97,9 @@ Source, shader, font/license, procedural assets, tests, build instructions, art 
 
 ## Stadium scoreboards
 
-Blue title panels have been replaced with ballpark scoreboards. Wrigley uses painted green manual panels, white league grids, a clock, flags and lamps inspired by the supplied photograph. Fenway uses a green manual face; other parks and Rays Adventure use dark LED faces with amber numbers. Bowling scores and totals update with the match. Wrigley and Fenway flip score tiles as values change. Three consecutive strikes by the same bowler at Tropicana Stadium trigger a Rays scoreboard celebration and a brief wash of blue light on the lane. Unlocking Tropicana gets its own notification after winning at Yankee Stadium.
+The HUD keeps both bowlers’ ten frames on stitched leather score rails. A brass pin gauge follows the active rack. Wrigley and Fenway hang stencil-numbered enamel plates on their outfield boards. Each changed digit turns over when its score settles. The other parks and Rays Adventure use a lamp-matrix jumbotron with the park and club marks. All boards show the current frame, pins standing, both score lines and running totals. They also carry pin-deck replays and the Tropicana celebration. Three consecutive strikes by the same bowler at Tropicana trigger the celebration and a brief wash of blue light on the lane.
+
+To capture a populated score rail and its matching outfield board, run `python3 native/headless.py --smoke --capture-frame 2300 --screenshot artifacts/score-hud.png --scoreboard-screenshot artifacts/score-board.png`. The test captures that match tick, then plays to completion.
 
 See [Astra's art handoff](docs/ASTRA_HANDOFF.md) for presentation hooks, previews and power-up references.
 

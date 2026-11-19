@@ -8,6 +8,8 @@ Start with one full Wrigley frame from the normal bowling camera. The existing s
 
 The game loads original generated paintings and emblems from `native/assets/ballpark-art`. Wrigley and Tropicana use curved painted backdrops behind the live scoreboard. The aquarium uses illuminated exhibit windows, a textured tunnel and swimming ray meshes. Lane pickups share the six HUD badges. A separate manta medallion identifies challenge tokens. Rival quips have portrait badges, and the Tropicana celebration and unlock screen use the sunburst painting.
 
+The stadium HUD uses two stitched score rails and a brass pin gauge. Wrigley and Fenway hang enamel number plates. The other parks use incandescent score digits and their team marks. [In-game scoreboard preview](arcade-scoreboard.jpg)
+
 ## Playable scenes
 
 Build with `python3 native/build.py`. These native-window captures use a fixed simulation clock and leave career saves untouched.

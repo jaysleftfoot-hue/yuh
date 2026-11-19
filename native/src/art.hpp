@@ -10,6 +10,8 @@ struct Art {
     Model cube{}, sphere{}, cylinder{}, pin{}, tube{}, course{}, rayBody{};
     Shader shader{};
     Texture2D gearCase{}, wrigley{}, tank{}, trop{}, sunburst{}, tokenMedal{};
+    Texture2D manualBoard{}, electricBoard{}, scorePlates{}, enamelLettering{}, pinGauge{};
+    std::array<Texture2D, 2> scoreRails{};
     std::array<Texture2D, 3> reactions{};
     std::array<Texture2D, bowling::powerCount> badges{};
     void loadBallparkArt() {
@@ -22,6 +24,12 @@ struct Art {
             SetTextureFilter(texture, TEXTURE_FILTER_TRILINEAR);
             return texture;
         };
+        manualBoard = load("manual-board.jpg");
+        electricBoard = load("electric-board.jpg");
+        enamelLettering = load("enamel-lettering.png");
+        scorePlates = load("score-plates.png");
+        pinGauge = load("pin-gauge.png");
+        scoreRails = {load("score-rail-home.png"), load("score-rail-away.png")};
         gearCase = load("equipment-case.jpg");
         wrigley = load("wrigley.jpg");
         trop = load("trop.jpg");
@@ -46,6 +54,31 @@ struct Art {
     float cueSeconds = 0, tileSeconds = 0;
     using Tiles = std::array<std::array<std::string, 10>, 2>;
     Tiles visibleTiles{}, oldTiles{};
+    std::array<int, 2> visibleTotals{}, oldTotals{};
+    void enamelLabel(int row, Rectangle dest) const {
+        const float h = enamelLettering.height / 4.f;
+        DrawTexturePro(enamelLettering, {0, row * h, float(enamelLettering.width), h},
+                       dest, {0, 0}, 0, WHITE);
+    }
+    void plateTotal(int total, int before, float cx) const {
+        const float width = scorePlates.width / 11.f;
+        const float phase = 1.f - tileSeconds / .42f;
+        for (int place = 2, scale = 100; place >= 0; --place, scale /= 10) {
+            // Sprite 10 is the empty enamel plate for a leading zero.
+            const int digit = place && total < scale ? 10 : total / scale % 10;
+            const int old = place && before < scale ? 10 : before / scale % 10;
+            const bool moving = tileSeconds > 0 && digit != old;
+            const float angle = moving ? std::abs(std::cos(PI * phase)) : 1.f;
+            const int face = moving && phase < .5f ? old : digit;
+            const float left = cx - 116 + (2 - place) * 78;
+            if (moving)
+                DrawTexturePro(scorePlates, {10 * width, 0, width, float(scorePlates.height)},
+                               {left, 128, 77, 126}, {0, 0}, 0, {112, 123, 114, 255});
+            DrawTexturePro(scorePlates, {face * width, 0, width, float(scorePlates.height)},
+                           {left, 128 + 63 * (1 - angle), 77, 126 * angle}, {0, 0}, 0,
+                           ColorBrightness(WHITE, -.35f * (1.f - angle)));
+        }
+    }
     bool mascot = false, inSceneryTransform = false;
     Mesh courseMesh() {
         constexpr int rings = 26 + int(geo::sceneryExtension / 2) + 1, sides = 24;
@@ -196,8 +229,11 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                     nextTiles[player][i] = std::to_string(rolls[0]);
             }
         }
-        const bool flipped = nextTiles != visibleTiles;
+        const std::array<int, 2> totals{bowling::scoreTotal(match.games[0]), bowling::scoreTotal(match.games[1])};
+        const bool flipped = nextTiles != visibleTiles || totals != visibleTotals;
         if (flipped) {
+            oldTotals = visibleTotals;
+            visibleTotals = totals;
             oldTiles = visibleTiles;
             visibleTiles = nextTiles;
             tileSeconds = .42f;
@@ -208,119 +244,79 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         if (key == scoreboardKey && !animating && !replayFeed)
             return;
         scoreboardKey = key;
-        bool manual = !mascot && (arena == 0 || arena == 1);
-        Color paint = manual ? Color{58, 77, 51, 255} : Color{9, 13, 14, 255};
-        Color letters = manual ? Color{231, 232, 207, 255} : Color{249, 195, 70, 255};
+        const bool manual = !mascot && (arena == 0 || arena == 1);
+        const int park = mascot ? 9 : arena;
+        const Color visitorInk = {255, 200, 91, 255}, homeInk = {151, 232, 207, 255};
         BeginTextureMode(scoreboard);
-        ClearBackground(paint);
-        if (manual) {
-            // Hand-operated painted panels, inspired by the supplied Wrigley board.
-            for (int row = 0; row < 16; ++row)
-                for (int col = 0; col < 32; ++col)
-                    DrawRectangleLines(col * 32, row * 32, 32, 32, {42, 58, 38, 150});
-            center(bowling::arenas[arena].name, 512, 10, 48, letters);
-            DrawLineEx({32,70}, {992,70}, 3, letters);
+        ClearBackground(BLACK);
+        sprite(manual ? manualBoard : electricBoard, {0, 0, 1024, 512});
+        if (!replayFeed && cue != bowling::StadiumCue::Turkey) {
+            if (manual) {
+                enamelLabel(park, {322, 17, 380, 56});
+            } else {
+                auto logo = [](Texture2D texture, float x, float y, float width, float height) {
+                    float scale = std::min(width / texture.width, height / texture.height);
+                    DrawTextureEx(texture, {x - texture.width * scale / 2, y}, 0, scale, WHITE);
+                };
+                logo(parkLogos[park], 512, 68, 360, 65);
+                logo(teamLogos[park], 512, 142, 155, 124);
+            }
             for (int side = 0; side < 2; ++side) {
-                const int left = side ? 676 : 44;
-                DrawRectangle(left, 91, 304, 213, {34, 53, 39, 255});
-                DrawRectangleLines(left, 91, 304, 213, letters);
-                center(side ? "HOME RIVAL" : "VISITOR", left+152, 105, 31, letters);
-                center(std::to_string(bowling::scoreTotal(match.games[side])), left+152, 148, 115, cream);
+                const float cx = side ? 810 : 214;
+                const Color lamp = side ? homeInk : visitorInk;
+                if (manual) {
+                    enamelLabel(2 + side, {cx - 188, 75, 376, 52});
+                    plateTotal(visibleTotals[side], oldTotals[side], cx);
+                } else {
+                    arcadeCenter(side ? "HOME" : "VISITORS", cx, 75, 40, lamp);
+                    scoreboardLights(std::to_string(visibleTotals[side]), cx, 142, 16, lamp);
+                }
             }
-            center("FRAME", 512, 90, 26, letters);
-            center(std::to_string(match.games[match.player].frame+1), 512, 125, 55, cream);
-            center("PINS UP", 512, 206, 25, letters);
-            center(std::to_string(pinsStanding), 512, 239, 55, cream);
-            DrawLineEx({32,323}, {992,323}, 4, letters);
-        } else {
-            const int park = mascot ? 9 : arena;
-            Color accent = GetColor(teams[bowling::arenas[park].team].color);
-            DrawRectangleGradientH(0, 0, 1024, 340, {8, 19, 36, 255}, accent);
-            // Layered broadcast graphics: angled light ribbons, team insignia and stat panels.
-            for (int stripe = 0; stripe < 16; ++stripe) {
-                float x = stripe * 90.f - 260;
-                DrawTriangle({x, 0}, {x + 230, 340}, {x + 265, 340}, Fade(WHITE, .09f));
-                DrawLineEx({x + 20, 0}, {x + 280, 340}, 2, Fade(SKYBLUE, .22f));
-            }
-            for (int star = 0; star < 25; ++star) {
-                int x = (star * 137 + 41) % 1024, y = (star * 67 + 13) % 330;
-                DrawLine(x - 3, y, x + 3, y, Fade(WHITE, .35f));
-                DrawLine(x, y - 3, x, y + 3, Fade(WHITE, .35f));
-            }
-            auto fit = [](Texture2D texture, Rectangle rect) {
-                float scale = std::min(rect.width / texture.width, rect.height / texture.height);
-                DrawTextureEx(texture,
-                              {rect.x + (rect.width - texture.width * scale) / 2,
-                               rect.y + (rect.height - texture.height * scale) / 2},
-                              0, scale, WHITE);
-            };
-            DrawRectangleGradientV(20, 16, 984, 82, {236, 242, 242, 255}, {173, 193, 204, 255});
-            fit(parkLogos[park], {300, 20, 424, 74});
-            fit(teamLogos[park], {28, 110, 225, 220});
-            for (int side = 0; side < 2; ++side) {
-                float x = 280 + side * 360.f;
-                DrawRectangleRounded({x, 119, 332, 189}, .04f, 4, {6, 17, 29, 220});
-                DrawRectangle(x, 119, 332, 6,
-                              side ? Color{91, 201, 221, 255} : Color{255, 206, 87, 255});
-                center(side ? "RIVAL" : "YOU", x + 166, 139, 24, WHITE);
-                center(std::to_string(bowling::scoreTotal(match.games[side])), x + 166, 172, 85, WHITE);
-                center("FRAME " + std::to_string(std::min(10, match.games[side].frame + 1)), x + 166,
-                       274, 18, cream);
-            }
-            letters = WHITE;
+            arcadeCenter("FRAME  " + std::to_string(std::min(10, match.games[match.player].frame + 1)),
+                         247, 269, 28, cream);
+            arcadeCenter(std::to_string(pinsStanding) + "  PINS UP", 784, 269, 28, cream);
         }
         // Dedicated video area. The feed draws only the deck, so it cannot sample this board.
         if (replayFeed) {
-            DrawRectangle(132, 13, 760, 323, {7, 18, 25, 255});
             DrawTexturePro(*replayFeed, {0, 0, float(replayFeed->width), -float(replayFeed->height)},
-                           {245, 18, 534, 300}, {0, 0}, 0, WHITE);
-            arcadeCenter("PIN DECK", 186, 140, 26, gold);
-            arcadeCenter("REPLAY", 835, 140, 26, gold);
+                           {265, 22, 494, 278}, {0, 0}, 0, WHITE);
+            arcadeCenter("PIN DECK", 139, 136, 37, gold);
+            arcadeCenter("REPLAY", 882, 136, 37, gold);
         }
         if (!replayFeed && cue == bowling::StadiumCue::Turkey) {
-            DrawRectangleGradientH(0, 85, 1024, 250, {9, 24, 61, 255}, {34, 101, 173, 255});
-            DrawTexturePro(teamLogos[9], {0, 0, float(teamLogos[9].width), float(teamLogos[9].height)},
-                           {89, 101, 226, 214}, {0, 0}, 0, WHITE);
-            sprite(sunburst, {0, 85, 1024, 250});
-            arcadeCenter("TURKEY!", 260, 120, 88, gold);
-            arcadeCenter("RAYS UP!", 260, 216, 48, cream);
+            sprite(sunburst, {29, 24, 966, 275});
+            arcadeCenter("TURKEY!", 260, 116, 88, gold);
+            arcadeCenter("RAYS UP!", 260, 212, 48, cream);
         }
         // These frame scores are live game data.
-        text("BOWLING", 25, 351, 17, letters);
         for (int frame = 0; frame < 10; ++frame)
-            center(std::to_string(frame + 1), 245 + frame * 60, 349, 17, letters);
-        center("TOTAL", 945, 349, 16, letters);
+            arcadeCenter(std::to_string(frame + 1), 185 + frame * 68, 305, 20, gold);
+        arcadeCenter("TOTAL", 908, 305, 20, gold);
         for (int player = 0; player < 2; ++player) {
             const auto &game = match.games[player];
-            float y = 377 + player * 45.f;
-            text(player ? "RIVAL" : "YOU", 28, y + 6, 24, letters);
+            const Color rowInk = manual ? cream : (player ? homeInk : visitorInk);
+            const float y = 350 + player * 62.f;
+            arcadeCenter(player ? "HOME" : "VISITORS", 88, y, 26, rowInk);
             for (int frame = 0; frame < 10; ++frame) {
-                float x = 217 + frame * 60;
-                DrawRectangleLinesEx({x, y, 56, 37}, 1, Fade(letters, .55f));
-                if (frame == game.frame && player == match.player)
-                    DrawRectangleLinesEx({x, y, 56, 37}, 3, letters);
+                const float cx = 185 + frame * 68;
                 const auto &value = visibleTiles[player][frame];
                 const auto &old = oldTiles[player][frame];
                 if (manual && tileSeconds > 0 && old != value) {
                     const float phase = 1.f - tileSeconds / .42f;
-                    const float faceHeight = std::abs(std::cos(PI * phase));
-                    const float height = 35.f * faceHeight;
-                    DrawRectangleRec({x + 2, y + 19 - height / 2, 52, height},
-                                     ColorBrightness(paint, phase < .5f ? -.18f : .16f));
-                    if (faceHeight > .12f)
-                        center(phase < .5f ? old : value, x + 28, y + 19 - 11.5f * faceHeight,
-                               23 * faceHeight, letters);
+                    const float height = 29.f * std::abs(std::cos(PI * phase));
+                    if (height > 3)
+                        arcadeCenter(phase < .5f ? old : value, cx, y + (29 - height) / 2, height, rowInk);
                 } else
-                    center(value, x + 28, y + 8, 23, letters);
+                    arcadeCenter(value, cx, y, 29, rowInk);
+                if (!game.complete && frame == game.frame && player == match.player)
+                    DrawLineEx({cx - 11, y + 31}, {cx + 11, y + 30}, 3, gold);
             }
-            center(std::to_string(bowling::scoreTotal(game)), 945, y + 4, 30, letters);
+            arcadeCenter(std::to_string(bowling::scoreTotal(game)), 908, y - 2, 33, rowInk);
         }
-        DrawRectangle(0, 476, 1024, 36, {5, 8, 9, 255});
-        std::string welcome =
-            cue == bowling::StadiumCue::TropicanaUnlocked ? "TROPICANA FIELD UNLOCKED"
-                   : mascot ? "RAYS UP!" : std::string("WELCOME TO ") + bowling::arenas[arena].name;
-        float size = std::min(28.f, 960.f / std::max(1.f, tw(welcome, 28)) * 28);
-        center(welcome, 512, 480, size, cream);
+        const std::string welcome = cue == bowling::StadiumCue::TropicanaUnlocked
+            ? "TROPICANA FIELD UNLOCKED"
+            : mascot ? "RAYS UP!" : std::string("WELCOME TO ") + bowling::arenas[arena].name;
+        arcadeCenter(welcome, 512, manual ? 472 : 451, manual ? 21 : 25, cream);
         EndTextureMode();
         if (tileSeconds > 0 || replayFeed) {
             // Only the base level changes during playback. Sample it until new mipmaps are ready.
@@ -967,7 +963,8 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
     void close() {
         for (auto texture : reactions)
             UnloadTexture(texture);
-        for (auto texture : {gearCase, wrigley, tank, trop, sunburst, tokenMedal})
+        for (auto texture : {gearCase, wrigley, tank, trop, sunburst, tokenMedal, manualBoard, electricBoard,
+                             scorePlates, enamelLettering, pinGauge, scoreRails[0], scoreRails[1]})
             UnloadTexture(texture);
         for (auto texture : badges)
             UnloadTexture(texture);

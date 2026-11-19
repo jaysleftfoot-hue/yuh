@@ -42,6 +42,14 @@ int main() {
     check(rejected && tenth.frames[9].size() == 2, "invalid roll preserves state");
     tenth.roll(3);
     check(tenth.complete && tenth.scores()[9] == 20, "tenth bonus score");
+    Game tenthMarks;
+    tenthMarks.frame = 9;
+    tenthMarks.roll(10);
+    tenthMarks.roll(0);
+    check(!tenthMarks.freshRack(), "strike then miss leaves the same bonus rack standing");
+    tenthMarks.roll(10);
+    check(tenthMarks.marks(9) == "X - /", "all remaining pins count as a spare on the last ball");
+    check(perfect.marks(9) == "X X X" && spare.marks(9) == "5 / 5", "tenth-frame bonus marks");
     check(geometry::width == 10 && geometry::headPin - geometry::foulLine == 160,
           "fixed arcade lane proportion baseline");
     check(geometry::ballRadius == .85f && geometry::pinRadius == .55f && geometry::pinSpacingX == 2.65f,
