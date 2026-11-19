@@ -51,7 +51,7 @@ Rays Adventure is a separate fantasy course inspired by the supplied Polar/Shrek
 
 All playable dimensions are defined in `src/lane_geometry.hpp`; physics and rendering use the same world coordinates. Stadium has a 160-unit run and Mascot has a 144-unit run, both with a 10-unit lane width. Ball/pin sizes and camera framing stay fixed when decoration changes. See `PROPORTIONS.md`. Decoration transforms do not contain the playable lane, ball or rack.
 
-The art remains procedural. Authored models/textures, richer character reactions and more distinct course layouts are still needed to reach the requested commercial-game finish. Logo balls use the MLB team marks. Gameplay is arcade collision simulation, not regulation bowling physics. The 64 ball unlocks, ten stadium unlocks ending with Tropicana, powers, AI rival and saved progression remain in place. Windows runtime and sound playback are unverified here.
+The native renderer combines authored character meshes, painted exhibits and procedural scenery. Mascot Ride includes an underwater ballpark mural, two distinct power-emblem settings, an articulated sling and a shot-timed Wave Crash replay. [Aquarium graphics and capture commands](docs/ASTRA_HANDOFF.md). Logo balls use the MLB team marks. Gameplay is arcade collision simulation, not regulation bowling physics. The 64 ball unlocks, ten stadium unlocks ending with Tropicana, powers, AI rival and saved progression remain in place. Windows runtime and sound playback are unverified here.
 
 ## Linux / cloud build
 

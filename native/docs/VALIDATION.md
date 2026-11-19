@@ -1,3 +1,12 @@
+# Rays aquarium graphics
+
+- Linux scoring, geometry, physics and campaign suites passed, including checks that Wave Crash starts at the recorded hit and rider pose follows the displayed replay sample.
+- Verified the drawn sling through X11 mouse input, the two power emblems at course speed, and launch and pin impact in both modes. An automated Power Ride took the Wave Crash crest, struck the rack, and reproduced the effect in the pin-deck replay.
+- Complete Pro matches took 36 deliveries in Stadium, 35 in Power Ride and 40 in Straight Ride. The Power Ride pin scores were 187–156 with ride bonuses of 114–104.
+- Rebuilt the Windows x64 portable ZIP and NSIS installer. Verified the ZIP contents, CRC and package SHA-256. Windows playback and physical audio still need verification on the target machine.
+
+[In-game captures](aquarium-ride.jpg) · [Reproduce the shots](ASTRA_HANDOFF.md)
+
 # Mascot Ride QA and graphics handoff
 
 - Linux rules and campaign suites passed with AddressSanitizer and UndefinedBehaviorSanitizer. Tests cover a spare after a miss on a full rack, the tenth-frame `X - /` case, and a bonus that changes the match winner while preserving the bowling score.

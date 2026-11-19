@@ -86,9 +86,13 @@ int main() {
     ride.ball.x = geometry::halfWidth;
     ride.ball.z = geometry::mascotLane.headPin();
     require(!route.impact(ride, 0), "wave waits for contact");
+    ride.elapsed = 3.4f;
     ++ride.impacts;
     require(route.impact(ride, 0) && ride.knocked() >= 2 && !route.impact(ride, 0),
             "first impact triggers the wave once against nearby pins");
+    require(route.wave->progress(3.2f) < 0 && route.wave->progress(3.5f) > 0 &&
+                route.wave->progress(4.2f) > 1 && route.wave->center.z == ride.ball.z,
+            "wave follows the sampled shot clock and original contact point during replay");
     route = {};
     require(route.bonus(6) == 0 && !route.impact(ride, 0), "ride powers expire before the next shot");
     Profile p;
@@ -201,10 +205,13 @@ int main() {
     drill.launch({2.f, 0.f, 1.f, 0.f});
     while (splitLane.active) {
         const bool finished = drill.step(1.f / 120);
-        replay.record(splitLane, finished);
+        MascotPose pose;
+        pose.bank = std::sin(splitLane.elapsed);
+        replay.record(splitLane, finished, pose);
     }
     require(drill.outcome().split && drill.outcome().spare, "inside-edge bank can convert the 7-10");
     require(replay.available(drill.outcome()) && replay.view().knocked() < 2, "split replay starts before impact");
+    require(replay.frame().rider.bank == std::sin(replay.view().elapsed), "replay pose matches the displayed tick");
     replay.seconds = PinReplay::maxSeconds;
     require(replay.view().knocked() == 2 && splitLane.standingCount() == 0 &&
                 drill.games[0].frames[0].empty(), "replay shows both falls without advancing live score");

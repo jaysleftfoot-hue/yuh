@@ -57,7 +57,11 @@ void main() {
         float plank=floor((world.x+30.0)*3.4);
         float grain=sin(world.x*165.0+noise(vec3(world.x*8.0,0,world.z*.7))*3.0);
         float aa=1.0-smoothstep(.4,2.5,fwidth(world.x*165.0));
-        lit*=.90+.12*hash(plank)+grain*.022*aa;
+        float ribbon=sin(world.x*24.0+2.8*noise(vec3(plank,0,world.z*.19)));
+        lit*=.90+.12*hash(plank)+grain*.022*aa+.023*ribbon*aa;
+        // A soft reflection across the waxed pocket boards under the deck lights.
+        float varnish=exp(-square((world.x+1.1)/2.8))*smoothstep(.0,.9,1.-abs(n.z));
+        lit+=vec3(.024,.016,.009)*varnish;
         float seam=fract((world.x+30.0)*3.4);
         float lineWidth=max(.012,fwidth(world.x*3.4));
         lit*=mix(.88,1.0,smoothstep(0.0,lineWidth,seam)*smoothstep(0.0,lineWidth,1.0-seam));
@@ -69,7 +73,12 @@ void main() {
         lit=mix(lit,vec3(.28,.63,.77),streak*.32);
         float seam=abs(fract(world.x*.33+.5)-.5);
         lit+=vec3(.18,.24,.26)*exp(-seam*100.0)*.35;
-        lit+=vec3(.07,.14,.17)*sin(world.z*.24+world.x*.6);
+        lit*=vec3(.82,.91,.94);
+        // Shallow blue glass carries soft cross-light from the exhibit mullions.
+        float sweep=sin(world.z*.21+world.x*.76+sceneTime*.28);
+        lit+=vec3(.025,.073,.083)*sweep;
+        float glint=1.0-smoothstep(.015,.18,abs(sweep+.24*sin(world.x*1.62-sceneTime*.41)));
+        lit+=vec3(.055,.085,.065)*glint;
         float caustic=.5+.5*sin(world.x*2.8+world.z*.38+sin(world.z*.72-sceneTime*1.4)*.7);
         float ripple=.5+.5*sin(world.x*1.5-world.z*.52+sceneTime*.96);
         lit+=vec3(.07,.14,.17)*(pow(caustic*ripple,5.0));
@@ -77,10 +86,15 @@ void main() {
     if(floorMaterial) {
         float shadow=0.0;
         for(int i=0;i<10;++i) {
-            vec2 d=(world.xz-pinShadows[i].xz)/vec2(.50,.85);
-            shadow+=exp(-dot(d,d)*2.0)*.50;
+            float lean=pinShadows[i].y;
+            vec2 axis=vec2(-.3714*abs(lean),.9285*lean)*2.28;
+            vec2 offset=world.xz-pinShadows[i].xz;
+            float along=clamp(dot(offset,axis)/max(.001,dot(axis,axis)),0.,1.);
+            vec2 d=(offset-axis*along)/vec2(.50,.85);
+            shadow+=exp(-dot(d,d)*2.0)*mix(.52,.32,along);
         }
-        vec2 d=(world.xz-ballShadow.xz)/vec2(.8,1.2);
+        vec2 footprint=woodMode==5 ? vec2(1.46,1.63) : vec2(.8,1.2);
+        vec2 d=(world.xz-ballShadow.xz)/footprint;
         shadow+=exp(-dot(d,d)*1.8)*.60;
         lit*=1.0-min(shadow,.75);
         // Soft elongated ceiling-light glints in the varnish, not scene reflections.
@@ -96,6 +110,12 @@ void main() {
         lit+=vec3(.15,.28,.49)*boardLight.x*screenReach;
         float edge=exp(-square((abs(world.x)-4.8)/.6));
         lit+=vec3(.03,.16,.22)*edge;
+    }
+    if(woodMode==9) {
+        // Lacquer over painted maple picks up a warm key and a cool strip of fill.
+        vec3 refl=reflect(-v,n);
+        float softbox=smoothstep(.86,.98,dot(refl,normalize(vec3(.65,.4,-.55))));
+        lit+=softbox*vec3(.22,.21,.16)+rim*vec3(.026,.052,.064);
     }
     if(woodMode==8) {
         float blades=noise(vec3(world.x*12.0,0.,world.z*8.0));
@@ -117,6 +137,17 @@ void main() {
     if(woodMode==4) {
         float wave=sin(world.z*3.0+world.x*2.0+sceneTime*1.1)+sin(world.z*1.5-world.x*3.0-sceneTime);
         lit=tex*(.7+wave*.12)+vec3(.12,.35,.38)*pow(.5+.5*sin(wave*3.0),6.0);
+    }
+    if(woodMode==10) {
+        // Looking up through the tunnel roof, broad bands of sunlight drift across the water.
+        vec2 water=world.xz*vec2(.56,.22);
+        water+=vec2(.65*sin(water.y+sceneTime*.30),.52*sin(water.x*.9-sceneTime*.24));
+        float crest=abs(sin(water.x+water.y)+.72*sin(water.y*1.64-water.x));
+        float caustic=1.0-smoothstep(.025,.21,crest);
+        float shafts=.5+.5*sin(world.z*.29-world.x*.81 + broad*2.4);
+        lit=mix(vec3(.027,.16,.24),vec3(.12,.49,.54),shafts*.65+detail*.24);
+        lit+=caustic*vec3(.06,.19,.17);
+        lit=mix(tex*.68,lit,smoothstep(4.2,8.0,world.y));
     }
     float fog=1.0-exp(-length(eye-world)*.0035);
     lit=mix(lit,vec3(.09,.17,.24),fog);

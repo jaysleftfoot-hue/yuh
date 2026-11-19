@@ -2,7 +2,7 @@
 
 Continue on `codex/big-league-bowling` in `native/`. Start with Mascot Ride and the original Rays aquarium theme. The current build has separate Straight and Power rules, three-dimensional ride coins, and the shorter Mascot lane fitted to the opening frame of the supplied clip. Use the original baseball arcade art direction for new props, animation and effects. [Art direction](../ART_DIRECTION.md)
 
-[Current Mascot Ride captures](mascot-qa-preview.jpg) show the opening view, the rack at impact, and the Power Ride result with the aquarium scoreboard. [Drawn sling and visible pickups](mascot-power-ride.jpg)
+[Aquarium graphics pass in play](aquarium-ride.jpg) shows the loaded sling, both power pickups, live impact, strike replay and the Wrigley pin deck. The [earlier QA captures](mascot-qa-preview.jpg) include the Power Ride result and combined match scoreboard.
 
 ## Play the current build
 
@@ -12,14 +12,12 @@ In **Mascot Adventure**, choose **Power Ride** or **Straight Ride** below the ri
 
 Use the existing 144-unit Mascot run, 160-unit Stadium run, shared 10-unit lane width and respective opening cameras when changing the scenery. Rails, rack, pickups and rider use simulation coordinates. Keep decoration outside that transform. [Measured lane framing and regression bounds](../PROPORTIONS.md)
 
-## Visual priorities
+## Aquarium graphics pass
 
-| Priority | What to inspect in the current game |
-| --- | --- |
-| 1. Pickup readability | In the opening view, the two Power coins are small and the gold rims resemble the Touch Tank coins. Test Wave Crash and 2× at both distances and through their spin. Improve the silhouette, contrast and pickup cue around the existing collision center. `Art::floatingMedal` draws all three styles from authored textures. |
-| 2. Sling and rider movement | Follow one shot from rest through full draw, release, a sharp carve and a gutter. Refine the strap contacts, tube weight and fin response in `Art::world` and `Art::rider`. `MascotPose` supplies pull, recoil, lateral bank and wipeout. |
-| 3. Wave Crash and pin-deck finish | The current live Wave Crash effect is a thin ring. Give the impact a readable water burst and keep the standing pins visible. For replay effects, use recorded impact timing. The ring currently uses a live timer and the replay stores lane snapshots. |
-| 4. Aquarium scenery | Push depth with the glass, lighting and landmark silhouettes between approach and deck. `Art::mascotScenery`, `courseMesh` and `lighting.fs` own the tunnel, exhibit glass and lane shading. Compare the launch and impact cameras after the pass. |
+- **Pickups.** The Wave Crash crest sits in a scalloped sea-star setting. The violet 2× emblem sits in a diamond. Both rock toward the rider and cast a tinted marker at their lane position. Collecting either draws a short burst around the tube. The three round gold manta medals still mark the Touch Tank challenge.
+- **Sling and rider.** Piped leather straps close around a padded yoke on the tube. Drawing it compresses the inflatable and folds the fins. On release, the sling rebounds and the rider pitches forward. During a carve, the two fins flex asymmetrically and a narrow wake follows the tube.
+- **Impact and replay.** A broken crown of water, foam and airborne droplets starts at the point of the first powered pin hit. The effect reads the sampled shot time. Replay frames also retain the rider pose for the main view and scoreboard feed. Fallen pins cast a contact shadow along the direction of the fall.
+- **Aquarium.** The original painted exhibit behind the deck features a sunken Gulf Coast ballpark, a diving bell and spotted eagle rays. Lateral windows, swaying seagrass, riveted arches and shifting light through the overhead water give the course depth as the tube passes.
 
 The pickup positions and effects live in `RidePickups`. `MascotTokens` owns the fixed three-coin Touch Tank route. Stadium powers use `PowerPickups::item` and the Dugout Equipment case. `Art::updateScoreboard` owns the outfield display and the 512×288 deck-only replay feed. [Ride presentation state](../src/presentation.hpp) · [Renderer](../src/art.hpp)
 
@@ -30,6 +28,8 @@ Run these from the repository root after a Linux build. Preview and smoke comman
 ```sh
 python3 native/headless.py --play --mascot --arena 9 --capture-frame 4 --screenshot artifacts/mascot-ready.png
 python3 native/tests/ui_flow.py mascot-pull
+python3 native/headless.py --demo-wave --capture-frame 253 --screenshot artifacts/reef-wave.png
+python3 native/headless.py --demo-wave --capture-frame 450 --screenshot artifacts/reef-replay.png
 python3 native/headless.py --play --mascot --arena 9 --demo-shot --capture-frame 310 --screenshot artifacts/mascot-impact.png
 python3 native/headless.py --smoke --mascot --arena 9 --screenshot artifacts/power-result.png --scoreboard-screenshot artifacts/power-board.png
 python3 native/headless.py --smoke --mascot --straight-ride --arena 9

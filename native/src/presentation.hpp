@@ -104,11 +104,19 @@ struct RidePickup {
     RidePower power;
     LaneToken position;
     bool claimed = false;
+    float claimedAt = 0;
 };
 
 struct RidePickups {
     std::optional<std::array<RidePickup, 2>> route;
-    bool waveFired = false;
+    struct WaveImpact {
+        LaneToken center;
+        float seconds;
+        static constexpr float duration = .76f;
+
+        float progress(float shotSeconds) const { return (shotSeconds - seconds) / duration; }
+    };
+    std::optional<WaveImpact> wave;
 
     void reveal(std::mt19937 &rng) {
         if (route)
@@ -126,6 +134,7 @@ struct RidePickups {
             for (auto &pickup : *route)
                 if (!pickup.claimed && crossedPickup(before, lane, pickup.position, .34f)) {
                     pickup.claimed = true;
+                    pickup.claimedAt = lane.elapsed;
                     return pickup.power;
                 }
         return RidePower::None;
@@ -136,9 +145,9 @@ struct RidePickups {
         });
     }
     bool impact(Simulation &lane, int previousImpacts) {
-        if (waveFired || lane.impacts == previousImpacts || !armed(RidePower::Wave))
+        if (wave || lane.impacts == previousImpacts || !armed(RidePower::Wave))
             return false;
-        waveFired = true;
+        wave = WaveImpact{{lane.ball.x, lane.ball.z}, lane.elapsed};
         for (auto &pin : lane.pins) {
             const float dx = pin.x - lane.ball.x, dz = pin.z - lane.ball.z;
             const float distance = std::hypot(dx, dz);
@@ -171,12 +180,23 @@ inline bool closeFinish(int yours, int theirs) {
     return std::abs(yours - theirs) <= 10;
 }
 
+struct MascotPose {
+    float pull = 0;     // 0 at rest, 1 fully drawn.
+    float recoil = 0;   // Signed damped release spring.
+    float bank = 0;     // Lateral roll intent, -1 to 1.
+    float wipeout = 0;  // Progress from upright to wiped out.
+};
+
 // Playback only reads snapshots. Live rack, timers, powers and score stay untouched.
 struct PinReplay {
     static constexpr float sampleStep = 1.f / 30;
     static constexpr float playbackRate = .65f;
     static constexpr float maxSeconds = 4.f;
-    std::vector<Simulation> frames;
+    struct Frame {
+        Simulation lane;
+        MascotPose rider;
+    };
+    std::vector<Frame> frames;
     int ticksToSample = 0;
     size_t finalImpact = 0;
     int knocked = 0;
@@ -189,7 +209,7 @@ struct PinReplay {
         knocked = 0;
         seconds = 0;
     }
-    void record(const Simulation &lane, bool finished) {
+    void record(const Simulation &lane, bool finished, MascotPose rider = {}) {
         if (lane.ball.z < lane.layout.headPin() - 15.f)
             return;
         if (++ticksToSample == 4 || frames.empty() || finished) {
@@ -198,7 +218,7 @@ struct PinReplay {
                 knocked = newCount;
                 finalImpact = frames.size();
             }
-            frames.push_back(lane);
+            frames.push_back({lane, rider});
             ticksToSample = 0;
         }
     }
@@ -216,18 +236,13 @@ struct PinReplay {
     bool finished() const {
         return seconds >= (lastFrame() - firstFrame()) * sampleStep / playbackRate + .18f;
     }
-    const Simulation &view() const {
+    const Frame &frame() const {
         const size_t index = firstFrame() + size_t(seconds * playbackRate / sampleStep);
         return frames[std::min(index, lastFrame())];
     }
+    const Simulation &view() const { return frame().lane; }
 };
 
-struct MascotPose {
-    float pull = 0;     // 0 at rest, 1 fully drawn.
-    float recoil = 0;   // Signed damped release spring.
-    float bank = 0;     // Lateral roll intent, -1 to 1.
-    float wipeout = 0;  // Progress from upright to wiped out.
-};
 struct MascotMotion {
     MascotPose pose;
     float releaseSeconds = 0, releaseFrom = 0;

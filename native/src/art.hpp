@@ -9,7 +9,7 @@ inline constexpr float sceneryDepthScale = geo::sceneryDepthScale;
 struct Art {
     Model cube{}, sphere{}, cylinder{}, pin{}, tube{}, course{}, rayBody{};
     Shader shader{};
-    Texture2D gearCase{}, wrigley{}, tank{}, trop{}, sunburst{}, tokenMedal{};
+    Texture2D gearCase{}, wrigley{}, tank{}, reef{}, spray{}, trop{}, sunburst{}, tokenMedal{};
     Texture2D manualBoard{}, electricBoard{}, scorePlates{}, enamelLettering{}, pinGauge{};
     std::array<Texture2D, 2> scoreRails{};
     std::array<Texture2D, 3> reactions{};
@@ -35,6 +35,8 @@ struct Art {
         wrigley = load("wrigley.jpg");
         trop = load("trop.jpg");
         tank = load("tank.jpg");
+        reef = load("sunken-ballpark.jpg");
+        spray = load("wave-spray.png");
         SetTextureWrap(tank, TEXTURE_WRAP_MIRROR_REPEAT);
         course.materials[0].maps[MATERIAL_MAP_ALBEDO].texture = tank;
         sunburst = load("sunburst.jpg");
@@ -53,8 +55,7 @@ struct Art {
     const bowling::PowerPickup *powerPickup = nullptr;
     const bowling::MascotTokens *mascotTokens = nullptr;
     const bowling::RidePickups *ridePickups = nullptr;
-    float waveSeconds = 0;
-    Vector2 waveCenter{};
+    std::optional<bowling::RidePickups::WaveImpact> wave;
     bowling::StadiumCue cue = bowling::StadiumCue::None;
     float cueSeconds = 0, tileSeconds = 0;
     using Tiles = std::array<std::array<std::string, 10>, 2>;
@@ -144,16 +145,21 @@ struct Art {
 in vec2 vertexTexCoord;out vec2 uv;in vec3 vertexPosition;in vec3 vertexNormal;in vec4 vertexColor;uniform mat4 mvp;uniform mat4 matModel;uniform mat4 matNormal;out vec3 normal;out vec3 world;out vec3 localPos;out vec4 color;
 uniform int woodMode;
 uniform float sceneTime;
+uniform vec3 finLoad; // draw, signed turn and launch recoil
 void main(){
 localPos=vertexPosition;
 vec3 pos=vertexPosition;
+vec3 norm=vertexNormal;
 if(woodMode==6){
     float wing=pow(clamp((abs(pos.x)-.57)/1.46,0.0,1.0),2.0);
-    pos.y+=wing*.18*sin(sceneTime*4.0+pos.z*2.3);
+    float stroke=.21*sin(sceneTime*3.8+pos.z*2.3)-.31*finLoad.x
+        +.55*sign(pos.x)*finLoad.y+.25*finLoad.z;
+    pos.y+=wing*stroke;
+    norm.x-=norm.y*2.0*sqrt(wing)*stroke*sign(pos.x)/1.46;
     float tail=clamp((-pos.z-.9)/1.7,0.0,1.0);
-    pos.x+=tail*tail*.22*sin(sceneTime*3.0+pos.z*2.0);
+    pos.x+=tail*tail*(.22*sin(sceneTime*3.0+pos.z*2.0)-.44*finLoad.y);
 }
-uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matModel*vec4(pos,1));color=vertexColor;gl_Position=mvp*vec4(pos,1);})";
+uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec4(pos,1));color=vertexColor;gl_Position=mvp*vec4(pos,1);})";
         std::string path = std::string(GetApplicationDirectory()) + "assets/lighting.fs";
         char *fs = LoadFileText(path.c_str());
         if (!fs)
@@ -365,6 +371,181 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         }
         rlPopMatrix();
     }
+    // The frame stays readable edge-on. Its enamel face rocks on the vertical axis.
+    void rideEmblem(bowling::RidePower power, Vector3 pos, float time) {
+        const bool waveFace = power == bowling::RidePower::Wave;
+        const Color edge = waveFace ? Color{28, 113, 143, 255} : Color{107, 45, 136, 255};
+        const Color bevel = waveFace ? Color{137, 250, 233, 255} : Color{255, 168, 236, 255};
+        const int points = waveFace ? 10 : 4;
+        const float radius = waveFace ? 1.33f : 1.47f;
+        rlPushMatrix();
+        rlTranslatef(pos.x, pos.y, pos.z);
+        rlRotatef(44.f * std::sin(time * 2.0f + pos.z), 0, 1, 0);
+        // A scalloped sea-star mount and a four-corner baseball diamond.
+        for (int i = 0; i < points; ++i) {
+            auto corner = [&](int index, float z, float scale) {
+                float angle = PI / 2 + 2 * PI * index / points;
+                float r = radius * (waveFace && index % 2 ? .76f : 1.f) * scale;
+                return Vector3{r * std::cos(angle), r * std::sin(angle), z};
+            };
+            auto a = corner(i, 0, 1), b = corner(i + 1, 0, 1);
+            for (int side : {-1, 1}) {
+                auto c = corner(i, side * .17f, .88f), d = corner(i + 1, side * .17f, .88f);
+                auto tri = [&](Vector3 x, Vector3 y, Vector3 z, Color face) {
+                    if (side < 0) std::swap(y, z);
+                    DrawTriangle3D(x, y, z, face);
+                };
+                tri(a, b, d, i % 3 == 0 ? cream : bevel);
+                tri(a, d, c, bevel);
+                tri(c, d, {0, 0, side * .17f}, edge);
+            }
+        }
+        const float diameter = waveFace ? 1.81f : 1.84f;
+        for (int face = 0; face < 2; ++face) {
+            sign(rideBadges[int(power)], {0, 0, -.185f}, diameter, diameter, true);
+            rlRotatef(180, 0, 1, 0);
+        }
+        rlPopMatrix();
+        // A narrow, colored pool of light marks the pickup's lane position.
+        for (int i = 0; i < 24; ++i) {
+            const float a = 2 * PI * i / 24, b = a + 2 * PI / 24;
+            DrawTriangle3D({pos.x, .062f, pos.z},
+                           {pos.x + .79f * std::cos(b), .061f, pos.z + 1.03f * std::sin(b)},
+                           {pos.x + .79f * std::cos(a), .061f, pos.z + 1.03f * std::sin(a)},
+                           Fade(bevel, .52f));
+        }
+    }
+
+    void drawSling(float x, float contact, float pull) {
+        const Color leather{133, 48, 42, 255}, welt{242, 147, 75, 255};
+        const float drawZ = 2.4f - contact * (1.22f + 2.7f * pull);
+        const float saddleX = x * contact;
+        for (int side : {-1, 1}) {
+            const float anchorX = side * 4.8f;
+            cyl({anchorX, .04f, 2.4f}, .24f, 1.31f, {21, 65, 82, 255});
+            for (int wrap = 0; wrap < 4; ++wrap)
+                cyl({anchorX, .36f + wrap * .18f, 2.4f}, .252f, .065f, {211, 175, 113, 255});
+            cyl({anchorX, 1.03f, 2.4f}, .283f, .22f, {161, 96, 48, 255});
+            orb({anchorX, 1.39f, 2.4f}, {.31f, .31f, .31f}, gold);
+            Vector3 start{anchorX, 1.15f, 2.4f};
+            Vector3 end{saddleX + side * .98f, 1.06f - contact * .49f, drawZ};
+            Vector3 previous = start;
+            for (int segment = 1; segment <= 8; ++segment) {
+                const float t = segment / 8.f;
+                Vector3 next = Vector3Lerp(start, end, t);
+                next.y -= .16f * (1 - pull) * std::sin(t * PI);
+                const float r = .086f - pull * .018f;
+                beam(previous, next, r, leather);
+                beam({previous.x, previous.y + r * .70f, previous.z - .022f},
+                     {next.x, next.y + r * .70f, next.z - .022f}, .027f, welt);
+                previous = next;
+            }
+            orb(end, {.105f, .12f, .115f}, gold);
+            // The padded yoke wraps the near curve of the inflatable.
+            previous = end;
+            for (int i = 1; i <= 8; ++i) {
+                const float t = i / 8.f;
+                Vector3 next{saddleX + side * .98f * (1 - t), end.y - .032f * t,
+                             drawZ - .61f * std::sin(t * PI / 2) * contact};
+                beam(previous, next, .112f, {49, 75, 79, 255});
+                beam({previous.x, previous.y + .080f, previous.z},
+                     {next.x, next.y + .080f, next.z}, .036f, {220, 179, 111, 255});
+                previous = next;
+            }
+        }
+    }
+
+    void rideWake(Vector3 p, const bowling::Body &ball, float elapsed) {
+        const float length = std::min(3.7f, (p.z - geo::foulLine) * .68f);
+        if (length < .12f) return;
+        for (int side : {-1, 1}) {
+            for (int j = 0; j < 12; ++j) {
+                float a = j / 12.f, b = (j + 1) / 12.f;
+                auto edge = [&](float t, float width) {
+                    float spread = .92f + .31f*t + .07f*std::sin(9*t-elapsed*8)*t;
+                    return Vector3{p.x + side*(spread + width) + ball.vx / std::max(1.f,ball.vz)*length*t,
+                                   .071f + .025f*(1-t), p.z - .52f - t*length};
+                };
+                Vector3 strip[]{edge(a, 0), edge(a, .13f*(1-a)), edge(b, 0), edge(b, .13f*(1-b))};
+                if (side < 0) { std::swap(strip[0],strip[1]); std::swap(strip[2],strip[3]); }
+                DrawTriangleStrip3D(strip, 4, Fade({200, 251, 248, 255}, .68f*(1-a)));
+            }
+        }
+    }
+
+    void pickupFlash(Vector3 p, bowling::RidePower kind, float t) {
+        const Color light = kind == bowling::RidePower::Wave ? Color{139, 255, 240, 255}
+                                                              : Color{255, 172, 248, 255};
+        for (int i = 0; i < 9; ++i) {
+            const float angle = 2*PI*i/9 + t*.8f;
+            const float r = 1.48f*(1-t) + .22f;
+            Vector3 star{p.x + r*std::cos(angle), .71f + t*1.39f + .17f*std::sin(angle),
+                         p.z + r*std::sin(angle)};
+            const float size = .11f*std::sin(t*PI);
+            orb(star, {size*.65f, size*1.6f, size*.65f}, light);
+        }
+    }
+
+    void splash(Vector3 origin, float t, Camera3D camera) {
+        const float radius = .38f + 3.95f * (1 - (1 - t) * (1 - t));
+        const float swell = std::sin(PI * std::sqrt(t));
+        rlPushMatrix();
+        rlTranslatef(origin.x, origin.y, origin.z);
+        // A broken crown with individual lips of foam. The pin silhouettes show through the gaps.
+        for (int i = 0; i < 72; ++i) {
+            const float a = 2 * PI * i / 72, b = 2 * PI * (i + 1) / 72;
+            auto crest = [&](float angle) {
+                float h = .14f + .70f * std::pow(.5f + .5f * std::sin(angle * 7 + .8f*std::sin(angle*3)), 2.f);
+                float lip = radius + h * swell * .21f;
+                return Vector3{lip * std::cos(angle), .02f + swell * h, lip * std::sin(angle)};
+            };
+            if (i % 17 < 2) continue;
+            Vector3 c = crest(a), d = crest(b);
+            Vector3 p{c.x * .84f, .012f, c.z * .84f}, q{d.x * .84f, .012f, d.z * .84f};
+            const Color foot = Fade({41, 172, 204, 255}, .06f*(1-t));
+            const Color lip = Fade({153, 237, 245, 255}, .68f*(1-t));
+            auto vertex = [](Vector3 v, Color color) {
+                rlColor4ub(color.r, color.g, color.b, color.a);
+                rlVertex3f(v.x, v.y, v.z);
+            };
+            rlBegin(RL_QUADS);
+            vertex(p, foot); vertex(c, lip); vertex(d, lip); vertex(q, foot);
+            vertex(q, foot); vertex(d, lip); vertex(c, lip); vertex(p, foot);
+            rlEnd();
+            const float foam = .012f + .019f*swell;
+            beam(c, d, foam, Fade({222, 255, 247, 255}, .84f*(1-t)));
+        }
+        for (int i = 0; i < 22; ++i) {
+            const float a = i * 2.39996f;
+            const float travel = radius * (.72f + .14f * (i % 4));
+            const float h = swell * (.48f + .29f * (i % 6));
+            float r = (.030f + .011f * (i % 3)) * (1 - t);
+            orb({travel * std::cos(a), h, travel * std::sin(a)}, {r, r * 1.8f, r},
+                i % 3 ? Color{133, 239, 246, 255} : WHITE);
+        }
+        // Put illustrated sheets of spray on the far and side lips. Their bases
+        // travel out with the crown, then settle. The central lane stays open.
+        Vector3 right = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(camera.target, camera.position),
+                                                            camera.up));
+        rlSetTexture(spray.id);
+        rlBegin(RL_QUADS);
+        rlColor4ub(255, 255, 255, static_cast<unsigned char>(224.f * swell));
+        for (float a : {.20f, 1.14f, 2.06f, 2.96f}) {
+            float extent = 1.2f + 1.1f*swell;
+            Vector3 base{radius*.78f*std::cos(a), .05f, radius*.78f*std::sin(a)};
+            Vector3 left = Vector3Subtract(base, Vector3Scale(right, extent*.5f));
+            Vector3 end = Vector3Add(base, Vector3Scale(right, extent*.5f));
+            float height = extent*(.64f + .12f*std::sin(a*3));
+            float u = std::cos(a)*right.x >= 0 ? 0.f : 1.f;
+            rlTexCoord2f(u, 1); rlVertex3f(left.x, left.y, left.z);
+            rlTexCoord2f(1-u, 1); rlVertex3f(end.x, end.y, end.z);
+            rlTexCoord2f(1-u, 0); rlVertex3f(end.x, end.y+height, end.z);
+            rlTexCoord2f(u, 0); rlVertex3f(left.x, left.y+height, left.z);
+        }
+        rlEnd();
+        rlSetTexture(0);
+        rlPopMatrix();
+    }
     void loadBallSkins() {
         const std::string folder = std::string(GetApplicationDirectory()) + "assets/balls/";
         for (size_t id = 0; id < skins.size(); ++id) {
@@ -398,25 +579,33 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         rlTranslatef(geo::renderX(p.x), .06f + lift, p.z);
         rlRotatef(tilt, p.id % 2 ? 1.f : -1.f, 0, .4f);
         rlScalef(geo::pinRadius / .40f, geo::pinHeight / 2.05f, geo::pinRadius / .40f);
+        material(9);
         DrawModel(pin, {0, 0, 0}, 1, WHITE);
+        material(0);
         rlPopMatrix();
     }
     void rider(Vector3 p, float time, bool ready, bowling::MascotPose pose, bool gutter) {
-        const float bank = pose.bank * 7.f;
         const float wipeout = gutter ? pose.wipeout : 0.f;
+        const float bob = std::sin(time * 3.f) * .028f;
         rlPushMatrix();
-        rlTranslatef(p.x, p.y + std::sin(time * 3) * .035f - wipeout * .24f, p.z + pose.recoil * .18f);
-        rlRotatef(std::sin(time * 3) * 2 - bank * 3.5f + wipeout * (p.x < 0 ? -74.f : 74.f), 0, 0, 1);
-        rlRotatef(bank * 2 + wipeout * 55.f, 0, 1, 0);
+        rlTranslatef(p.x, p.y + bob - wipeout * .24f - pose.pull * .05f, p.z + pose.recoil * .18f);
+        rlRotatef(bob * 42 - pose.bank * 20 + wipeout * (p.x < 0 ? -74.f : 74.f), 0, 0, 1);
+        rlRotatef(pose.bank * 12 + wipeout * 55.f, 0, 1, 0);
+        rlRotatef(-pose.pull * 3.f + pose.recoil * 10.f, 1, 0, 0);
+        rlPushMatrix();
+        rlScalef(1 + pose.pull * .035f, 1 - pose.pull * .13f, 1 + pose.pull * .025f);
         DrawModel(tube, {0, 0, 0}, 1, WHITE);
-        rlPushMatrix();
-        rlTranslatef(0, .12f, 0);
-        rlRotatef(ready ? 180.f + std::sin(time * 1.5f) * 5.f : bank * 2, 0, 1, 0);
-        rlRotatef(std::sin(time * 4) * 2.5f, 0, 0, 1);
+        rlPopMatrix();
+        rlTranslatef(0, .12f - pose.pull * .10f, -.09f * pose.pull);
+        rlRotatef(ready ? 180.f + std::sin(time * 1.5f) * 4.f : pose.bank * 10, 0, 1, 0);
+        rlRotatef(pose.pull * 7 - pose.recoil * 9, 1, 0, 0);
+        const Vector3 finLoad{pose.pull, pose.bank, pose.recoil};
+        SetShaderValue(shader, GetShaderLocation(shader, "finLoad"), &finLoad, SHADER_UNIFORM_VEC3);
         material(6);
         DrawModel(rayBody, {0, 0, 0}, 1, WHITE);
         material(0);
-        rlPopMatrix();
+        const Vector3 resting{};
+        SetShaderValue(shader, GetShaderLocation(shader, "finLoad"), &resting, SHADER_UNIFORM_VEC3);
         rlPopMatrix();
     }
 
@@ -495,30 +684,46 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         for (int i = 1; i <= 28; ++i) {
             float a = PI * i / 28;
             Vector3 next{-width * std::cos(a), .35f + height * std::sin(a), z};
-            // Shader-lit spheres hide the joints between curved rib segments.
             beam(last, next, radius, c);
             last = next;
         }
     }
-    void mascotScenery(float time, Color team) {
+    void mascotScenery(float time, Color team, int openSide) {
         const float extra = geo::mascotLane.sceneryExtension();
         Color rock = {45, 119, 165, 255};
+        material(10);
+        if (openSide == 0)
+            DrawModel(course, {0, 0, 0}, 1, WHITE);
         material(3);
-        DrawModel(course, {0, 0, 0}, 1, WHITE);
         box({0, 5.5f, 42.5f + extra}, {20, 11, 1}, rock);
         material(0);
-        box({0, 1.3f, 30.8f + extra}, {10, 2.6f, .5f}, {5, 17, 34, 255});
+        // The end of the ride opens onto a single large exhibit beyond the last pin.
+        const float endWindow = 31.2f + extra;
+        box({0, 4.92f, endWindow + .24f}, {15.3f, 10.f, .38f}, {21, 54, 63, 255});
+        sign(reef, {0, 4.91f, endWindow}, 14.8f, 9.8f, true);
+        for (int side : {-1, 1}) {
+            beam({side * 7.43f, .08f, endWindow - .03f}, {side * 7.43f, 9.82f, endWindow - .03f},
+                 .13f, {183, 142, 85, 255});
+        }
         material(4);
         for (int side : {-1, 1})
             box({side * 6.7f, -.13f, 15 + extra / 2}, {2.45f, .10f, 46 + extra}, {27, 157, 193, 255});
         material(0);
         // Recessed exhibit windows follow the outer walls, leaving the course clear.
         for (int side : {-1, 1}) {
-            for (float z = 1; z < 34 + extra; z += 11.f) {
+            if (side == openSide) continue;
+            int bay = side < 0 ? 0 : 2;
+            for (float z = 1; z < 34 + extra; z += 11.f, ++bay) {
                 rlPushMatrix();
                 rlTranslatef(side * 7.05f, 4.2f, z);
                 rlRotatef(side * 90.f, 0, 1, 0);
-                sign(tank, {0, 0, 0}, 10.8f, 7.6f, true);
+                if (bay % 3 == 0) {
+                    for (int half : {-1, 1})
+                        sign(half == side ? reef : tank, {half * 2.73f, 0, 0}, 5.43f, 7.6f, true);
+                    beam({0, -3.82f, -.025f}, {0, 3.82f, -.025f}, .075f, {58, 107, 111, 255});
+                } else {
+                    sign(tank, {0, 0, 0}, 10.8f, 7.6f, true);
+                }
                 for (float y : {-3.85f, 3.85f})
                     beam({-5.5f, y, 0}, {5.5f, y, 0}, .12f, {73, 157, 161, 255});
                 rlPopMatrix();
@@ -527,29 +732,60 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         // Layers of close scenery make the ride feel embedded in a themed course.
         for (int side : {-1, 1})
             for (int i = 0; i < 9 + int(extra / 4.7f) + 1; ++i) {
+                if (side == openSide) break;
                 float z = -3 + i * 4.7f;
                 material(3);
                 orb({side * (8.4f + .3f * std::sin(i * 3.f)), 1.2f, z},
                     {1.1f, 1.8f + .8f * std::sin(i * 2.f), 2.4f}, rock);
                 material(0);
-                if (arena == 0 || arena == 1 || arena == 7) {
-                    for (int j = 0; j < 4; ++j)
-                        orb({side * (7.8f + j * .08f), 3.f + j * .65f, z + .3f * std::sin(j * 2.f)},
-                            {.8f, .7f, 1.1f}, j % 2 ? Color{71, 132, 47, 255} : Color{33, 91, 55, 255});
-                }
                 cyl({side * 6.35f, .05f, z}, .18f, 1.1f, {22, 53, 86, 255});
                 orb({side * 6.35f, 1.2f, z}, {.22f, .25f, .22f}, {135, 246, 255, 255});
             }
         for (float z : {4.f, 16.f + extra / 2, 29.f + extra}) {
-            arch(z, 8.1f, 9.3f, {24, 71, 109, 255}, .38f);
-            arch(z - .42f, 7.95f, 9.18f, {109, 217, 224, 255}, .09f);
+            const Color bronze{151, 107, 57, 255}, trim{213, 171, 102, 255};
+            arch(z, 6.83f, 8.65f, {31, 71, 78, 255}, .27f);
+            arch(z - .15f, 6.80f, 8.60f, bronze, .10f);
+            arch(z - .19f, 6.64f, 8.41f, {121, 226, 218, 255}, .049f);
             for (int side : {-1, 1}) {
-                box({side * 7.5f, 3.3f, z}, {.7f, 4.5f, .85f}, team);
-                box({side * 7.5f, 5.6f, z}, {1.1f, .25f, 1.15f}, gold);
+                box({side * 6.8f, .55f, z}, {.64f, 1.10f, .70f}, team);
+                box({side * 6.8f, 1.1f, z}, {.74f, .13f, .83f}, trim);
+                for (float a : {.15f, .44f, .78f, 1.13f}) {
+                    Vector3 joint{side * 6.83f * std::cos(a), .35f + 8.65f * std::sin(a), z - .18f};
+                    orb(joint, {.16f, .16f, .09f}, bronze);
+                    joint.z -= .07f;
+                    orb(joint, {.072f, .072f, .04f}, trim);
+                }
             }
         }
-        // A broad themed marquee above the rack, with a readable stadium identity.
-        neonMural(30.42f + extra);
+        // Foreground ribbons break the straight window sill. Different clusters
+        // pass at different depths, giving the exhibit parallax during the ride.
+        for (int side : {-1, 1}) {
+            if (side == openSide) continue;
+            for (int bed = 0; bed < 9; ++bed) {
+                const float z = -2 + bed * 10.5f + (side < 0 ? 3.4f : 0.f);
+                for (int j = 0; j < 7; ++j) {
+                    const float seed = float(bed * 13 + j * 7 + side);
+                    const float x = side * (6.53f + .39f * std::sin(seed * 1.26f));
+                    const float depth = z + std::sin(seed * .75f) * 1.47f;
+                    const float height = .8f + .92f * (1 + std::sin(seed * .82f));
+                    Vector3 leaf[12];
+                    for (int joint = 0; joint < 6; ++joint) {
+                        const float t = joint / 5.f;
+                        const float drift = (.34f * std::sin(3.6f*t + seed + time*.72f)
+                                             + .27f * std::cos(seed)) * t;
+                        const float width = (.035f + .14f * std::sin(t*PI)) * (1 - t);
+                        Vector3 knot{x + drift, .13f + height*t, depth + .19f*t*t};
+                        leaf[joint*2] = {knot.x - width, knot.y, knot.z};
+                        leaf[joint*2+1] = {knot.x + width, knot.y, knot.z + width*.45f};
+                    }
+                    DrawTriangleStrip3D(leaf, 12, j % 2 ? Color{68, 147, 114, 255} : Color{25, 96, 88, 255});
+                    // The curving blades can be seen from either end of the exhibit.
+                    for (int joint = 0; joint < 6; ++joint)
+                        std::swap(leaf[joint*2], leaf[joint*2+1]);
+                    DrawTriangleStrip3D(leaf, 12, {34, 106, 92, 255});
+                }
+            }
+        }
         for (int side : {-1, 1}) {
             for (int j = 0; j < 5; ++j)
                 orb({side * (5.4f + j * .18f), 2.2f + j * .5f, 30.4f + extra}, {.23f, .23f, .23f}, gold);
@@ -558,6 +794,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         // Tropicana's aquarium theme: suspended rays and bubbles beyond the rails.
         if (mascot)
             for (int side : {-1, 1}) {
+                if (side == openSide) continue;
                 for (int i = 0; i < 3; ++i) {
                     float z = 8 + i * (9.f + extra / 3);
                     const float swimPhase = time * .75f + i * 1.7f + side;
@@ -579,44 +816,6 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                     }
                 }
             }
-    }
-    void neonMural(float z) {
-        auto tubeLine = [&](Vector3 a, Vector3 b, Color hue) {
-            beam(a, b, .095f, {31, 49, 63, 255});
-            beam({a.x, a.y, a.z - .12f}, {b.x, b.y, b.z - .12f}, .035f, hue);
-        };
-        // Original neon bowling illustration, built from continuous tube strokes.
-        for (int i = 0; i < 64; ++i) {
-            float a = i * 2 * PI / 64, b = (i + 1) * 2 * PI / 64;
-            tubeLine({-3.9f + 1.45f * std::cos(a), 5.25f + 1.45f * std::sin(a), z},
-                     {-3.9f + 1.45f * std::cos(b), 5.25f + 1.45f * std::sin(b), z}, {69, 232, 194, 255});
-        }
-        for (Vector2 hole : {Vector2{-4.35f, 5.8f}, Vector2{-3.8f, 6.f}, Vector2{-3.95f, 5.35f}})
-            for (int i = 0; i < 16; ++i) {
-                float a = i * 2 * PI / 16, b = (i + 1) * 2 * PI / 16;
-                tubeLine({hole.x + .12f * std::cos(a), hole.y + .12f * std::sin(a), z},
-                         {hole.x + .12f * std::cos(b), hole.y + .12f * std::sin(b), z},
-                         {69, 232, 194, 255});
-            }
-        const Vector2 shape[] = {
-            {-.48f, 0},     {-.68f, .36f},  {-.72f, .82f}, {-.61f, 1.25f}, {-.29f, 1.9f}, {-.22f, 2.36f},
-            {-.39f, 2.65f}, {-.36f, 3.02f}, {0, 3.19f},    {.36f, 3.02f},  {.39f, 2.65f}, {.22f, 2.36f},
-            {.29f, 1.9f},   {.61f, 1.25f},  {.72f, .82f},  {.68f, .36f},   {.48f, 0},     {-.48f, 0}};
-        for (int pin = 0; pin < 3; ++pin) {
-            float angle = (pin - 1) * .25f, ox = .2f + pin * 1.7f;
-            auto point = [&](Vector2 p) {
-                return Vector3{ox + p.x * std::cos(angle) - p.y * std::sin(angle),
-                               3.7f + p.x * std::sin(angle) + p.y * std::cos(angle), z};
-            };
-            for (int i = 0; i < 17; ++i)
-                tubeLine(point(shape[i]), point(shape[i + 1]), {233, 111, 220, 255});
-            tubeLine(point({-.24f, 2.2f}), point({.24f, 2.2f}), {255, 202, 108, 255});
-        }
-        for (int i = 0; i < 28; ++i) {
-            float x = -6.3f + i * .45f;
-            tubeLine({x, 3.45f + .1f * std::sin(x), z}, {x + .45f, 3.45f + .1f * std::sin(x + .45f), z},
-                     {255, 184, 99, 255});
-        }
     }
     void loungeDetails(Color team) {
         // Close columns, soffits and pendant lights, in the warm arcade-bowling style.
@@ -858,13 +1057,17 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         Vector3 shadow[10];
         for (int i = 0; i < 10; ++i)
             shadow[i] = {1000, 0, 1000};
-        for (size_t i = 0; i < sim.pins.size(); ++i)
-            shadow[i] = {geo::renderX(sim.pins[i].x), 0, sim.pins[i].z};
+        for (size_t i = 0; i < sim.pins.size(); ++i) {
+            const auto &pinBody = sim.pins[i];
+            float lean = std::sin(pinBody.fall * 86.f * DEG2RAD);
+            shadow[i] = {geo::renderX(pinBody.x), pinBody.id % 2 ? lean : -lean, pinBody.z};
+        }
         SetShaderValueV(shader, GetShaderLocation(shader, "pinShadows"), shadow, SHADER_UNIFORM_VEC3,
                         10);
         Vector3 ballPos{geo::renderX(sim.hasBall ? sim.ball.x : shot.position), 0,
                         sim.hasBall ? sim.ball.z : geo::foulLine};
-        Vector3 shadowBall{ballPos.x, 0, ballPos.z};
+        const float slingDraw = mascot && aim ? mascotPose.pull * 2.7f : 0.f;
+        Vector3 shadowBall{ballPos.x, 0, ballPos.z - slingDraw};
         SetShaderValue(shader, GetShaderLocation(shader, "ballShadow"), &shadowBall,
                        SHADER_UNIFORM_VEC3);
         SetShaderValue(shader, GetShaderLocation(shader, "sceneTime"), &time, SHADER_UNIFORM_FLOAT);
@@ -873,6 +1076,9 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                                : 0.f;
         const Vector2 boardLight{glow, sim.layout.headPin()};
         SetShaderValue(shader, GetShaderLocation(shader, "boardLight"), &boardLight, SHADER_UNIFORM_VEC2);
+        // The replay rig looks in from outside the left exhibit wall. Open that
+        // side like a stage cutaway and carry the surrounding water to the horizon.
+        const int openSide = mascot && std::abs(cam.position.x) > 7.05f ? (cam.position.x < 0 ? -1 : 1) : 0;
         BeginMode3D(cam);
         if (!deckOnly) {
             rlPushMatrix();
@@ -884,7 +1090,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
             if (!mascot)
                 stadiumScenery(time, team);
             else
-                mascotScenery(time, {16, 52, 94, 255});
+                mascotScenery(time, {16, 52, 94, 255}, openSide);
             rlPopMatrix();
             inSceneryTransform = false;
         }
@@ -923,12 +1129,15 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
             }
             if (ridePickups && ridePickups->route)
                 for (const auto &item : *ridePickups->route) {
-                    if (item.claimed)
+                    if (item.claimed) {
+                        const float t = (sim.elapsed - item.claimedAt) / .48f;
+                        if (sim.active && t >= 0 && t < 1)
+                            pickupFlash(ballPos, item.power, t);
                         continue;
+                    }
                     const auto pos = item.position;
-                    floatingMedal(rideBadges[int(item.power)],
-                                  {geo::renderX(pos.x), 1.35f + .22f * std::sin(time * 4 + pos.z), pos.z},
-                                  2.08f, time);
+                    rideEmblem(item.power, {geo::renderX(pos.x), 1.58f + .13f * std::sin(time * 3 + pos.z),
+                                            pos.z}, time);
                 }
             if (mascotTokens)
                 for (size_t i = 0; i < mascotTokens->layout.size(); ++i) {
@@ -940,13 +1149,10 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                                   1.5f, time);
                 }
         }
-        if (mascot && !deckOnly && waveSeconds > 0) {
-            const float progress = 1 - waveSeconds / .55f;
-            DrawCircle3D({geo::renderX(waveCenter.x), .16f, waveCenter.y}, .35f + progress * 4.1f,
-                         {1, 0, 0}, 90.f, Fade(aqua, waveSeconds / .55f));
-        }
         for (const auto &p : sim.pins)
             drawPin(p, time);
+        if (mascot && sim.active && ballPos.z < sim.layout.headPin() && !sim.gutter)
+            rideWake(ballPos, sim.ball, sim.elapsed);
         if (ballPos.z < surfaceEnd) {
             if (mascot)
                 rider({ballPos.x, .57f,
@@ -958,18 +1164,10 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                             sim.hasBall ? (ballPos.z - geo::foulLine) * RAD2DEG / sim.ball.r : 0.f,
                             sim.hasBall ? sim.ball.r : geo::ballRadius);
         }
-        if (aim && mascot) {
-            float pull = mascotPose.pull * 2.7f;
-            // Sling attaches to the front of the tube, below the ray's fins.
-            Vector3 center{ballPos.x, .40f, ballPos.z - pull - 1.f};
-            for (int side : {-1, 1}) {
-                cyl({side * 4.8f, .04f, 2.4f}, .24f, 1.3f, {24, 69, 110, 255});
-                for (int wrap = 0; wrap < 5; ++wrap)
-                    cyl({side * 4.8f, .37f + wrap * .16f, 2.4f}, .255f, .06f, cream);
-                orb({side * 4.8f, 1.4f, 2.4f}, {.31f, .34f, .31f}, gold);
-                beam({side * 4.8f, 1.15f, 2.4f}, center, .095f - .03f * mascotPose.pull,
-                     {220, 44, 60, 255});
-            }
+        if (mascot && !deckOnly && (aim || (sim.active && sim.elapsed < .48f))) {
+            const float spring = aim ? 0 : std::exp(-10 * sim.elapsed) * std::cos(23 * sim.elapsed);
+            drawSling(aim ? ballPos.x : geo::renderX(shot.position),
+                      aim ? 1.f : spring, aim ? mascotPose.pull : shot.power);
         }
         if (aim)
             for (int i = 0; i < 20; ++i) {
@@ -981,12 +1179,22 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                     orb({x, .07f, geo::foulLine + t * geo::launchSpeed(shot.power)},
                         {.045f, .015f, .10f}, gold);
             }
+        if (mascot && wave) {
+            const float progress = wave->progress(sim.elapsed);
+            if (progress >= 0 && progress < 1) {
+                rlDrawRenderBatchActive();
+                rlDisableDepthMask();
+                splash({geo::renderX(wave->center.x), .08f, wave->center.z}, progress, cam);
+                rlDrawRenderBatchActive();
+                rlEnableDepthMask();
+            }
+        }
         EndMode3D();
     }
     void close() {
         for (auto texture : reactions)
             UnloadTexture(texture);
-        for (auto texture : {gearCase, wrigley, tank, trop, sunburst, tokenMedal, manualBoard, electricBoard,
+        for (auto texture : {gearCase, wrigley, tank, reef, spray, trop, sunburst, tokenMedal, manualBoard, electricBoard,
                              scorePlates, enamelLettering, pinGauge, scoreRails[0], scoreRails[1]})
             UnloadTexture(texture);
         for (auto texture : badges)

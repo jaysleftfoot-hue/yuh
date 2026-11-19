@@ -1,8 +1,6 @@
 # Current milestone
 
-**Current handoff.** The Mascot Ride gameplay and QA pass is ready for Astra. Start with the current controls, captures and graphics priorities in [ASTRA_HANDOFF.md](native/docs/ASTRA_HANDOFF.md).
-
-Ballpark challenges, home-rival styles, pin-deck replays, Tropicana events, mascot motion and six randomized power-ups are implemented in C++. See [Astra art handoff](native/docs/ASTRA_HANDOFF.md) for the playable scenes, render hooks and planned visual work.
+**Current milestone.** The Rays aquarium graphics pass covers the sling, rider motion, power pickups, Wave Crash replay, underwater exhibits and pin finish. [In-game captures](native/docs/aquarium-ride.jpg) · [Graphics notes and repeatable shots](native/docs/ASTRA_HANDOFF.md)
 
 The 64-ball locker now ships separate club logo, illustrated club, and Rays special wraps. The supplied MLB reference kit guides marks and themes. Left/right arrows rotate the selected locker preview. The existing unlock slots and XP thresholds still apply.
 

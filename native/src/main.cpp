@@ -41,7 +41,7 @@ void scoreRail(const Game &game, Texture2D rail, bool rivalSide, const char *nam
 }
 int main(int argc, char **argv) {
     bool smoke = false, startInGame = false, smokeMascot = false, demoShot = false;
-    bool demoStrike = false, splitPreview = false, powerRide = true;
+    bool demoStrike = false, demoWave = false, splitPreview = false, powerRide = true;
     int captureFrame = 90;
     bool captureAtTick = false;
     int previewArena = -1;
@@ -51,6 +51,8 @@ int main(int argc, char **argv) {
         std::string a = argv[i];
         if (a == "--demo-shot")
             demoShot = true;
+        if (a == "--demo-wave")
+            demoWave = demoShot = true;
         if (a == "--demo-strike")
             demoShot = demoStrike = true;
         if (a == "--preview-split")
@@ -88,6 +90,10 @@ int main(int argc, char **argv) {
             scoreboardScreenshot = argv[++i];
         if (a == "--screenshot" && i + 1 < argc)
             screenshot = argv[++i];
+    }
+    if (demoWave) {
+        startInGame = smokeMascot = powerRide = true;
+        previewArena = 9;
     }
     if (splitPreview) {
         previewArena = 1;
@@ -194,7 +200,6 @@ int main(int argc, char **argv) {
         stadiumSetup.reset();
         ridePickups = {};
         mouseSteering = 0;
-        art.waveSeconds = 0;
         stadiumArmed = false;
     };
     auto saveCareer = [&]() {
@@ -424,11 +429,11 @@ int main(int argc, char **argv) {
                         }
                     }
                     match.steering = match.rivalSteering(target);
-                } else if (smoke) {
-                    float target = geometry::halfWidth + std::sin(rolls * 2.37f) * 1.6f;
+                } else if (smoke || (demoWave && rolls == 0)) {
+                    float target = demoWave ? 4.5f : geometry::halfWidth + std::sin(rolls * 2.37f) * 1.6f;
                     if (ridePickups.route)
                         for (const auto &item : *ridePickups.route)
-                            if (item.position.z > sim.ball.z) {
+                            if (item.position.z > sim.ball.z && (!demoWave || item.power == RidePower::Wave)) {
                                 target = item.position.x;
                                 break;
                             }
@@ -456,8 +461,6 @@ int main(int argc, char **argv) {
                         audio.play(audio.click);
                     }
                     if (ridePickups.impact(sim, impacts)) {
-                        art.waveCenter = {sim.ball.x, sim.ball.z};
-                        art.waveSeconds = .55f;
                         pickupMessage = "WAVE CRASH!";
                         pickupSeconds = 1.f;
                     }
@@ -476,7 +479,7 @@ int main(int argc, char **argv) {
                     }
                 }
                 if (!smoke)
-                    replay.record(sim, finished);
+                    replay.record(sim, finished, mascotMotion.pose);
                 if (sim.impacts > impacts)
                     audio.play(audio.hit);
                 accum -= step;
@@ -585,7 +588,6 @@ int main(int argc, char **argv) {
                 awarded = true;
             }
             pickupSeconds = std::max(0.f, pickupSeconds - dt);
-            art.waveSeconds = std::max(0.f, art.waveSeconds - dt);
             if (turn != Turn::Replay)
                 cueSeconds = std::max(0.f, cueSeconds - dt);
             if (cueSeconds == 0 && stadiumCue == StadiumCue::Turkey)
@@ -599,7 +601,6 @@ int main(int argc, char **argv) {
         art.arena = arena;
         art.skin = skin;
         art.mascot = match.mascot;
-        art.mascotPose = mascotMotion.pose;
         const auto &pickup = pickups[match.player].item;
         art.powerPickup = !splitDrill && !match.mascot && pickup ? &*pickup : nullptr;
         art.ridePickups = match.mascot && (charge || turn == Turn::Rolling) ? &ridePickups : nullptr;
@@ -608,6 +609,8 @@ int main(int argc, char **argv) {
         art.cue = screen == Screen::Lane ? stadiumCue : StadiumCue::None;
         art.cueSeconds = cueSeconds;
         const bool replaying = screen == Screen::Lane && turn == Turn::Replay;
+        art.mascotPose = replaying ? replay.frame().rider : mascotMotion.pose;
+        art.wave = ridePickups.wave;
         if (replaying) {
             // Use a deck-only render for the stadium board to avoid video feedback.
             const float rack = replay.view().layout.headPin();
@@ -650,6 +653,9 @@ int main(int argc, char **argv) {
         BeginTextureMode(scene);
         ClearBackground({45, 92, 129, 255});
         DrawRectangleGradientV(0, 0, W, 550, {17, 39, 75, 255}, {140, 182, 193, 255});
+        if (replaying && match.mascot)
+            DrawTexturePro(art.tank, {0, 0, float(art.tank.width), float(art.tank.height)},
+                           {0, 0, float(W), float(H)}, {}, 0, {72, 122, 145, 255});
         if (screen == Screen::Lane || screen == Screen::Setup)
             art.world(view, shot, turn == Turn::Ready && screen == Screen::Lane, arenas[arena].team,
                       camera, replaying ? replay.seconds : time);
