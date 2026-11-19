@@ -1,1 +1,1 @@
-Mascot Ride build from 743ae4a3fce50422dd744a6dabe6dd82cb46f894. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
+Mascot Ride QA handoff build from 34ca6cda3111c5746ec03deb9d641f23a37716d0. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
