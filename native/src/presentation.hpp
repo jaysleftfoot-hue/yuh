@@ -22,17 +22,45 @@ struct PowerPickups {
     static constexpr float radius = .5f;
     std::vector<PowerPickup> items;
 
-    void spawn(std::mt19937 &rng) {
+    std::array<bool, 10> scheduled{};
+    int currentFrame = -1;
+    RivalDifficulty difficulty = RivalDifficulty::Pro;
+
+    void startMatch(std::mt19937 &rng, RivalDifficulty level) {
+        currentFrame = -1;
+        difficulty = level;
         items.clear();
-        std::uniform_int_distribution<int> roll(0, 99);
-        const int chance = roll(rng);
-        const int count = chance < 20 ? 0 : chance < 77 ? 1 : 2;
-        std::array<float, 4> depth{{30.f, 63.f, 106.f, 144.f}};
-        std::shuffle(depth.begin(), depth.end(), rng);
+        scheduled.fill(false);
+        if (level == RivalDifficulty::Rookie) {
+            scheduled.fill(true);
+        } else if (level == RivalDifficulty::Pro) {
+            std::uniform_int_distribution<int> gap(2, 3);
+            for (int f = gap(rng) - 1; f < 10; f += gap(rng))
+                scheduled[f] = true;
+        } else {
+            std::array<int, 10> frames{0,1,2,3,4,5,6,7,8,9};
+            std::shuffle(frames.begin(), frames.end(), rng);
+            scheduled[frames[0]] = true;
+            if (std::bernoulli_distribution(.5)(rng))
+                scheduled[frames[1]] = true;
+        }
+    }
+    void enterFrame(std::mt19937 &rng, int frame) {
+        if (frame == currentFrame)
+            return;
+        currentFrame = frame;
+        items.clear();
+        if (!scheduled[frame])
+            return;
+        // Heavy, Magnet and Bumpers directly improve pin coverage or spare accuracy.
+        constexpr double weights[3][powerCount] = {{18,20,18,16,14,14},
+                                                   {12,10,12,24,21,21},
+                                                   {6,4,6,32,26,26}};
+        const auto &row = weights[int(difficulty)];
+        std::discrete_distribution<int> kind(std::begin(row), std::end(row));
         std::uniform_real_distribution<float> side(1.65f, geometry::width - 1.65f);
-        std::uniform_int_distribution<int> kind(1, powerCount);
-        for (int i = 0; i < count; ++i)
-            items.push_back({{side(rng), depth[i]}, Power(kind(rng))});
+        std::uniform_real_distribution<float> depth(30.f, 144.f);
+        items.push_back({{side(rng), depth(rng)}, Power(1 + kind(rng))});
     }
     Power sweep(const Body &from, Match &match) {
         const auto &lane = match.lanes[match.player];

@@ -9,7 +9,7 @@ inline constexpr float sceneryDepthScale = geo::sceneryDepthScale;
 struct Art {
     Model cube{}, sphere{}, cylinder{}, pin{}, tube{}, course{}, rayBody{};
     Shader shader{};
-    Texture2D wrigley{}, tank{}, trop{}, sunburst{}, tokenMedal{};
+    Texture2D gearCase{}, wrigley{}, tank{}, trop{}, sunburst{}, tokenMedal{};
     std::array<Texture2D, 3> reactions{};
     std::array<Texture2D, bowling::powerCount> badges{};
     void loadBallparkArt() {
@@ -22,6 +22,7 @@ struct Art {
             SetTextureFilter(texture, TEXTURE_FILTER_TRILINEAR);
             return texture;
         };
+        gearCase = load("equipment-case.jpg");
         wrigley = load("wrigley.jpg");
         trop = load("trop.jpg");
         tank = load("tank.jpg");
@@ -217,36 +218,20 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
             for (int row = 0; row < 16; ++row)
                 for (int col = 0; col < 32; ++col)
                     DrawRectangleLines(col * 32, row * 32, 32, 32, {42, 58, 38, 150});
-            center("NATIONAL", 210, 16, 35, letters);
-            center("AMERICAN", 814, 16, 35, letters);
-            center("BALLPARK", 512, 24, 20, letters);
-            center("FRAME", 512, 99, 22, letters);
-            center(std::to_string(std::min(10, match.games[match.player].frame + 1)), 512, 132, 53,
-                   letters);
-            center("PINS", 512, 216, 19, letters);
-            center(std::to_string(pinsStanding), 512, 245, 35, letters);
-            const char *names[2][8] = {{"COLORADO", "SAN DIEGO", "LOS ANGELES", "ARIZONA",
-                                        "PHILADELPHIA", "WASHINGTON", "PITTSBURGH", "CUBS"},
-                                       {"BALTIMORE", "TEXAS", "OAKLAND", "CLEVELAND", "BOSTON",
-                                        "TAMPA BAY", "SEATTLE", "NEW YORK"}};
+            center(bowling::arenas[arena].name, 512, 10, 48, letters);
+            DrawLineEx({32,70}, {992,70}, 3, letters);
             for (int side = 0; side < 2; ++side) {
-                float left = side ? 610 : 20;
-                for (int row = 0; row < 8; ++row) {
-                    float y = 76 + row * 29.f;
-                    text(names[side][row], left + 8, y + 5, 16, letters);
-                    DrawLineEx({left, y}, {left + 390, y}, 2, letters);
-                }
-                DrawLineEx({left, 308}, {left + 390, 308}, 2, letters);
-                for (int col = 0; col <= 10; ++col) {
-                    float x = left + 180 + col * 21.f;
-                    DrawLineEx({x, 61}, {x, 308}, col == 0 ? 3 : 1, Fade(letters, .8f));
-                    if (col < 10)
-                        center(std::to_string(col + 1), x + 10, 59, 12, letters);
-                }
+                const int left = side ? 676 : 44;
+                DrawRectangle(left, 91, 304, 213, {34, 53, 39, 255});
+                DrawRectangleLines(left, 91, 304, 213, letters);
+                center(side ? "HOME RIVAL" : "VISITOR", left+152, 105, 31, letters);
+                center(std::to_string(bowling::scoreTotal(match.games[side])), left+152, 148, 115, cream);
             }
-            DrawLineEx({20, 310}, {410, 310}, 4, {158, 42, 35, 255});
-            DrawLineEx({610, 310}, {1000, 310}, 4, {158, 42, 35, 255});
-            center("BALLPARK BOWLING", 512, 317, 20, letters);
+            center("FRAME", 512, 90, 26, letters);
+            center(std::to_string(match.games[match.player].frame+1), 512, 125, 55, cream);
+            center("PINS UP", 512, 206, 25, letters);
+            center(std::to_string(pinsStanding), 512, 239, 55, cream);
+            DrawLineEx({32,323}, {992,323}, 4, letters);
         } else {
             const int park = mascot ? 9 : arena;
             Color accent = GetColor(teams[bowling::arenas[park].team].color);
@@ -360,6 +345,23 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         rlVertex3f(p.x + w / 2, p.y - h / 2, p.z);
         rlEnd();
         rlSetTexture(0);
+    }
+    void floatingMedal(Texture2D face, Vector3 pos, float size, float time) {
+        rlPushMatrix();
+        rlTranslatef(pos.x, pos.y, pos.z);
+        rlRotatef(time * 75 + pos.z, 0, 1, 0);
+        const float r = size * .5f;
+        DrawCylinderEx({0,0,-.11f}, {0,0,.11f}, r, r, 32, {164,108,44,255});
+        for (int i = 0; i < 28; ++i) {
+            float a = 2*PI*i/28;
+            DrawLine3D({r*std::cos(a),r*std::sin(a),-.10f},
+                       {r*std::cos(a),r*std::sin(a),.10f}, gold);
+        }
+        for (int side = 0; side < 2; ++side) {
+            sign(face, {0,0,-.115f}, size, size, true);
+            rlRotatef(180, 0, 1, 0);
+        }
+        rlPopMatrix();
     }
     void loadBallSkins() {
         const std::string folder = std::string(GetApplicationDirectory()) + "assets/balls/";
@@ -776,7 +778,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         Color boardPaint = (arena == 0 || arena == 1) ? Color{58, 77, 51, 255} : Color{19, 23, 25, 255};
         float boardX = arena == 9 ? 0.f : -15.f, boardW = arena == 9 ? 39.f : (arena == 0 ? 19.f : 23.f);
         float boardY = arena == 9 ? 16.f : (arena == 0 ? 12.f : 14.f),
-              boardH = arena == 9 ? 12.f : (arena == 0 ? 9.3f : 11.5f);
+              boardH = boardW * .5f;
         box({boardX, boardY, 42 + extra}, {boardW + .7f, boardH + .7f, .8f}, boardPaint);
         sign(scoreboard.texture, {boardX, boardY, 41.5f + extra}, boardW, boardH);
         if (arena != 0) {
@@ -914,17 +916,16 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                         continue;
                     const float x = geo::renderX(item.position.x);
                     const float y = 1.04f + .13f * std::sin(time * 3.2f + item.position.z);
-                    DrawBillboard(cam, badges[int(item.power) - 1], {x, y, item.position.z},
-                                  1.35f, WHITE);
+                    floatingMedal(badges[int(item.power) - 1], {x,y,item.position.z}, 1.35f, time);
                 }
             if (mascotTokens)
                 for (size_t i = 0; i < mascotTokens->layout.size(); ++i) {
                     if (mascotTokens->collected[i])
                         continue;
                     const auto token = mascotTokens->layout[i];
-                    DrawBillboard(cam, tokenMedal,
+                    floatingMedal(tokenMedal,
                                   {geo::renderX(token.x), .95f + .14f * std::sin(time * 4 + i), token.z},
-                                  1.5f, WHITE);
+                                  1.5f, time);
                 }
         }
         for (const auto &p : sim.pins)
@@ -968,7 +969,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
     void close() {
         for (auto texture : reactions)
             UnloadTexture(texture);
-        for (auto texture : {wrigley, tank, trop, sunburst, tokenMedal})
+        for (auto texture : {gearCase, wrigley, tank, trop, sunburst, tokenMedal})
             UnloadTexture(texture);
         for (auto texture : badges)
             UnloadTexture(texture);

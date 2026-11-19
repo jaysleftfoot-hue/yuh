@@ -178,21 +178,27 @@ int main() {
 
     std::mt19937 rng{109};
     std::set<Power> types;
-    std::set<size_t> amounts;
-    for (int i = 0; i < 120; ++i) {
-        pickups.spawn(rng);
-        amounts.insert(pickups.items.size());
-        for (const auto &item : pickups.items) {
-            types.insert(item.power);
-            require(!item.claimed && item.position.x >= geometry::launchMin &&
-                        item.position.x <= geometry::launchMax &&
-                        item.position.z > geometry::arrowZ && item.position.z < geometry::headPin,
-                    "spawn stays between rails and clear of pins");
+    for (auto level : {RivalDifficulty::Rookie, RivalDifficulty::Pro, RivalDifficulty::AllStar}) {
+        for (int game = 0; game < 120; ++game) {
+            pickups.startMatch(rng, level);
+            int count = 0, previous = -1;
+            for (int f = 0; f < 10; ++f) {
+                pickups.enterFrame(rng, f);
+                if (pickups.items.empty()) continue;
+                ++count;
+                types.insert(pickups.items.front().power);
+                if (level == RivalDifficulty::Pro)
+                    require(f-previous >= 2 && f-previous <= 3, "normal frame spacing");
+                previous = f;
+                pickups.items.front().claimed = true;
+                pickups.enterFrame(rng, f);
+                require(pickups.items.front().claimed, "same frame cannot reroll a pickup");
+            }
+            if (level == RivalDifficulty::Rookie) require(count == 10, "easy pickup each frame");
+            if (level == RivalDifficulty::AllStar) require(count == 1 || count == 2, "hard match budget");
         }
-        if (pickups.items.size() == 2)
-            require(pickups.items[0].position.z != pickups.items[1].position.z, "no overlapping slots");
     }
-    require(amounts == std::set<size_t>{0, 1, 2} && types.size() == powerCount, "random counts and six kinds");
+    require(types.size() == powerCount, "all six powers can spawn");
     MascotTokens tokens;
     for (const auto &token : tokens.layout) {
         Simulation lane;

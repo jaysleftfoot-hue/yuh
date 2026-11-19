@@ -27,7 +27,8 @@ std::string marks(const std::vector<int> &r, int f) {
 }
 void scoreCard(const Game &g, float x, const char *who) {
     // One shallow score strip per player, like a classic arcade bowling display.
-    panel({x, 0, 610, 67});
+    DrawRectangleGradientV(int(x), 0, 610, 64, {46, 70, 58, 255}, {18, 33, 29, 255});
+    DrawRectangleLinesEx({x+1, 1, 608, 62}, 2, {167, 149, 99, 255});
 
     auto scores = g.scores();
     for (int i = 0; i < 10; ++i) {
@@ -36,14 +37,16 @@ void scoreCard(const Game &g, float x, const char *who) {
             DrawRectangle(int(left), 3, 49, 43, {88, 123, 132, 125});
         DrawLine(int(left + 50), 6, int(left + 50), 44, {117, 143, 150, 130});
         std::string rolls = marks(g.frames[i], i);
-        center(rolls, left + 24, 7, 15, {211, 230, 224, 255});
+        center(std::to_string(i+1), left+24, 3, 11, cream);
+        center(rolls, left + 24, 17, 16, {211, 230, 224, 255});
         if (scores[i])
-            center(std::to_string(*scores[i]), left + 24, 31, 23, {150, 242, 77, 255});
+            center(std::to_string(*scores[i]), left + 24, 36, 21, {150, 242, 77, 255});
     }
     int total = 0;
     for (auto score : scores)
         if (score)
             total = *score;
+    center("TOTAL", x+566, 4, 13, cream);
     center(std::to_string(total), x + 566, 20, 29, Color{150, 242, 77, 255});
     title(who, x + 4, 68, 18, cream);
 }
@@ -181,6 +184,7 @@ int main(int argc, char **argv) {
     float time = 0, accum = 0, reaction = 0, chargeTime = 0, aiWait = .9f, celebration = 0;
     Vector2 dragStart{};
     bool mouseCharge = false, stadiumArmed = false;
+    bool equipmentOpen = false;
     bool paused = false, charge = false, done = false, ok = false, awarded = false;
     std::string result = "WELCOME TO THE TOUR", reward;
     Camera3D camera{{0, 3.0f, -6.2f}, {0, 1.7f, 23}, {0, 1, 0}, 43, CAMERA_PERSPECTIVE};
@@ -204,7 +208,7 @@ int main(int argc, char **argv) {
     auto preparePickups = [&]() {
         tokens = {};
         if (!splitDrill)
-            pickups.spawn(pickupRng);
+            pickups.enterFrame(pickupRng, match.games[match.player].frame);
         else
             pickups.items.clear();
         pickupSeconds = 0;
@@ -217,6 +221,8 @@ int main(int argc, char **argv) {
         match.rival = homeRival(arena);
         if (splitDrill)
             setSevenTenRack(match.lanes[0]);
+        pickups.startMatch(pickupRng, selectedDifficulty);
+        equipmentOpen = false;
         preparePickups();
         mascotMotion = {};
         replay.reset();
@@ -283,7 +289,15 @@ int main(int argc, char **argv) {
             ToggleFullscreen();
         if (IsKeyPressed(KEY_M))
             audio.toggle();
-        if (IsKeyPressed(KEY_ESCAPE)) {
+        const bool canBrowse = screen == Screen::Lane && match.player == 0 && turn == Turn::Ready &&
+                               !splitDrill && !paused;
+        if (canBrowse && IsKeyPressed(KEY_P)) {
+            equipmentOpen = !equipmentOpen;
+            charge = stadiumArmed = false;
+        }
+        if (equipmentOpen && IsKeyPressed(KEY_ESCAPE))
+            equipmentOpen = false;
+        else if (IsKeyPressed(KEY_ESCAPE)) {
             if (screen == Screen::Lane) {
                 paused = !paused;
                 charge = false;
@@ -295,7 +309,7 @@ int main(int argc, char **argv) {
         }
         bool human = match.player == 0;
         auto &sim = match.lanes[match.player];
-        if (screen == Screen::Lane && !paused) {
+        if (screen == Screen::Lane && !paused && !equipmentOpen) {
             if (turn == Turn::Ready) {
                 if (!human) {
                     aiWait -= dt;
@@ -584,7 +598,7 @@ int main(int argc, char **argv) {
             DrawTexturePro(titleArt, {0, 0, float(titleArt.width), float(titleArt.height)},
                            {0, 0, float(W), float(H)}, {0, 0}, 0, WHITE);
         }
-        uiBlocked = paused;
+        uiBlocked = paused || equipmentOpen;
         if (screen == Screen::Title) {
             title("WELCOME TO THE BIG LEAGUES!", 565, 16, 20, cream);
             if (button({282, 650, 320, 52}, "SINGLE PLAYER", true) || IsKeyPressed(KEY_ENTER)) {
@@ -865,6 +879,10 @@ int main(int argc, char **argv) {
                         match.equip(Power(i + 1));
             }
         }
+        if (canBrowse && button({11, 653, 137, 42}, "GEAR CASE [P]")) {
+            equipmentOpen = true;
+            charge = stadiumArmed = false;
+        }
         if (screen == Screen::Lane && button({8, 724, 144, 64}, "MENU")) {
             paused = true;
             charge = false;
@@ -875,6 +893,31 @@ int main(int argc, char **argv) {
             lastLoggedScreen = int(screen);
         }
         uiBlocked = false;
+        if (equipmentOpen) {
+            DrawRectangle(0, 0, W, H, {4, 9, 9, 175});
+            sprite(art.gearCase, {155, 45, 970, 705});
+            arcadeCenter("DUGOUT EQUIPMENT", 640, 170, 42, cream);
+            constexpr const char *effects[] = {"Bigger ball", "Draw toward pins", "Guard the gutters",
+                                                "Extra speed", "Shrink rival ball", "Bend rival shot"};
+            for (int i = 0; i < powerCount; ++i) {
+                float x = 395 + 245.f * (i % 3), y = 236 + 164.f * (i / 3);
+                Power power = Power(i + 1);
+                bool equipped = match.equipped == power;
+                if (equipped)
+                    DrawRing({x, y+39}, 45, 49, 0, 360, 60, gold);
+                sprite(art.badges[i], {x-42, y, 84, 84}, match.stock[0][i] ? WHITE : LIGHTGRAY);
+                arcadeCenter(std::string(powerName(power)) + "  x" + std::to_string(match.stock[0][i]),
+                             x, y+83, 24, equipped ? gold : cream);
+                center(effects[i], x, y+113, 15, cream);
+                if (match.canEquip(power) && ((CheckCollisionPointRec(GetMousePosition(), {x-108,y,216,138}) &&
+                    IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) || IsKeyPressed(KEY_ONE+i))) {
+                    match.equip(power);
+                    audio.play(audio.click);
+                }
+            }
+            if (plaqueButton({523, 583, 234, 54}, "BACK TO LANE"))
+                equipmentOpen = false;
+        }
         if (paused) {
             DrawRectangle(0, 77, W, 723, {3, 10, 20, 210});
             panel({421, 260, 438, 258}, ink);

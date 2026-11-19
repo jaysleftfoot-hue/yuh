@@ -11,7 +11,7 @@ t.XTestFakeMotionEvent.argtypes=[c.c_void_p,c.c_int,c.c_int,c.c_int,c.c_ulong]
 t.XTestFakeButtonEvent.argtypes=[c.c_void_p,c.c_uint,c.c_int,c.c_ulong]
 os.chdir(Path(__file__).resolve().parents[2])
 scenario=sys.argv[1]
-assert scenario in ['phases','keyboard','setup','locker','locked','pause','help','scores','mascot','curve','power']
+assert scenario in ['phases','keyboard','setup','locker','locked','pause','help','scores','mascot','curve','power','equipment']
 old=set(Path('/tmp/.X11-unix').glob('X*'));log=Path('/tmp/arcade-'+scenario+'.log')
 with log.open('w') as f:
  p=subprocess.Popen(['python3','native/headless.py','--capture-frame','3600','--screenshot','artifacts/arcade-'+scenario+'.png'],stdout=f,stderr=f)
@@ -37,6 +37,7 @@ with log.open('w') as f:
   if scenario not in ['setup','locked']:
    if scenario=='keyboard':key(0xff0d)
    else:click(510,682)
+   if scenario=='equipment':key(ord('p'))
    if scenario=='pause':key(0xff1b)
    if scenario=='keyboard':
     assert 'Shot phase:' not in log.read_text(), 'Setup key release advanced shot'
