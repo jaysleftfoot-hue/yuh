@@ -1,1 +1,1 @@
-Dugout equipment build from 648cdec8f631badbb1c49208f90c21e13ed0df30. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
+Independent medal drops build from 5a315a0b251331a11fb5767076e388d616e9cb2e. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
