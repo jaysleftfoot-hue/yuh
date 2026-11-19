@@ -5,10 +5,10 @@ C++17 + raylib 5.5 desktop prototype. The native work lost in the cloud refresh 
 ## Playable systems
 
 - Stadium bowling against an AI rival with separate spot, curve and power phases.
-- Rookie, Pro and All-Star rivals in both modes. Click the AI label in Ballpark Showdown to cycle the difficulty. Pro is the default, and the selection carries into rematches.
+- Rookie, Pro, All-Star and Hall of Fame rivals in both modes. Click the AI label in Ballpark Showdown to cycle the difficulty. Pro is the default, and the selection carries into rematches.
 - The pin triangle and standing count follow the active rack in real time, including spare attempts and changes of player.
 - Mascot Ride: an original ray mascot on an inflatable tube; steering after launch and one boost per shot.
-- Heavy, Magnet, Bumpers, Fastball, Changeup and Wild Pitch are random lane pickups. Open the dugout equipment case with P or Gear Case before a shot. One medal is shared per scheduled frame. Rookie gets one every frame, Pro every two or three frames, and All-Star one or two per match. Heavy, Magnet and Bumpers together have 56%, 34% and 16% drop chances respectively across the three difficulties. Both bowlers start with empty inventories. Bowl through a pickup and equip it on a later shot, one power per shot and up to three charges of each. Fastball adds speed. Changeup shrinks the opponent's ball for their next shot. Wild Pitch gives their next shot a brief sideways push. Tricks cannot stack.
+- Heavy, Magnet, Bumpers, Fastball, Changeup and Wild Pitch are random lane pickups. Open the dugout equipment case with P or Gear Case before a shot. Each bowler rolls for a medal on their own frames. A spawn resets only that bowler’s odds. Spare and bonus attempts keep the same medal state. Both bowlers start with empty inventories. Bowl through a pickup and equip it on a later shot, one power per shot and up to three charges of each. Fastball adds speed. Changeup shrinks the opponent's ball for their next shot. Wild Pitch gives their next shot a brief sideways push. Tricks cannot stack.
 - Home rivals have different shot plans at the same difficulty. The Slugger throws hard hooks on full racks, the Umpire favors a straight line and spare conversions, and the Ball Boy favors Bumpers and Wild Pitch. Rivals react to strikes, spares, gutters and finishes within ten points.
 - Pin-deck replays play after strikes and 7–10 conversions. Press Space, Enter, or the Skip Replay label to continue. The stadium scoreboard shows the replay feed while the live match waits.
 - Three challenges can unlock existing balls ahead of their XP thresholds. Beat the Wrigley Slugger in Stadium to earn **Ivy League Cub**. Convert a 7–10 at Fenway in a match or via the **7–10 Split Drill** in setup to earn **The Green Monster**. Collect all three gold tokens in one Mascot shot for **Touch Tank**. The drill can be repeated without adding career games or XP.
@@ -17,6 +17,17 @@ C++17 + raylib 5.5 desktop prototype. The native work lost in the cloud refresh 
 - Completed matches award 120 + score XP, plus 150 for a win. Abandoned matches award nothing.
 - Ten stadium-themed layouts open by winning at the previous stop: Wrigley, Fenway, Oracle, PNC, Coors, Kauffman, Chase, T-Mobile, Yankee, and **Tropicana Field last**.
 - Local profile with XP, wins, stadium unlocks and best score. Saved under APPDATA, XDG_DATA_HOME or HOME as big-league-bowling-profile.txt, with .bak recovery. Failed persistence is reported on screen.
+
+### Medal odds by difficulty
+
+Odds are conditional on all earlier eligible frames passing without a spawn. The sequence starts fresh after each spawn, even if the medal goes unclaimed. Strong medals are Heavy, Magnet and Bumpers.
+
+| Difficulty | Successive frame odds | Max per bowler | Strong medal odds on a spawn |
+| --- | --- | ---: | ---: |
+| Rookie | 50%, 95%, 100% | 10 | 56% |
+| Pro | 0%, 50%, 95%, 100% | 5 | 34% |
+| All-Star | 3%, 5%, 10%, 18%, 35%, 65%, 90%, 100% | 2 | 16% |
+| Hall of Fame | 1%, 2%, 4%, 7%, 12%, 20%, 35%, 60%, 85%, 100% | 1 | 8% |
 
 ## Controls
 

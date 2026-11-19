@@ -143,12 +143,14 @@ int main() {
     Match battingPractice;
     battingPractice.lanes[0].ball = {5, 50};
     PowerPickups pickups;
-    pickups.items = {{{5, 48}, Power::Fastball}, {{7.9f, 48}, Power::Magnet}};
+    pickups.item = PowerPickup{{7.9f, 48}, Power::Fastball};
     Body before{5, 47};
+    require(pickups.sweep(before, battingPractice) == Power::None, "wide miss collects nothing");
+    pickups.item = PowerPickup{{5, 48}, Power::Fastball};
     require(pickups.sweep(before, battingPractice) == Power::Fastball &&
                 battingPractice.stock[0][int(Power::Fastball) - 1] == 1 &&
                 pickups.sweep(before, battingPractice) == Power::None,
-            "swept pickup goes into active inventory once, wide miss collects nothing");
+            "swept pickup goes into active inventory once");
     require(battingPractice.equip(Power::Fastball), "equip pickup next shot");
     battingPractice.launch({5, 0, 1, 0});
     require(battingPractice.lanes[0].ball.vz > geometry::maxLaunchSpeed, "Fastball increases speed");
@@ -176,29 +178,68 @@ int main() {
     require(drift.lanes[0].ball.x < 5 && drift.queuedTrick[0] == Power::None,
             "Wild Pitch deflects one shot");
 
+    require(pickupTuning[0].chances[0] == 50 && pickupTuning[0].chances[1] == 95 &&
+                pickupTuning[0].chances[2] == 100, "rookie pity curve");
     std::mt19937 rng{109};
     std::set<Power> types;
-    for (auto level : {RivalDifficulty::Rookie, RivalDifficulty::Pro, RivalDifficulty::AllStar}) {
-        for (int game = 0; game < 120; ++game) {
-            pickups.startMatch(rng, level);
-            int count = 0, previous = -1;
+    float previousRareRate = 1.f;
+    int previousDropTotal = 10000;
+    constexpr std::array<int, rivalDifficultyCount> longestGap{3, 4, 8, 10};
+    for (int tier = 0; tier < rivalDifficultyCount; ++tier) {
+        int total = 0, rare = 0;
+        for (int game = 0; game < 1000; ++game) {
+            pickups.startMatch(RivalDifficulty(tier), rng());
+            int count = 0, lastDrop = -1;
             for (int f = 0; f < 10; ++f) {
-                pickups.enterFrame(rng, f);
-                if (pickups.items.empty()) continue;
+                pickups.enterFrame(f);
+                if (!pickups.item)
+                    continue;
+                require(f - lastDrop <= longestGap[tier], "pickup drought ends at guaranteed frame");
+                lastDrop = f;
                 ++count;
-                types.insert(pickups.items.front().power);
-                if (level == RivalDifficulty::Pro)
-                    require(f-previous >= 2 && f-previous <= 3, "normal frame spacing");
-                previous = f;
-                pickups.items.front().claimed = true;
-                pickups.enterFrame(rng, f);
-                require(pickups.items.front().claimed, "same frame cannot reroll a pickup");
+                const auto power = pickups.item->power;
+                types.insert(power);
+                rare += power == Power::Heavy || power == Power::Magnet || power == Power::Bumpers;
+                pickups.item->claimed = true;
+                pickups.enterFrame(f);
+                require(pickups.item && pickups.item->claimed && pickups.item->power == power,
+                        "spare and bonus attempts keep the same pickup roll");
             }
-            if (level == RivalDifficulty::Rookie) require(count == 10, "easy pickup each frame");
-            if (level == RivalDifficulty::AllStar) require(count == 1 || count == 2, "hard match budget");
+            require(count >= 1 && count <= pickupTuning[tier].matchLimit, "per-bowler pickup budget");
+            total += count;
         }
+        const float rareRate = float(rare) / total;
+        require(total < previousDropTotal && rareRate < previousRareRate,
+                "higher difficulty reduces medals and strong drops");
+        previousDropTotal = total;
+        previousRareRate = rareRate;
     }
     require(types.size() == powerCount, "all six powers can spawn");
+
+    PowerPickups visitor, visitorControl, home;
+    visitor.startMatch(RivalDifficulty::Rookie, 3141);
+    visitorControl.startMatch(RivalDifficulty::Rookie, 3141);
+    home.startMatch(RivalDifficulty::Rookie, 5926);
+    bool differentLanes = false;
+    for (int frame = 0; frame < 10; ++frame) {
+        visitor.enterFrame(frame);
+        home.enterFrame(frame);
+        visitorControl.enterFrame(frame);
+        require(bool(visitor.item) == bool(visitorControl.item), "rival never advances visitor RNG");
+        if (visitor.item) {
+            require(visitor.item->position.x == visitorControl.item->position.x &&
+                        visitor.item->position.z == visitorControl.item->position.z &&
+                        visitor.item->power == visitorControl.item->power,
+                    "rival turns preserve visitor position and power draws");
+            visitor.item->claimed = true;
+        }
+        if (bool(visitor.item) != bool(home.item) ||
+            (visitor.item && home.item && visitor.item->position.x != home.item->position.x))
+            differentLanes = true;
+        if (visitor.item && home.item)
+            require(!home.item->claimed, "claiming your pickup leaves the rival's intact");
+    }
+    require(differentLanes, "bowlers get independent pickup rolls");
     MascotTokens tokens;
     for (const auto &token : tokens.layout) {
         Simulation lane;
@@ -216,7 +257,8 @@ int main() {
     for (bool mascot : {false, true}) {
         int previousScore = -1;
         for (auto difficulty :
-             {RivalDifficulty::Rookie, RivalDifficulty::Pro, RivalDifficulty::AllStar}) {
+             {RivalDifficulty::Rookie, RivalDifficulty::Pro, RivalDifficulty::AllStar,
+              RivalDifficulty::HallOfFame}) {
             Match match;
             match.mascot = mascot;
             match.difficulty = difficulty;

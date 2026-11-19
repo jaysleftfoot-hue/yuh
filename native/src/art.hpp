@@ -40,7 +40,7 @@ struct Art {
     std::string scoreboardKey;
     int arena = 0, skin = 0;
     bowling::MascotPose mascotPose;
-    const bowling::PowerPickups *powerPickups = nullptr;
+    const bowling::PowerPickup *powerPickup = nullptr;
     const bowling::MascotTokens *mascotTokens = nullptr;
     bowling::StadiumCue cue = bowling::StadiumCue::None;
     float cueSeconds = 0, tileSeconds = 0;
@@ -910,14 +910,12 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         for (int i = -2; i <= 2; ++i)
             DrawSphere({i * 1.1f, .05f, geo::dotsZ}, .045f, ink);
         if (!deckOnly && (aim || sim.active)) {
-            if (powerPickups)
-                for (const auto &item : powerPickups->items) {
-                    if (item.claimed)
-                        continue;
-                    const float x = geo::renderX(item.position.x);
-                    const float y = 1.04f + .13f * std::sin(time * 3.2f + item.position.z);
-                    floatingMedal(badges[int(item.power) - 1], {x,y,item.position.z}, 1.35f, time);
-                }
+            if (powerPickup && !powerPickup->claimed) {
+                const auto &item = *powerPickup;
+                const float x = geo::renderX(item.position.x);
+                const float y = 1.04f + .13f * std::sin(time * 3.2f + item.position.z);
+                floatingMedal(badges[int(item.power) - 1], {x, y, item.position.z}, 1.35f, time);
+            }
             if (mascotTokens)
                 for (size_t i = 0; i < mascotTokens->layout.size(); ++i) {
                     if (mascotTokens->collected[i])

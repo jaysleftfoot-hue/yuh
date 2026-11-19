@@ -1,3 +1,9 @@
+# Independent medal drops
+
+- Native rules and campaign passed. Tested 4,000 seeded schedules across Rookie, Pro, All-Star and Hall of Fame, including drought bounds, per-bowler caps, progressively rarer strong medals and independent RNG streams. A spare or bonus attempt preserves the frame’s medal and claim state.
+- Hall of Fame was selectable through the native match setup. Full native Hall of Fame matches completed in Stadium and Mascot Ride.
+- The Windows x64 archive and installer were rebuilt. The archive passed CRC and its executable and assets matched the build. Windows execution remains unverified.
+
 # Challenges, replays and random pickups
 
 - Native scoring, lane geometry and campaign tests passed. Coverage includes version 1 save migration, individual challenge unlocks, a simulated 7–10 conversion, replay isolation, strike cues, six pickup types, lane placement, one-time pickup credit and opponent trick expiry.

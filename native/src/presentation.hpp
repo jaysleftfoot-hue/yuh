@@ -1,5 +1,6 @@
 #pragma once
 #include "campaign.hpp"
+#include <optional>
 
 namespace bowling {
 struct LaneToken {
@@ -18,60 +19,67 @@ struct PowerPickup {
     Power power;
     bool claimed = false;
 };
+// Each row describes successive frames after a drop or the start of a match.
+struct PickupTuning {
+    std::array<int, 10> chances;
+    int matchLimit;
+    std::array<int, powerCount> weights;
+};
+
+inline constexpr std::array<PickupTuning, rivalDifficultyCount> pickupTuning{{
+    {{50, 95, 100}, 10, {18, 20, 18, 16, 14, 14}},
+    {{0, 50, 95, 100}, 10, {12, 10, 12, 24, 21, 21}},
+    {{3, 5, 10, 18, 35, 65, 90, 100}, 2, {6, 4, 6, 32, 26, 26}},
+    {{1, 2, 4, 7, 12, 20, 35, 60, 85, 100}, 1, {3, 2, 3, 36, 28, 28}},
+}};
+
 struct PowerPickups {
     static constexpr float radius = .5f;
-    std::vector<PowerPickup> items;
+    std::optional<PowerPickup> item;
 
-    std::array<bool, 10> scheduled{};
-    int currentFrame = -1;
-    RivalDifficulty difficulty = RivalDifficulty::Pro;
-
-    void startMatch(std::mt19937 &rng, RivalDifficulty level) {
-        currentFrame = -1;
+    void startMatch(RivalDifficulty level, std::mt19937::result_type seed) {
         difficulty = level;
-        items.clear();
-        scheduled.fill(false);
-        if (level == RivalDifficulty::Rookie) {
-            scheduled.fill(true);
-        } else if (level == RivalDifficulty::Pro) {
-            std::uniform_int_distribution<int> gap(2, 3);
-            for (int f = gap(rng) - 1; f < 10; f += gap(rng))
-                scheduled[f] = true;
-        } else {
-            std::array<int, 10> frames{0,1,2,3,4,5,6,7,8,9};
-            std::shuffle(frames.begin(), frames.end(), rng);
-            scheduled[frames[0]] = true;
-            if (std::bernoulli_distribution(.5)(rng))
-                scheduled[frames[1]] = true;
-        }
+        rng.seed(seed);
+        item.reset();
+        currentFrame = -1;
+        missedFrames = spawned = 0;
     }
-    void enterFrame(std::mt19937 &rng, int frame) {
-        if (frame == currentFrame)
+    void enterFrame(int frame) {
+        if (frame <= currentFrame)
             return;
         currentFrame = frame;
-        items.clear();
-        if (!scheduled[frame])
+        item.reset();
+        const auto &tuning = pickupTuning[int(difficulty)];
+        if (spawned == tuning.matchLimit)
             return;
-        // Heavy, Magnet and Bumpers directly improve pin coverage or spare accuracy.
-        constexpr double weights[3][powerCount] = {{18,20,18,16,14,14},
-                                                   {12,10,12,24,21,21},
-                                                   {6,4,6,32,26,26}};
-        const auto &row = weights[int(difficulty)];
-        std::discrete_distribution<int> kind(std::begin(row), std::end(row));
+
+        // A drop resets the streak even if the bowler leaves the medal unclaimed.
+        const int chance = tuning.chances[missedFrames];
+        std::uniform_int_distribution<int> percent(1, 100);
+        if (percent(rng) > chance) {
+            ++missedFrames;
+            return;
+        }
+        missedFrames = 0;
+        ++spawned;
+        std::discrete_distribution<int> kind(tuning.weights.begin(), tuning.weights.end());
         std::uniform_real_distribution<float> side(1.65f, geometry::width - 1.65f);
         std::uniform_real_distribution<float> depth(30.f, 144.f);
-        items.push_back({{side(rng), depth(rng)}, Power(1 + kind(rng))});
+        item = PowerPickup{{side(rng), depth(rng)}, Power(1 + kind(rng))};
     }
     Power sweep(const Body &from, Match &match) {
         const auto &lane = match.lanes[match.player];
-        for (auto &item : items)
-            if (!item.claimed && crossedPickup(from, lane, item.position, radius) &&
-                match.storePower(item.power)) {
-                item.claimed = true;
-                return item.power;
-            }
-        return Power::None;
+        if (!item || item->claimed || !crossedPickup(from, lane, item->position, radius) ||
+            !match.storePower(item->power))
+            return Power::None;
+        item->claimed = true;
+        return item->power;
     }
+
+  private:
+    std::mt19937 rng;
+    RivalDifficulty difficulty = RivalDifficulty::Pro;
+    int currentFrame = -1, missedFrames = 0, spawned = 0;
 };
 
 struct MascotTokens {

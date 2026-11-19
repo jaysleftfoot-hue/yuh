@@ -151,7 +151,8 @@ inline const char *powerName(Power power) {
     constexpr const char *names[] = {"", "HEAVY", "MAGNET", "BUMPERS", "FASTBALL", "CHANGEUP", "WILD PITCH"};
     return names[int(power)];
 }
-enum class RivalDifficulty { Rookie, Pro, AllStar };
+enum class RivalDifficulty { Rookie, Pro, AllStar, HallOfFame };
+inline constexpr int rivalDifficultyCount = int(RivalDifficulty::HallOfFame) + 1;
 inline const char *difficultyName(RivalDifficulty difficulty) {
     switch (difficulty) {
     case RivalDifficulty::Rookie:
@@ -160,6 +161,8 @@ inline const char *difficultyName(RivalDifficulty difficulty) {
         return "PRO";
     case RivalDifficulty::AllStar:
         return "ALL-STAR";
+    case RivalDifficulty::HallOfFame:
+        return "HALL OF FAME";
     }
     return "PRO";
 }
@@ -226,6 +229,8 @@ inline RivalTuning rivalTuning(RivalDifficulty difficulty) {
         return {1.15f, .72f, .50f, 3, true};
     case RivalDifficulty::AllStar:
         return {.22f, .98f, .85f, 2, true};
+    case RivalDifficulty::HallOfFame:
+        return {.065f, 1.f, 1.05f, 2, true};
     }
     return {1.15f, .72f, .50f, 3, true};
 }
@@ -375,8 +380,12 @@ struct Match {
                     });
                 target = nearest->x;
             }
-            if (pins.size() == 10)
-                target = geometry::halfWidth + .48f;
+            if (pins.size() == 10) {
+                // The faster Hall of Fame shots need their own pocket line.
+                const float pocket = difficulty == RivalDifficulty::HallOfFame
+                                         ? (mascot ? .46f : .54f) : .48f;
+                target = geometry::halfWidth + pocket;
+            }
         }
         std::uniform_real_distribution<float> error(-1, 1);
         const float spread = tuning.spread * (1.f - .025f * stage);

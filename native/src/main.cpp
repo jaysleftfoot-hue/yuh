@@ -79,8 +79,10 @@ int main(int argc, char **argv) {
                 selectedDifficulty = RivalDifficulty::Pro;
             else if (difficulty == "all-star")
                 selectedDifficulty = RivalDifficulty::AllStar;
+            else if (difficulty == "hall-of-fame")
+                selectedDifficulty = RivalDifficulty::HallOfFame;
             else {
-                std::cerr << "Difficulty must be rookie, pro, or all-star\n";
+                std::cerr << "Difficulty must be rookie, pro, all-star, or hall-of-fame\n";
                 return 2;
             }
         }
@@ -170,12 +172,12 @@ int main(int argc, char **argv) {
     PinReplay replay;
     MascotMotion mascotMotion;
     MascotTokens tokens;
-    PowerPickups pickups;
+    std::array<PowerPickups, 2> pickups;
     StadiumCue stadiumCue = StadiumCue::None;
     float cueSeconds = 0, pickupSeconds = 0;
     std::string pickupMessage, challengeMessage, rivalLine;
     bool splitDrill = splitPreview;
-    std::mt19937 pickupRng(smoke || !screenshot.empty() ? 271u : std::random_device{}());
+    std::mt19937 pickupSeedSource(smoke || !screenshot.empty() ? 271u : std::random_device{}());
     Turn turn = Turn::Ready;
     Screen screen = startInGame || smoke ? Screen::Lane : Screen::Title;
     Screen lockerReturn = Screen::Title;
@@ -208,9 +210,7 @@ int main(int argc, char **argv) {
     auto preparePickups = [&]() {
         tokens = {};
         if (!splitDrill)
-            pickups.enterFrame(pickupRng, match.games[match.player].frame);
-        else
-            pickups.items.clear();
+            pickups[match.player].enterFrame(match.games[match.player].frame);
         pickupSeconds = 0;
     };
     auto restart = [&]() {
@@ -221,7 +221,8 @@ int main(int argc, char **argv) {
         match.rival = homeRival(arena);
         if (splitDrill)
             setSevenTenRack(match.lanes[0]);
-        pickups.startMatch(pickupRng, selectedDifficulty);
+        for (auto &bowlerPickups : pickups)
+            bowlerPickups.startMatch(selectedDifficulty, pickupSeedSource());
         equipmentOpen = false;
         preparePickups();
         mascotMotion = {};
@@ -422,7 +423,7 @@ int main(int argc, char **argv) {
                             completeChallenge(Challenge::MascotPickups);
                     }
                 }
-                if (Power picked = pickups.sweep(before, match); picked != Power::None && human) {
+                if (Power picked = pickups[match.player].sweep(before, match); picked != Power::None && human) {
                     pickupMessage = std::string(powerName(picked)) + " PICKED UP";
                     pickupSeconds = 1.6f;
                 }
@@ -538,7 +539,8 @@ int main(int argc, char **argv) {
         art.skin = skin;
         art.mascot = match.mascot;
         art.mascotPose = mascotMotion.pose;
-        art.powerPickups = &pickups;
+        const auto &pickup = pickups[match.player].item;
+        art.powerPickup = !splitDrill && pickup ? &*pickup : nullptr;
         art.mascotTokens = match.mascot && match.player == 0 &&
                            !profile.completed(Challenge::MascotPickups) ? &tokens : nullptr;
         art.cue = screen == Screen::Lane ? stadiumCue : StadiumCue::None;
@@ -673,7 +675,7 @@ int main(int argc, char **argv) {
             if (plaqueButton({495, 487, 290, 68}, match.mascot ? "MASCOT RIDE" : "STADIUM BOWLING"))
                 match.mascot = !match.mascot;
             if (button({495, 554, 290, 40}, std::string("AI: ") + difficultyName(selectedDifficulty))) {
-                selectedDifficulty = static_cast<RivalDifficulty>((int(selectedDifficulty) + 1) % 3);
+                selectedDifficulty = static_cast<RivalDifficulty>((int(selectedDifficulty) + 1) % rivalDifficultyCount);
                 audio.play(audio.click);
             }
             bool unlocked = arena < profile.stadiums();
