@@ -1,1 +1,1 @@
-Home rosters build from 05da736dba43883a1af92652da96536e05d2c739. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
+Mascot Ride build from 743ae4a3fce50422dd744a6dabe6dd82cb46f894. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
