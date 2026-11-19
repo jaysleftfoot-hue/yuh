@@ -37,6 +37,30 @@ int main() {
     require(mascotPull(input, 1000).power == 1 && mascotPull(input, -90).power == .15f,
             "sling pull is clamped in both directions");
 
+    require(mascotMouseDraw(542, 622, 798) == 80, "normal sling travel stays unchanged");
+    require(mascotPull(input, mascotMouseDraw(750, 798, 798)).power == 1,
+            "low grip reaches full power before the window edge");
+
+    Match spareAfterMiss(true);
+    spareAfterMiss.settle();
+    for (auto &pin : spareAfterMiss.lanes[0].pins)
+        pin.down = true;
+    const auto recovery = spareAfterMiss.outcome();
+    require(recovery.spare && !recovery.strike && recovery.knocked == 10,
+            "a clean pickup after a miss is a spare");
+    spareAfterMiss.settle();
+    require(spareAfterMiss.games[0].marks(0) == "- /" && spareAfterMiss.strikeStreak[0] == 0,
+            "reaction, streak and scorecard agree on the spare");
+
+    Match tenthSpare(true);
+    tenthSpare.games[0].frame = 9;
+    tenthSpare.games[0].roll(10);
+    tenthSpare.games[0].roll(0);
+    for (auto &pin : tenthSpare.lanes[0].pins)
+        pin.down = true;
+    const auto bonusSpare = tenthSpare.outcome();
+    require(bonusSpare.spare && !bonusSpare.strike, "tenth frame X - / is a spare on the last ball");
+
     std::mt19937 rideRng(61);
     RidePickups route;
     require(!route.route && route.bonus(10) == 0, "rider starts without a visible route or powers");
@@ -85,6 +109,18 @@ int main() {
     }
     p.xp = 5040;
     require(p.balls() == 64, "all balls at 5040 XP");
+    Match scoredRide(true);
+    scoredRide.games[0].roll(4);
+    scoredRide.games[0].roll(4);
+    scoredRide.games[1].roll(9);
+    scoredRide.games[1].roll(0);
+    scoredRide.rideBonus = {4, 0};
+    require(scoreTotal(scoredRide.games[0]) == 8 && scoredRide.total(0) == 12 && scoredRide.total(1) == 9,
+            "ride bonus enters the match total but never the scorecard");
+    Profile rideCareer;
+    require(rideCareer.award(8, 9, 0, 4, 0) == 278 && rideCareer.wins == 1 &&
+            rideCareer.best == 8 && rideCareer.stadiums() == 2,
+            "a bonus win unlocks the park while keeping base pin score and XP");
     auto path = (std::filesystem::temp_directory_path() / "blb-campaign-test.txt").string();
     require(p.save(path), "save");
     Profile restored;

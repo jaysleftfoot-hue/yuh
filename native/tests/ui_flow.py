@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Native X11 input regression: python3 native/tests/ui_flow.py phases (or keyboard/setup/locker/locked/pause/help/scores/mascot/mascot-pull/mascot-shot/mascot-straight/curve/power). Build Linux first; requires Xorg dummy, libX11 and libXtst. Uses an isolated display and non-saving screenshot mode."""
+"""Native X11 input regression: python3 native/tests/ui_flow.py phases (or keyboard/setup/locker/locked/pause/help/scores/mascot/mascot-pull/mascot-shot/mascot-low-grip/mascot-straight/curve/power). Build Linux first; requires Xorg dummy, libX11 and libXtst. Uses an isolated display and non-saving screenshot mode."""
 import ctypes as c,subprocess,time,sys,os
 from pathlib import Path
 x=c.CDLL('libX11.so.6');t=c.CDLL('libXtst.so.6')
@@ -11,7 +11,7 @@ t.XTestFakeMotionEvent.argtypes=[c.c_void_p,c.c_int,c.c_int,c.c_int,c.c_ulong]
 t.XTestFakeButtonEvent.argtypes=[c.c_void_p,c.c_uint,c.c_int,c.c_ulong]
 os.chdir(Path(__file__).resolve().parents[2])
 scenario=sys.argv[1]
-assert scenario in ['phases','keyboard','setup','locker','locked','pause','help','scores','mascot','mascot-pull','mascot-shot','mascot-straight','curve','power','equipment']
+assert scenario in ['phases','keyboard','setup','locker','locked','pause','help','scores','mascot','mascot-pull','mascot-shot','mascot-low-grip','mascot-straight','curve','power','equipment']
 old=set(Path('/tmp/.X11-unix').glob('X*'));log=Path('/tmp/arcade-'+scenario+'.log')
 with log.open('w') as f:
  p=subprocess.Popen(['python3','native/headless.py','--capture-frame','3600','--screenshot','artifacts/arcade-'+scenario+'.png'],stdout=f,stderr=f)
@@ -40,12 +40,14 @@ with log.open('w') as f:
    if scenario=='mascot-straight':click(900,606)
    if scenario=='keyboard':key(0xff0d)
    else:click(510,682)
-   if scenario in ['mascot-pull','mascot-shot','mascot-straight']:
-    click(415,542)
+   if scenario in ['mascot-pull','mascot-shot','mascot-low-grip','mascot-straight']:
+    low_grip=scenario=='mascot-low-grip'
+    grip_y=750 if low_grip else 542
+    click(415,grip_y)
     assert 'Mascot launch:' not in log.read_text(), 'A click without drawing the sling launched'
-    move(415,542)
+    move(415,grip_y)
     t.XTestFakeButtonEvent(d,1,1,0);x.XFlush(d);time.sleep(.25)
-    move(615,682)
+    move(615,798 if low_grip else 682)
     if scenario!='mascot-pull':
      t.XTestFakeButtonEvent(d,1,0,0);x.XFlush(d);time.sleep(.5)
      line=next(l for l in log.read_text().splitlines() if l.startswith('Mascot launch:'))

@@ -1,45 +1,41 @@
-# Big League Bowling art handoff
+# Big League Bowling graphics handoff
 
-Start with one full Wrigley frame from the normal bowling camera. The existing stadium visuals and pickup markers show the game states that need authored graphics. Use the original baseball arcade direction in [ART_DIRECTION.md](../ART_DIRECTION.md). Keep the shared dimensions and camera presets in [lane_geometry.hpp](../src/lane_geometry.hpp), and keep decoration outside the playable lane transform.
+Continue on `codex/big-league-bowling` in `native/`. Start with Mascot Ride and the original Rays aquarium theme. The current build has separate Straight and Power rules, three-dimensional ride coins, and the shorter Mascot lane fitted to the opening frame of the supplied clip. Use the original baseball arcade art direction for new props, animation and effects. [Art direction](../ART_DIRECTION.md)
 
-## Implemented art pass
+[Current Mascot Ride captures](mascot-qa-preview.jpg) show the opening view, the rack at impact, and the Power Ride result with the aquarium scoreboard. [Drawn sling and visible pickups](mascot-power-ride.jpg)
 
-[Native camera captures of Wrigley, Mascot Ride and Tropicana](ballpark-art-preview.jpg)
+## Play the current build
 
-The game loads original generated paintings and emblems from `native/assets/ballpark-art`. Wrigley and Tropicana use curved painted backdrops behind the live scoreboard. The aquarium uses illuminated exhibit windows, a textured tunnel and swimming ray meshes. Lane pickups share the six HUD badges. A separate manta medallion identifies challenge tokens. Rival quips have portrait badges, and the Tropicana celebration and unlock screen use the sunburst painting.
+Build with `python3 native/build.py --sdk-cache /workspace/tools` on the cloud machine. On a fresh Linux checkout, use `python3 native/build.py` to download the pinned SDK. Launch `./dist/native-linux/big-league-bowling` in a graphical session.
 
-The stadium HUD uses two stitched score rails and a brass pin gauge. Wrigley and Fenway hang enamel number plates. The other parks use incandescent score digits and their team marks. [In-game scoreboard preview](arcade-scoreboard.jpg)
+In **Mascot Adventure**, choose **Power Ride** or **Straight Ride** below the rival. Move over the lane to position the tube. Grab and pull straight back to set strength, release to start forward motion, then steer with the mouse or A/D. Space can draw the sling and Backspace cancels a draw. The two Power Ride coins appear after loading the sling. Wave Crash is armed until first contact with a pin. The 2× coin adds one point per pin knocked down on that delivery. Frame marks follow regular bowling and the aquarium board uses the combined match total. The three manta coins are the separate Touch Tank challenge.
 
-## Playable scenes
+Use the existing 144-unit Mascot run, 160-unit Stadium run, shared 10-unit lane width and respective opening cameras when changing the scenery. Rails, rack, pickups and rider use simulation coordinates. Keep decoration outside that transform. [Measured lane framing and regression bounds](../PROPORTIONS.md)
 
-Build with `python3 native/build.py`. These native-window captures use a fixed simulation clock and leave career saves untouched.
+## Visual priorities
 
-| Scene | Command after `python3 native/headless.py` |
+| Priority | What to inspect in the current game |
 | --- | --- |
-| Wrigley from the foul line | `--play --screenshot artifacts/wrigley.png --capture-frame 5` |
-| Strike replay with board video | `--play --demo-strike --screenshot artifacts/strike.png --scoreboard-screenshot artifacts/strike-board.png --capture-frame 465` |
-| Fenway 7–10 conversion | `--preview-split --demo-shot --screenshot artifacts/fenway-split.png --capture-frame 440` |
-| Mascot route and pickups | `--play --mascot --screenshot artifacts/touch-tank.png --capture-frame 5` |
-| Tropicana from the foul line | `--play --arena 9 --screenshot artifacts/tropicana.png --capture-frame 5` |
+| 1. Pickup readability | In the opening view, the two Power coins are small and the gold rims resemble the Touch Tank coins. Test Wave Crash and 2× at both distances and through their spin. Improve the silhouette, contrast and pickup cue around the existing collision center. `Art::floatingMedal` draws all three styles from authored textures. |
+| 2. Sling and rider movement | Follow one shot from rest through full draw, release, a sharp carve and a gutter. Refine the strap contacts, tube weight and fin response in `Art::world` and `Art::rider`. `MascotPose` supplies pull, recoil, lateral bank and wipeout. |
+| 3. Wave Crash and pin-deck finish | The current live Wave Crash effect is a thin ring. Give the impact a readable water burst and keep the standing pins visible. For replay effects, use recorded impact timing. The ring currently uses a live timer and the replay stores lane snapshots. |
+| 4. Aquarium scenery | Push depth with the glass, lighting and landmark silhouettes between approach and deck. `Art::mascotScenery`, `courseMesh` and `lighting.fs` own the tunnel, exhibit glass and lane shading. Compare the launch and impact cameras after the pass. |
 
-See the [Wrigley replay feed](wrigley-replay-board.jpg) and the [Fenway conversion](fenway-split-replay.jpg) as rendered by the current build.
+The pickup positions and effects live in `RidePickups`. `MascotTokens` owns the fixed three-coin Touch Tank route. Stadium powers use `PowerPickups::item` and the Dugout Equipment case. `Art::updateScoreboard` owns the outfield display and the 512×288 deck-only replay feed. [Ride presentation state](../src/presentation.hpp) · [Renderer](../src/art.hpp)
 
-To see a manual board flip, let a replay finish or skip it with Space. To trigger the Tropicana event, bowl three consecutive strikes at Tropicana in Stadium mode. The career unlock announcement fires after winning at Yankee Stadium when that victory opens the last park. In setup, the Fenway split drill is available after unlocking Fenway and selecting Stadium mode.
+## Repeatable captures
 
-## Graphics work
+Run these from the repository root after a Linux build. Preview and smoke commands leave career saves alone. `--arena 9` previews Tropicana directly.
 
-| Scene or asset | Existing C++ and shader interface |
-| --- | --- |
-| Wrigley ivy, clock, brick, trusswork, floodlights and stands | [Art::stadiumScenery and Art::landmarks](../src/art.hpp) own the world placement. Keep signs readable from the foul line. |
-| Mechanical scoreboard, working clock art and replay surround | `Art::updateScoreboard` has old/new string values for each score tile and runs a 0.42-second transition. The 512 × 288 replay video comes from `replayFeed` in [main.cpp](../src/main.cpp). Preserve the deck-only scene for the video render so it never samples its own stadium board. |
-| Rays tunnel, curved aquarium glass, swimming rays and caustics | `Art::mascotScenery` has timed free-swimming positions beyond the rails. Replace the temporary ray silhouettes and add the glass within the scenery pass. [lighting.fs](../assets/lighting.fs) already sends scene time to the animated lane material. |
-| Slingshot, turn lean and gutter wipeout | [MascotPose](../src/presentation.hpp) exposes normalized pull, lateral pull, release recoil, bank and wipeout. `Art::rider` and the sling endpoints consume the pose. Attach visuals to the same pose while the physics body keeps its canonical radius and position. |
-| Trop roof, catwalks, stadium board, sunbursts, unlock reveal | `StadiumCue::Turkey` and `StadiumCue::TropicanaUnlocked` signal the moments in both the match UI and board. `cueSeconds` carries the countdown and `boardLight` passes intensity and deck origin to the lane shader. Replace the temporary celebration with an original Rays animation. |
-| Six pickup props, HUD badges and three challenge tokens | `PowerPickups::items` carries power type, lane position and collection state. Keep the lane props and HUD badge keyed to the same `Power` value. `MascotTokens::layout` defines the fixed three-token route and tracks each collected token independently. |
-| Rival reactions and challenge rewards | `rivalReaction` keys strike, spare and gutter lines by style and bowler. The game also signals close finishes and first-time rewards. Use the existing portrait atlas as the starting point for reaction art. |
+```sh
+python3 native/headless.py --play --mascot --arena 9 --capture-frame 4 --screenshot artifacts/mascot-ready.png
+python3 native/tests/ui_flow.py mascot-pull
+python3 native/headless.py --play --mascot --arena 9 --demo-shot --capture-frame 310 --screenshot artifacts/mascot-impact.png
+python3 native/headless.py --smoke --mascot --arena 9 --screenshot artifacts/power-result.png --scoreboard-screenshot artifacts/power-board.png
+python3 native/headless.py --smoke --mascot --straight-ride --arena 9
+python3 native/headless.py --smoke --capture-frame 2300 --screenshot artifacts/stadium-impact.png
+```
 
-## Pickup reference and tuning
+The draw capture is `artifacts/arcade-mascot-pull.png`. To check the Stadium launch and the three-shot setup phases, also run `python3 native/headless.py --play --capture-frame 4 --screenshot artifacts/stadium-launch.png` and `python3 native/tests/ui_flow.py phases`. [Stadium scoreboard art](arcade-scoreboard.jpg) · [Windows build and validation](VALIDATION.md)
 
-The two reference games used both helpful items and opponent tricks. *Elf Bowling 7 1/7* included a speed boost, gutter removal, ball shrinkage and loss-of-control items. *Zombie Bowl-o-Rama* used lane collectibles that stock powers for subsequent turns and combined ball, lane and pin effects. Big League Bowling uses the shared play pattern with its own power names and visuals. [Elf Bowling reference](https://www.mobygames.com/game/34717/elf-bowling-7-17-the-last-insult/) · [Zombie Bowl-o-Rama gameplay reference](https://www.mobygames.com/game/43571/zombie-bowl-o-rama/) · [Official Zombie Bowl-o-Rama listing](https://store.steampowered.com/app/32160/Zombie_BowloRama/)
-
-Each bowler rolls independently for at most one floating medal per frame, including spare and bonus attempts. The spawn chance rises after each empty frame and resets after each spawn. All-Star caps medals at two per bowler and Hall of Fame caps them at one. See the difficulty table in the [native README](../README.md). Pickups use swept collision against the ball/rider radius, award stock to the current bowler and cap inventory at three per kind. Challenge tokens have a fixed course and require three in the same shot. Keep the two kinds of collectibles visually distinct.
+Windows graphics and physical sound output still need a playtest on the target machine.

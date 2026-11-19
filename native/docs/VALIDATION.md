@@ -1,3 +1,11 @@
+# Mascot Ride QA and graphics handoff
+
+- Linux rules and campaign suites passed with AddressSanitizer and UndefinedBehaviorSanitizer. Tests cover a spare after a miss on a full rack, the tenth-frame `X - /` case, and a bonus that changes the match winner while preserving the bowling score.
+- X11 input flows passed for the low grip, Straight Ride selection and sling, Stadium keyboard phases and pause, and Dugout Equipment. The low grip went from 45% to full power in the same drag from Y=750 to Y=798.
+- Complete native Stadium, Straight Ride and Power Ride matches passed. Checked launch and pin impact in both modes, and a board-only export exited after capture. In the Power Ride capture the bowling scores were 187 and 156, the bonuses were 114 and 104, and both the aquarium board and the match result showed 301–260.
+- Windows x64 ZIP and NSIS installer were rebuilt. Package CRC and recorded SHA-256 checks passed. Windows installation and runtime remain unverified.
+- [Current captures](mascot-qa-preview.jpg) · [Astra graphics priorities and reproduction commands](ASTRA_HANDOFF.md)
+
 # Independent medal drops
 
 - Native rules and campaign passed. Tested 4,000 seeded schedules across Rookie, Pro, All-Star and Hall of Fame, including drought bounds, per-bowler caps, progressively rarer strong medals and independent RNG streams. A spare or bonus attempt preserves the frame’s medal and claim state.

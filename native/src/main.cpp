@@ -94,6 +94,7 @@ int main(int argc, char **argv) {
         startInGame = true;
         smokeMascot = smoke = false;
     }
+    const bool captureRequested = !screenshot.empty() || !scoreboardScreenshot.empty();
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(W, H, "Big League Bowling - Ballpark Tour");
     if (!IsWindowReady())
@@ -166,20 +167,19 @@ int main(int argc, char **argv) {
     MascotMotion mascotMotion;
     MascotTokens tokens;
     RidePickups ridePickups;
-    std::array<int, 2> rideBonus{};
-    std::mt19937 rideRng(smoke || !screenshot.empty() ? 628u : std::random_device{}());
+    std::mt19937 rideRng(smoke || captureRequested ? 628u : std::random_device{}());
     float mouseSteering = 0;
     std::array<PowerPickups, 2> pickups;
     StadiumCue stadiumCue = StadiumCue::None;
     float cueSeconds = 0, pickupSeconds = 0;
     std::string pickupMessage, challengeMessage, rivalLine;
     bool splitDrill = splitPreview;
-    std::mt19937 pickupSeedSource(smoke || !screenshot.empty() ? 271u : std::random_device{}());
+    std::mt19937 pickupSeedSource(smoke || captureRequested ? 271u : std::random_device{}());
     Turn turn = Turn::Ready;
     Screen screen = startInGame || smoke ? Screen::Lane : Screen::Title;
     Screen lockerReturn = Screen::Title;
     int arena = previewArena < 0 ? 0 : previewArena;
-    std::mt19937 rosterRng(smoke || !screenshot.empty() ? 391u : std::random_device{}());
+    std::mt19937 rosterRng(smoke || captureRequested ? 391u : std::random_device{}());
     int opponent = drawHomeRival(arena, rosterRng);
     int skin = 0, rolls = 0, ticks = 0, selectedSkin = 0;
     float time = 0, accum = 0, reaction = 0, chargeTime = 0, aiWait = .9f, celebration = 0;
@@ -198,7 +198,7 @@ int main(int argc, char **argv) {
         stadiumArmed = false;
     };
     auto saveCareer = [&]() {
-        return smoke || !screenshot.empty() || previewArena >= 0 || profile.save(save);
+        return smoke || captureRequested || previewArena >= 0 || profile.save(save);
     };
     auto completeChallenge = [&](Challenge challenge) {
         if (!profile.finish(challenge))
@@ -218,7 +218,6 @@ int main(int argc, char **argv) {
     auto restart = [&]() {
         match = Match(match.mascot);
         match.stage = arena;
-        rideBonus = {};
         match.rival = roster[opponent].style;
         if (splitDrill)
             setSevenTenRack(match.lanes[0]);
@@ -280,7 +279,7 @@ int main(int argc, char **argv) {
         }
     };
     while (!WindowShouldClose() && !done) {
-        float dt = smoke ? 1.f / 15 : !screenshot.empty() ? 1.f / 60 : std::min(GetFrameTime(), .25f);
+        float dt = smoke ? 1.f / 15 : captureRequested ? 1.f / 60 : std::min(GetFrameTime(), .25f);
         time += dt;
         ++ticks;
         if (demoShot && ticks == 30 && screen == Screen::Lane) {
@@ -387,14 +386,17 @@ int main(int argc, char **argv) {
                         }
                         if (charge) {
                             chargeTime += dt;
-                            const float pull = mouseCharge ? GetMouseY() - dragStart.y : chargeTime * 155;
+                            const float mouseY = GetMouseY();
+                            const float pull = mouseCharge ? mascotMouseDraw(dragStart.y, mouseY, H - 2.f)
+                                                          : chargeTime * 155;
+                            const bool drawn = pull >= 10.f && (!mouseCharge || mouseY - dragStart.y >= 8.f);
                             shot = mascotPull(shot, pull);
                             mascotMotion.aim((shot.power - .15f) / .85f);
-                            if (powerRide && pull >= 10)
+                            if (powerRide && drawn)
                                 ridePickups.reveal(rideRng);
                             if (mouseCharge ? IsMouseButtonReleased(MOUSE_BUTTON_LEFT)
                                             : IsKeyReleased(KEY_SPACE)) {
-                                if (pull >= 10)
+                                if (drawn)
                                     launch();
                                 else
                                     charge = false;
@@ -483,7 +485,7 @@ int main(int argc, char **argv) {
 
                 const auto roll = match.outcome();
                 const int bonus = ridePickups.bonus(roll.knocked);
-                rideBonus[match.player] += bonus;
+                match.rideBonus[match.player] += bonus;
                 if (bonus > 0) {
                     pickupMessage = "+" + std::to_string(bonus) + " RIDE BONUS";
                     pickupSeconds = 2.5f;
@@ -545,7 +547,7 @@ int main(int argc, char **argv) {
             if (turn == Turn::Complete && !awarded) {
                 if (!splitDrill) {
                     int yours = scoreTotal(match.games[0]), theirs = scoreTotal(match.games[1]);
-                    const int finalScore = yours + rideBonus[0], rivalScore = theirs + rideBonus[1];
+                    const int finalScore = match.total(0), rivalScore = match.total(1);
                     result = finalScore > rivalScore    ? "YOU WIN!"
                              : finalScore == rivalScore ? "A TIE! REMATCH?"
                                                : "RIVAL WINS - KEEP SWINGING!";
@@ -554,7 +556,7 @@ int main(int argc, char **argv) {
                         int &record = powerRide ? profile.bestPowerRide : profile.bestStraightRide;
                         record = std::max(record, finalScore);
                     }
-                    int xp = profile.award(yours, theirs, arena, rideBonus[0], rideBonus[1]);
+                    int xp = profile.award(yours, theirs, arena, match.rideBonus[0], match.rideBonus[1]);
                     if (!match.mascot && arena == 0 && yours > theirs)
                         completeChallenge(Challenge::WrigleyWin);
                     reward = "+" + std::to_string(xp) + " XP | " + std::to_string(profile.balls()) +
@@ -849,8 +851,8 @@ int main(int argc, char **argv) {
             title(splitDrill ? "FENWAY 7-10 DRILL" : match.mascot ? (powerRide ? "POWER RIDE" : "STRAIGHT RIDE") : arenas[arena].name,
                   184, 122, 20, cream);
             if (match.mascot && powerRide) {
-                arcadeCenter("BONUS +" + std::to_string(rideBonus[0]), 304, 76, 18, aqua);
-                arcadeCenter("BONUS +" + std::to_string(rideBonus[1]), 976, 76, 18, aqua);
+                arcadeCenter("BONUS +" + std::to_string(match.rideBonus[0]), 304, 76, 18, aqua);
+                arcadeCenter("BONUS +" + std::to_string(match.rideBonus[1]), 976, 76, 18, aqua);
             }
             if (art.mascotTokens && turn != Turn::Complete)
                 arcadeCenter(std::to_string(tokens.count) + " / 3 TOUCH TANK TOKENS", 948, 142, 21, aqua);
@@ -896,10 +898,14 @@ int main(int argc, char **argv) {
                     arcadeCenter("FENWAY 7-10 SPLIT", 640, 335, 35, cream);
                     arcadeCenter(reward, 640, 405, 24, gold);
                 } else {
-                    const int yours = scoreTotal(match.games[0]) + rideBonus[0];
-                    const int theirs = scoreTotal(match.games[1]) + rideBonus[1];
-                    const int winner = yours >= theirs ? profile.avatar : opponent;
-                    portraitCard(portraits, winner, {548, 280, 184, 200}, "TOP BOWLER");
+                    const int yours = match.total(0), theirs = match.total(1);
+                    if (yours == theirs) {
+                        portraitCard(portraits, profile.avatar, {435, 280, 184, 200}, "YOU");
+                        portraitCard(portraits, opponent, {661, 280, 184, 200}, "RIVAL");
+                    } else {
+                        const int winner = yours > theirs ? profile.avatar : opponent;
+                        portraitCard(portraits, winner, {548, 280, 184, 200}, "TOP BOWLER");
+                    }
                     center(reward, 640, 506, std::min(18.f, 600.f * 18 / std::max(1.f, tw(reward, 18))), cream);
                     if (match.mascot && powerRide)
                         arcadeCenter("YOU " + std::to_string(yours) + "   /   RIVAL " + std::to_string(theirs),
@@ -1028,7 +1034,7 @@ int main(int argc, char **argv) {
             std::cout << "Native match smoke: mode=" << (match.mascot ? "mascot" : "traditional")
                       << " difficulty=" << difficultyName(match.difficulty)
                       << " rules=" << (match.mascot ? (powerRide ? "power" : "straight") : "stadium")
-                      << " bonus=" << rideBonus[0] << ',' << rideBonus[1]
+                      << " bonus=" << match.rideBonus[0] << ',' << match.rideBonus[1]
                       << " complete=" << match.complete() << " rolls=" << rolls
                       << " player=" << (match.complete() ? *match.games[0].scores()[9] : -1)
                       << " rival=" << (match.complete() ? *match.games[1].scores()[9] : -1) << '\n';
@@ -1036,7 +1042,7 @@ int main(int argc, char **argv) {
                 capture();
             done = true;
         }
-        if (!smoke && !screenshot.empty() && (ticks == captureFrame || IsKeyPressed(KEY_F12))) {
+        if (!smoke && captureRequested && (ticks == captureFrame || IsKeyPressed(KEY_F12))) {
             capture();
             done = true;
         }

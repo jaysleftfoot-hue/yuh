@@ -53,8 +53,14 @@ struct StadiumSetup {
     }
 };
 // Lock the starting spot when the sling is grabbed. Pull length sets speed.
+inline constexpr float mascotFullDraw = 136.f;
+inline float mascotMouseDraw(float gripY, float mouseY, float bottomY) {
+    // Shorten the stroke when the window edge limits mouse travel.
+    const float travel = std::clamp(bottomY - gripY, 8.f, mascotFullDraw);
+    return (mouseY - gripY) * mascotFullDraw / travel;
+}
 inline Shot mascotPull(Shot shot, float downward) {
-    shot.power = std::clamp(.15f + downward / 160.f, .15f, 1.f);
+    shot.power = .15f + .85f * std::clamp(downward / mascotFullDraw, 0.f, 1.f);
     shot.aim = shot.curve = 0;
     return shot;
 }

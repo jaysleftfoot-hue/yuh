@@ -269,7 +269,7 @@ struct Match {
     bool mascot;
     RivalDifficulty difficulty = RivalDifficulty::Pro;
     RivalStyle rival = RivalStyle::Slugger;
-    std::array<int, 2> strikeStreak{};
+    std::array<int, 2> strikeStreak{}, rideBonus{};
     bool startedOnSplit = false;
     float rivalTarget = geometry::halfWidth;
     std::array<std::array<int, powerCount>, 2> stock{};
@@ -285,6 +285,7 @@ struct Match {
     bool complete() const {
         return games[0].complete && games[1].complete;
     }
+    int total(int bowler) const { return scoreTotal(games[bowler]) + rideBonus[bowler]; }
     bool storePower(Power power) {
         int slot = int(power) - 1;
         if (slot < 0 || slot >= powerCount || stock[player][slot] == stockLimit)
@@ -363,7 +364,8 @@ struct Match {
         const auto &sim = lanes[player];
         const int pins = sim.knocked();
         const bool all = !sim.pins.empty() && pins == int(sim.pins.size());
-        return {pins, all && pins == 10, all && pins < 10, all && startedOnSplit, sim.gutter};
+        const bool strike = all && pins == 10 && games[player].freshRack();
+        return {pins, strike, all && !strike, all && startedOnSplit, sim.gutter};
     }
     void settle() {
         auto &g = games[player];

@@ -234,7 +234,8 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                     nextTiles[player][i] = std::to_string(rolls[0]);
             }
         }
-        const std::array<int, 2> totals{bowling::scoreTotal(match.games[0]), bowling::scoreTotal(match.games[1])};
+        const std::array<int, 2> totals{match.total(0), match.total(1)};
+        key += ":" + std::to_string(totals[0]) + ":" + std::to_string(totals[1]);
         const bool flipped = nextTiles != visibleTiles || totals != visibleTotals;
         if (flipped) {
             oldTotals = visibleTotals;
@@ -316,7 +317,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                 if (!game.complete && frame == game.frame && player == match.player)
                     DrawLineEx({cx - 11, y + 31}, {cx + 11, y + 30}, 3, gold);
             }
-            arcadeCenter(std::to_string(bowling::scoreTotal(game)), 908, y - 2, 33, rowInk);
+            arcadeCenter(std::to_string(visibleTotals[player]), 908, y - 2, 33, rowInk);
         }
         const std::string welcome = cue == bowling::StadiumCue::TropicanaUnlocked
             ? "TROPICANA FIELD UNLOCKED"
