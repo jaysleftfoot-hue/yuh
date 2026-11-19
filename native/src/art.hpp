@@ -9,6 +9,30 @@ inline constexpr float sceneryDepthScale = geo::sceneryDepthScale;
 struct Art {
     Model cube{}, sphere{}, cylinder{}, pin{}, tube{}, course{}, rayBody{};
     Shader shader{};
+    Texture2D wrigley{}, tank{}, trop{}, sunburst{}, tokenMedal{};
+    std::array<Texture2D, 3> reactions{};
+    std::array<Texture2D, bowling::powerCount> badges{};
+    void loadBallparkArt() {
+        auto load = [](const std::string &name) {
+            const auto path = std::string(GetApplicationDirectory()) + "assets/ballpark-art/" + name;
+            Texture2D texture = LoadTexture(path.c_str());
+            if (!texture.id)
+                throw std::runtime_error("Missing ballpark art: " + name);
+            GenTextureMipmaps(&texture);
+            SetTextureFilter(texture, TEXTURE_FILTER_TRILINEAR);
+            return texture;
+        };
+        wrigley = load("wrigley.jpg");
+        trop = load("trop.jpg");
+        tank = load("tank.jpg");
+        SetTextureWrap(tank, TEXTURE_WRAP_MIRROR_REPEAT);
+        course.materials[0].maps[MATERIAL_MAP_ALBEDO].texture = tank;
+        sunburst = load("sunburst.jpg");
+        reactions = {load("slugger.png"), load("umpire.png"), load("ballboy.png")};
+        tokenMedal = load("token.png");
+        for (int i = 0; i < bowling::powerCount; ++i)
+            badges[i] = load("power-" + std::to_string(i) + ".png");
+    }
     std::array<Texture2D, 64> skins{};
     RenderTexture2D scoreboard{};
     std::array<Texture2D, 10> parkLogos{}, teamLogos{};
@@ -47,8 +71,8 @@ struct Art {
                 m.normals[n * 3] = normal.x;
                 m.normals[n * 3 + 1] = normal.y;
                 m.normals[n * 3 + 2] = normal.z;
-                m.texcoords[n * 2] = v.z * .1f;
-                m.texcoords[n * 2 + 1] = v.y * .1f;
+                m.texcoords[n * 2] = v.z * .042f;
+                m.texcoords[n * 2 + 1] = 1.f - v.y * .093f;
                 ++n;
             }
         };
@@ -272,7 +296,9 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
             DrawRectangleGradientH(0, 85, 1024, 250, {9, 24, 61, 255}, {34, 101, 173, 255});
             DrawTexturePro(teamLogos[9], {0, 0, float(teamLogos[9].width), float(teamLogos[9].height)},
                            {89, 101, 226, 214}, {0, 0}, 0, WHITE);
-            arcadeCenter("TURKEY! RAYS UP!", 640, 165, 83, gold);
+            sprite(sunburst, {0, 85, 1024, 250});
+            arcadeCenter("TURKEY!", 260, 120, 88, gold);
+            arcadeCenter("RAYS UP!", 260, 216, 48, cream);
         }
         // These frame scores are live game data.
         text("BOWLING", 25, 351, 17, letters);
@@ -392,11 +418,6 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
 
     void landmarks(float time) {
         Color brick = {145, 72, 48, 255};
-        if (arena == 0)
-            for (int i = 0; i < 12; ++i) {
-                box({-8.f, 2, 4.f + i * 2.8f}, {1, 4, 2.6f}, brick);
-                orb({-7.4f, 3, 4.f + i * 2.8f}, {.5f, 1.7f, 1.6f}, {37, 104, 51, 255});
-            }
         if (arena == 1) {
             box({-7, 5, 16}, {1, 10, 35}, {30, 99, 68, 255});
             for (int i = 0; i < 12; ++i)
@@ -479,7 +500,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         const float extra = geo::sceneryExtension;
         Color rock = {45, 119, 165, 255};
         material(3);
-        DrawModel(course, {0, 0, 0}, 1, rock);
+        DrawModel(course, {0, 0, 0}, 1, WHITE);
         box({0, 5.5f, 42.5f + extra}, {20, 11, 1}, rock);
         material(0);
         box({0, 1.3f, 30.8f + extra}, {10, 2.6f, .5f}, {5, 17, 34, 255});
@@ -487,6 +508,18 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         for (int side : {-1, 1})
             box({side * 6.7f, -.13f, 15 + extra / 2}, {2.45f, .10f, 46 + extra}, {27, 157, 193, 255});
         material(0);
+        // Recessed exhibit windows follow the outer walls, leaving the course clear.
+        for (int side : {-1, 1}) {
+            for (float z = 1; z < 34 + extra; z += 11.f) {
+                rlPushMatrix();
+                rlTranslatef(side * 7.05f, 4.2f, z);
+                rlRotatef(side * 90.f, 0, 1, 0);
+                sign(tank, {0, 0, 0}, 10.8f, 7.6f, true);
+                for (float y : {-3.85f, 3.85f})
+                    beam({-5.5f, y, 0}, {5.5f, y, 0}, .12f, {73, 157, 161, 255});
+                rlPopMatrix();
+            }
+        }
         // Layers of close scenery make the ride feel embedded in a themed course.
         for (int side : {-1, 1})
             for (int i = 0; i < 9 + int(extra / 4.7f) + 1; ++i) {
@@ -525,13 +558,16 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                     float z = 8 + i * (9.f + extra / 3);
                     const float swimPhase = time * .75f + i * 1.7f + side;
                     const float swimZ = z + std::sin(swimPhase) * 3.4f;
-                    const float swimX = side * (7.1f + .25f * std::cos(swimPhase));
+                    const float swimX = side * (6.48f + .25f * std::cos(swimPhase));
                     const float swimY = 4.4f + .35f * std::sin(swimPhase * 2);
-                    orb({swimX, swimY, swimZ}, {.65f, .12f, .6f},
-                        {30, 70, 121, 255});
-                    for (int d : {-1, 1})
-                        orb({swimX + d * .65f, swimY + d * .08f * std::cos(swimPhase * 4), swimZ - .1f},
-                            {.7f, .06f, .33f}, {31, 82, 133, 255});
+                    rlPushMatrix();
+                    rlTranslatef(swimX, swimY, swimZ);
+                    rlRotatef(std::cos(swimPhase) * 75.f, 0, 1, 0);
+                    rlScalef(.68f, .55f, .55f);
+                    material(6);
+                    DrawModel(rayBody, {0, 0, 0}, 1, WHITE);
+                    material(0);
+                    rlPopMatrix();
                     for (int j = 0; j < 5; ++j) {
                         float y = std::fmod(time * .55f + j * 1.13f + i, 5.f) + 1;
                         orb({side * (6.9f + .2f * std::sin(j * 3.f)), y, z}, {.045f, .065f, .045f},
@@ -643,10 +679,11 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
     void stadiumScenery(float time, Color team) {
         // The playable lane sits on the diamond, with a full ballpark around it.
         const float extra = geo::sceneryExtension;
-        material(0);
+        material(8);
         for (int stripe = 0; stripe < 18 + int(extra / 4) + 2; ++stripe)
             box({0, -.24f, -12 + stripe * 4.f}, {118, .12f, 4.01f},
                 stripe % 2 ? Color{47, 111, 57, 255} : Color{58, 129, 65, 255});
+        material(0);
         for (int side : {-1, 1}) {
             fieldPath({0, -.13f, -8}, {side * 21.f, -.13f, 10}, 2.8f, {166, 112, 67, 255});
             fieldPath({side * 21.f, -.13f, 10}, {0, -.13f, 30}, 2.8f, {166, 112, 67, 255});
@@ -662,9 +699,30 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         // Low pin return keeps the stadium visible above the deck.
         box({0, .6f, 31 + extra}, {11, 1.2f, 1.2f}, {11, 28, 43, 255});
         box({0, 1.25f, 31 + extra}, {11.3f, .12f, 1.3f}, team);
+        const bool paintedPark = arena == 0 || arena == 9;
+        if (paintedPark) {
+            Texture2D backdrop = arena == 0 ? wrigley : trop;
+            // Continuous outfield panorama curves into the sidelines behind the live board.
+            rlSetTexture(backdrop.id);
+            rlBegin(RL_QUADS);
+            rlColor4ub(255, 255, 255, 255);
+            constexpr int sections = 56;
+            for (int section = 0; section < sections; ++section) {
+                for (int corner : {0, 1, 2, 3}) {
+                    float u = (section + (corner >= 2 ? 1.f : 0.f)) / sections;
+                    float angle = (u - .5f) * PI * 1.45f;
+                    bool top = corner == 1 || corner == 2;
+                    rlTexCoord2f(1.f-u, top ? 0.f : 1.f);
+                    rlVertex3f(118.f * std::sin(angle), top ? 109.f : -18.f,
+                               extra * .5f + 4.f + (extra * .5f + 48.f) * std::cos(angle));
+                }
+            }
+            rlEnd();
+            rlSetTexture(0);
+        }
         // Continue the seating down both sidelines as lane length increases.
         for (int side : {-1, 1})
-            for (float z = -8; z < extra + 28; z += 7.8f) {
+            for (float z = -8; !paintedPark && z < extra + 28; z += 7.8f) {
                 for (int row = 0; row < 8; ++row) {
                     float x = side * (43 + row * .7f), y = 4 + row * .8f;
                     box({x, y / 2, z}, {1, y, 8}, {91, 103, 111, 255});
@@ -679,7 +737,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                     }
                 }
             }
-        for (int section = 0; section < 19; ++section) {
+        for (int section = 0; !paintedPark && section < 19; ++section) {
             float a = (-85 + section * 10) * DEG2RAD;
             float x = std::sin(a) * 43, z = 13 + extra + std::cos(a) * 30;
             rlPushMatrix();
@@ -775,7 +833,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         if (arena == 9) {
             for (float z : {-2.f, 14.f + extra / 3, 30.f + extra * .66f, 46.f + extra})
                 arch(z, 49, 31, {155, 184, 200, 255}, .15f);
-            box({0, 32, 20 + extra / 2}, {115, .3f, 90 + extra}, {167, 174, 175, 255});
+
             // Tropicana's roof catwalk, orange landmark and flanking display pylons.
             for (float y : {27.f, 28.f})
                 beam({-43, y, 40 + extra}, {43, y, 40 + extra}, .12f, {48, 59, 67, 255});
@@ -856,16 +914,17 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                         continue;
                     const float x = geo::renderX(item.position.x);
                     const float y = 1.04f + .13f * std::sin(time * 3.2f + item.position.z);
-                    orb({x, y, item.position.z}, {.38f, .38f, .38f},
-                        powerColors[int(item.power) - 1]);
+                    DrawBillboard(cam, badges[int(item.power) - 1], {x, y, item.position.z},
+                                  1.35f, WHITE);
                 }
             if (mascotTokens)
                 for (size_t i = 0; i < mascotTokens->layout.size(); ++i) {
                     if (mascotTokens->collected[i])
                         continue;
                     const auto token = mascotTokens->layout[i];
-                    orb({geo::renderX(token.x), .82f + .14f * std::sin(time * 4 + i), token.z},
-                        {.55f, .46f, .30f}, gold);
+                    DrawBillboard(cam, tokenMedal,
+                                  {geo::renderX(token.x), .95f + .14f * std::sin(time * 4 + i), token.z},
+                                  1.5f, WHITE);
                 }
         }
         for (const auto &p : sim.pins)
@@ -887,6 +946,8 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
             Vector3 center{ballPos.x + mascotPose.sideways * 1.6f, .40f, ballPos.z - pull - 1.f};
             for (int side : {-1, 1}) {
                 cyl({side * 4.8f, .04f, 2.4f}, .24f, 1.3f, {24, 69, 110, 255});
+                for (int wrap = 0; wrap < 5; ++wrap)
+                    cyl({side * 4.8f, .37f + wrap * .16f, 2.4f}, .255f, .06f, cream);
                 orb({side * 4.8f, 1.4f, 2.4f}, {.31f, .34f, .31f}, gold);
                 beam({side * 4.8f, 1.15f, 2.4f}, center, .095f - .03f * mascotPose.pull,
                      {220, 44, 60, 255});
@@ -905,6 +966,12 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         EndMode3D();
     }
     void close() {
+        for (auto texture : reactions)
+            UnloadTexture(texture);
+        for (auto texture : {wrigley, tank, trop, sunburst, tokenMedal})
+            UnloadTexture(texture);
+        for (auto texture : badges)
+            UnloadTexture(texture);
         for (Model *character : {&pin, &rayBody, &tube})
             UnloadTexture(
                 character->materials[character->meshMaterial[0]].maps[MATERIAL_MAP_ALBEDO].texture);

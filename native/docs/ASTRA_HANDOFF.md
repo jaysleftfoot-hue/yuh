@@ -2,6 +2,12 @@
 
 Start with one full Wrigley frame from the normal bowling camera. The existing stadium visuals and pickup markers show the game states that need authored graphics. Use the original baseball arcade direction in [ART_DIRECTION.md](../ART_DIRECTION.md). Keep the shared dimensions and camera presets in [lane_geometry.hpp](../src/lane_geometry.hpp), and keep decoration outside the playable lane transform.
 
+## Implemented art pass
+
+[Native camera captures of Wrigley, Mascot Ride and Tropicana](ballpark-art-preview.jpg)
+
+The game loads original generated paintings and emblems from `native/assets/ballpark-art`. Wrigley and Tropicana use curved painted backdrops behind the live scoreboard. The aquarium uses illuminated exhibit windows, a textured tunnel and swimming ray meshes. Lane pickups share the six HUD badges. A separate manta medallion identifies challenge tokens. Rival quips have portrait badges, and the Tropicana celebration and unlock screen use the sunburst painting.
+
 ## Playable scenes
 
 Build with `python3 native/build.py`. These native-window captures use a fixed simulation clock and leave career saves untouched.

@@ -133,13 +133,14 @@ inline constexpr std::array<Color, bowling::powerCount> powerColors{{
     {223, 184, 108, 255}, {109, 209, 223, 255}, {154, 221, 112, 255},
     {249, 143, 63, 255}, {186, 151, 233, 255}, {235, 94, 97, 255}}};
 
-inline bool powerButton(int index, int stock, bool selected, bool enabled) {
+inline bool powerButton(Texture2D badge, int index, int stock, bool selected, bool enabled) {
     const float x = 78, y = 323 + index * 60.f;
     bool hover = enabled && !uiBlocked && CheckCollisionPointRec(GetMousePosition(), {18, y - 17, 120, 46});
-    const Color iconColor = stock ? powerColors[index] : Color{100, 110, 107, 255};
-    DrawCircle(x - 40, y + 2, 16, {0, 0, 0, 160});
-    DrawCircleGradient(x - 41, y, 15, selected || hover ? gold : iconColor, {37, 48, 55, 255});
-    arcadeCenter(std::to_string(index + 1), x - 41, y - 10, 19, stock ? cream : GRAY);
+    const Color iconColor = powerColors[index];
+    if (selected || hover)
+        DrawRing({x - 41, y}, 23, 26, 0, 360, 32, gold);
+    sprite(badge, {x - 64, y - 23, 46, 46}, stock ? WHITE : Color{165, 167, 174, 255});
+    arcadeCenter(std::to_string(index + 1), x - 58, y + 12, 15, cream);
     title(bowling::powerName(bowling::Power(index + 1)), x - 21, y - 11, 17,
           selected ? gold : stock ? cream : GRAY);
     text(std::to_string(stock), x - 21, y + 9, 12, iconColor);

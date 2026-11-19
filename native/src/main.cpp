@@ -120,6 +120,7 @@ int main(int argc, char **argv) {
     Art art;
     art.init();
     art.loadBallSkins();
+    art.loadBallparkArt();
     art.makeSigns();
     Texture2D titleArt =
         LoadTexture((std::string(GetApplicationDirectory()) + "assets/title-screen.png").c_str());
@@ -768,7 +769,11 @@ int main(int argc, char **argv) {
             if (turn == Turn::Reaction) {
                 title(result, 260, 245, 46, gold);
                 if (!rivalLine.empty())
-                    title(rivalLine, 264, 300, 25, cream);
+                {
+                    panel({240, 292, 535, 58});
+                    sprite(art.reactions[int(match.rival)], {211, 279, 75, 75});
+                    title(rivalLine, 293, 307, 24, cream);
+                }
             }
 
             if (celebration > 0)
@@ -782,6 +787,8 @@ int main(int argc, char **argv) {
             if (turn == Turn::Complete) {
                 DrawRectangle(0, 0, W, H, {0, 0, 0, 110});
                 panel({292, 187, 696, 458});
+                if (stadiumCue == StadiumCue::TropicanaUnlocked || !challengeMessage.empty())
+                    sprite(art.sunburst, {319, 211, 642, 287});
                 arcadeCenter(result, 640, 231, 39, {170, 255, 64, 255});
                 if (splitDrill) {
                     arcadeCenter("FENWAY 7-10 SPLIT", 640, 335, 35, cream);
@@ -853,7 +860,7 @@ int main(int argc, char **argv) {
             }
             {
                 for (int i = 0; i < powerCount; ++i)
-                    if (powerButton(i, match.stock[0][i], human && match.equipped == Power(i + 1),
+                    if (powerButton(art.badges[i], i, match.stock[0][i], human && match.equipped == Power(i + 1),
                                     enabled && !splitDrill && match.canEquip(Power(i + 1))))
                         match.equip(Power(i + 1));
             }

@@ -97,6 +97,11 @@ void main() {
         float edge=exp(-square((abs(world.x)-4.8)/.6));
         lit+=vec3(.03,.16,.22)*edge;
     }
+    if(woodMode==8) {
+        float blades=noise(vec3(world.x*12.0,0.,world.z*8.0));
+        lit*=.80+.24*broad+.18*blades;
+        lit+=vec3(.04,.025,.003)*smoothstep(.55,.88,blades);
+    }
     if(woodMode==2) {
         vec2 brick=vec2((abs(n.z)>.5?world.x:world.z)*1.25+floor(world.y*2.8)*.5,world.y*2.8);
         vec2 f=fract(brick);
