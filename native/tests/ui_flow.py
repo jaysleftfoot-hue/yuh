@@ -34,10 +34,12 @@ with log.open('w') as f:
  elif scenario=='scores':click(420,739)
  else:
   click(810 if scenario=='mascot' else 440,675)
+  if scenario=='setup':
+   for _ in range(3):key(0xff53)
   if scenario not in ['setup','locked']:
    if scenario=='keyboard':key(0xff0d)
    else:click(510,682)
-   if scenario=='equipment':key(ord('p'))
+   if scenario=='equipment':click(78,287)
    if scenario=='pause':key(0xff1b)
    if scenario=='keyboard':
     assert 'Shot phase:' not in log.read_text(), 'Setup key release advanced shot'

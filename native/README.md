@@ -4,6 +4,8 @@ C++17 + raylib 5.5 desktop prototype. The native work lost in the cloud refresh 
 
 ## Playable systems
 
+Use the arrows beside Player One in Ballpark Showdown to choose one of six portraits. Your career saves the selection. Choosing a stadium draws a home opponent from its current MLB player and club legend. Tropicana also fields Raymond. [Home roster and MLB sources](docs/HOME_RIVALS.md)
+
 - Stadium bowling against an AI rival with separate spot, curve and power phases.
 - Rookie, Pro, All-Star and Hall of Fame rivals in both modes. Click the AI label in Ballpark Showdown to cycle the difficulty. Pro is the default, and the selection carries into rematches.
 - The pin triangle and standing count follow the active rack in real time, including spare attempts and changes of player.

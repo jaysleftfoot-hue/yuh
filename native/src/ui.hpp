@@ -54,14 +54,16 @@ inline void modal(Rectangle r, const std::string &heading) {
     sprite(uiFrame, r);
     arcadeCenter(heading, r.x + r.width / 2, r.y + 66, 46, {170, 255, 64, 255});
 }
+inline void rosterPortrait(Texture2D portraits, int who, Rectangle rect) {
+    const float tile = portraits.width / 5.f;
+    DrawTexturePro(portraits, {(who % 5) * tile, (who / 5) * tile, tile, tile}, rect, {0, 0}, 0, WHITE);
+}
 inline void portraitCard(Texture2D portraits, int who, Rectangle r, const char *caption) {
     panel(r);
-    float w = portraits.width / 2.f, h = portraits.height / 2.f;
-    DrawTexturePro(portraits, {(who % 2) * w, (who / 2) * h, w, h},
-                   {r.x + 14, r.y + 42, r.width - 28, r.height - 92}, {0, 0}, 0, WHITE);
+    const float size = std::min(r.width - 28, r.height - 84);
+    rosterPortrait(portraits, who, {r.x + (r.width - size) / 2, r.y + 41, size, size});
     arcadeCenter(caption, r.x + r.width / 2, r.y + 16, 26, {170, 255, 64, 255});
-    const char *names[] = {"YOU", "SLUGGER", "UMPIRE", "BALL BOY"};
-    arcadeCenter(names[who], r.x + r.width / 2, r.y + r.height - 37, 23);
+    arcadeCenter(bowling::roster[who].name, r.x + r.width / 2, r.y + r.height - 37, 23);
 }
 // Incandescent stadium numerals. Pitch controls both the bulb and the spacing.
 inline void scoreboardLights(const std::string &value, float cx, float top, float pitch, Color lamp) {
@@ -84,7 +86,7 @@ inline void scoreboardLights(const std::string &value, float cx, float top, floa
         left += 6 * pitch;
     }
 }
-inline void baseballHud(Texture2D portraits, Texture2D pinGauge, int rival, const std::array<bool, 10> &standing) {
+inline void baseballHud(Texture2D portraits, Texture2D pinGauge, int player, int rival, const std::array<bool, 10> &standing) {
     // Painted turf/rock cornice connects the shallow slate scoreboards.
     DrawTexturePro(uiFrame, {0, 0, float(uiFrame.width), uiFrame.height * .135f}, {0, 58, 1280, 55},
                    {0, 0}, 0, WHITE);
@@ -103,18 +105,13 @@ inline void baseballHud(Texture2D portraits, Texture2D pinGauge, int rival, cons
         }
     arcadeCenter(std::to_string(std::count(standing.begin(), standing.end(), true)) + " STANDING", 640,
                  164, 19);
-    panel({8, 130, 145, 566}, {49, 64, 70, 255});
-    title("POWER UPS", 14, 274, 30, gold);
-    // Vector-style illustrated busts replace the primitive oval/rectangle faces.
-    const char *names[] = {"YOU", "SLUGGER", "UMPIRE", "BALL BOY"};
     for (int side = 0; side < 2; ++side) {
         float x = side ? 1206 : 80;
-        int who = side ? rival : 0;
+        int who = side ? rival : player;
         panel({x - 68, 128, 136, 138}, {54, 70, 76, 255});
-        float w = portraits.width / 2.f, h = portraits.height / 2.f;
-        DrawTexturePro(portraits, {(who % 2) * w, (who / 2) * h, w, h}, {x - 63, 130, 126, 119}, {0, 0},
-                       0, WHITE);
-        title(names[who], x - 42, 244, 20, cream);
+        rosterPortrait(portraits, who, {x - 56, 132, 112, 112});
+        const float size = std::min(20.f, 122.f * 20 / MeasureTextEx(arcadeFont, bowling::roster[who].name, 20, 1).x);
+        arcadeCenter(bowling::roster[who].name, x, 244, size, cream);
     }
 }
 inline void arcadeMeter(float x, float y, float power, Color c) {
@@ -147,22 +144,5 @@ inline bool plaqueButton(Rectangle r, const std::string &s, bool enabled = true)
     arcadeCenter(s, r.x + r.width / 2, r.y + (r.height - size) / 2 - 2, size, enabled ? cream : GRAY);
     if (hover)
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
-    return hover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
-}
-inline constexpr std::array<Color, bowling::powerCount> powerColors{{
-    {223, 184, 108, 255}, {109, 209, 223, 255}, {154, 221, 112, 255},
-    {249, 143, 63, 255}, {186, 151, 233, 255}, {235, 94, 97, 255}}};
-
-inline bool powerButton(Texture2D badge, int index, int stock, bool selected, bool enabled) {
-    const float x = 78, y = 323 + index * 60.f;
-    bool hover = enabled && !uiBlocked && CheckCollisionPointRec(GetMousePosition(), {18, y - 17, 120, 46});
-    const Color iconColor = powerColors[index];
-    if (selected || hover)
-        DrawRing({x - 41, y}, 23, 26, 0, 360, 32, gold);
-    sprite(badge, {x - 64, y - 23, 46, 46}, stock ? WHITE : Color{165, 167, 174, 255});
-    arcadeCenter(std::to_string(index + 1), x - 58, y + 12, 15, cream);
-    title(bowling::powerName(bowling::Power(index + 1)), x - 21, y - 11, 17,
-          selected ? gold : stock ? cream : GRAY);
-    text(std::to_string(stock), x - 21, y + 9, 12, iconColor);
     return hover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
 }

@@ -54,6 +54,7 @@ inline const ChallengeReward *ballChallenge(int ball) {
 }
 
 struct Profile {
+    int avatar = 0;
     int xp = 0, wins = 0, matches = 0, best = 0;
     unsigned cleared = 0, completedChallenges = 0;
     bool completed(Challenge challenge) const {
@@ -88,10 +89,12 @@ struct Profile {
         int version;
         Profile p;
         if (!(f >> magic >> version >> p.xp >> p.wins >> p.matches >> p.best >> p.cleared) ||
-            magic != "BLB" || (version != 1 && version != 2) || p.xp < 0 || p.xp > 100000000 || p.wins < 0 ||
+            magic != "BLB" || (version < 1 || version > 3) || p.xp < 0 || p.xp > 100000000 || p.wins < 0 ||
             p.matches < p.wins || p.best < 0 || p.best > 300 || p.cleared > 1023)
             return false;
-        if (version == 2 && (!(f >> p.completedChallenges) || p.completedChallenges > 7))
+        if (version >= 2 && (!(f >> p.completedChallenges) || p.completedChallenges > 7))
+            return false;
+        if (version == 3 && (!(f >> p.avatar) || p.avatar < 0 || p.avatar >= 6))
             return false;
         *this = p;
         return true;
@@ -100,8 +103,8 @@ struct Profile {
         auto temp = path + ".tmp";
         {
             std::ofstream f(temp);
-            if (!(f << "BLB 2 " << xp << ' ' << wins << ' ' << matches << ' ' << best << ' ' << cleared
-                    << ' ' << completedChallenges << '\n'))
+            if (!(f << "BLB 3 " << xp << ' ' << wins << ' ' << matches << ' ' << best << ' ' << cleared
+                    << ' ' << completedChallenges << ' ' << avatar << '\n'))
                 return false;
             f.flush();
             if (!f)
@@ -167,19 +170,40 @@ inline const char *difficultyName(RivalDifficulty difficulty) {
     return "PRO";
 }
 enum class RivalStyle { Slugger, Umpire, BallBoy };
-inline RivalStyle homeRival(int park) {
-    return static_cast<RivalStyle>(park % 3);
-}
-inline const char *rivalName(RivalStyle style) {
-    switch (style) {
-    case RivalStyle::Slugger: return "THE SLUGGER";
-    case RivalStyle::Umpire: return "THE UMPIRE";
-    case RivalStyle::BallBoy: return "THE BALL BOY";
+struct Bowler { const char *name; RivalStyle style; };
+inline constexpr std::array<Bowler, 25> roster{{
+    {"Evan Longoria", RivalStyle::Slugger},
+    {"Carl Crawford", RivalStyle::BallBoy},
+    {"David Price", RivalStyle::Umpire},
+    {"Raymond", RivalStyle::BallBoy},
+    {"DJ Kitty", RivalStyle::BallBoy},
+    {"Rookie Catcher", RivalStyle::Umpire},
+    {"Pete Crow-Armstrong", RivalStyle::BallBoy},
+    {"Roman Anthony", RivalStyle::Slugger},
+    {"Logan Webb", RivalStyle::Umpire},
+    {"Paul Skenes", RivalStyle::Umpire},
+    {"Ezequiel Tovar", RivalStyle::BallBoy},
+    {"Bobby Witt Jr.", RivalStyle::BallBoy},
+    {"Corbin Carroll", RivalStyle::BallBoy},
+    {"Julio Rodriguez", RivalStyle::Slugger},
+    {"Aaron Judge", RivalStyle::Slugger},
+    {"Ernie Banks", RivalStyle::Slugger},
+    {"David Ortiz", RivalStyle::Slugger},
+    {"Willie Mays", RivalStyle::Slugger},
+    {"Roberto Clemente", RivalStyle::BallBoy},
+    {"Todd Helton", RivalStyle::Slugger},
+    {"George Brett", RivalStyle::Umpire},
+    {"Randy Johnson", RivalStyle::Umpire},
+    {"Ken Griffey Jr.", RivalStyle::Slugger},
+    {"Derek Jeter", RivalStyle::Umpire},
+    {"Junior Caminero", RivalStyle::Slugger},
+}};
+inline int drawHomeRival(int park, std::mt19937 &rng) {
+    if (park == 9) {
+        constexpr int tropicana[] = {24, 0, 3}; // Caminero, Longoria and Raymond.
+        return tropicana[std::uniform_int_distribution<int>(0, 2)(rng)];
     }
-    return "THE RIVAL";
-}
-inline int rivalPortrait(RivalStyle style) {
-    return 1 + int(style);
+    return 6 + park + 9 * std::uniform_int_distribution<int>(0, 1)(rng);
 }
 struct RollResult {
     int knocked;

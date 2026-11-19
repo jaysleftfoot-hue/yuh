@@ -126,9 +126,9 @@ int main(int argc, char **argv) {
     GenTextureMipmaps(&titleArt);
     SetTextureFilter(titleArt, TEXTURE_FILTER_TRILINEAR);
     Texture2D portraits =
-        LoadTexture((std::string(GetApplicationDirectory()) + "assets/baseball-portraits.png").c_str());
+        LoadTexture((std::string(GetApplicationDirectory()) + "assets/ballpark-roster.jpg").c_str());
     if (!portraits.id)
-        throw std::runtime_error("Missing baseball-portraits.png");
+        throw std::runtime_error("Missing ballpark-roster.jpg");
     GenTextureMipmaps(&portraits);
     SetTextureFilter(portraits, TEXTURE_FILTER_TRILINEAR);
     auto uiTexture = [](const char *name) {
@@ -174,11 +174,13 @@ int main(int argc, char **argv) {
     Screen screen = startInGame || smoke ? Screen::Lane : Screen::Title;
     Screen lockerReturn = Screen::Title;
     int arena = previewArena < 0 ? 0 : previewArena;
+    std::mt19937 rosterRng(smoke || !screenshot.empty() ? 391u : std::random_device{}());
+    int opponent = drawHomeRival(arena, rosterRng);
     int skin = 0, rolls = 0, ticks = 0, selectedSkin = 0;
     float time = 0, accum = 0, reaction = 0, chargeTime = 0, aiWait = .9f, celebration = 0;
     Vector2 dragStart{};
     bool mouseCharge = false, stadiumArmed = false;
-    bool equipmentOpen = false;
+    bool equipmentOpen = false, avatarSaveFailed = false;
     bool paused = false, charge = false, done = false, ok = false, awarded = false;
     std::string result = "WELCOME TO THE TOUR", reward;
     Camera3D camera{{0, 3.0f, -6.2f}, {0, 1.7f, 23}, {0, 1, 0}, 43, CAMERA_PERSPECTIVE};
@@ -210,7 +212,7 @@ int main(int argc, char **argv) {
         match = Match{};
         match.mascot = mode;
         match.stage = arena;
-        match.rival = homeRival(arena);
+        match.rival = roster[opponent].style;
         if (splitDrill)
             setSevenTenRack(match.lanes[0]);
         for (auto &bowlerPickups : pickups)
@@ -598,11 +600,13 @@ int main(int argc, char **argv) {
             title("WELCOME TO THE BIG LEAGUES!", 565, 16, 20, cream);
             if (button({282, 650, 320, 52}, "SINGLE PLAYER", true) || IsKeyPressed(KEY_ENTER)) {
                 match.mascot = false;
+                opponent = drawHomeRival(arena, rosterRng);
                 screen = Screen::Setup;
                 audio.play(audio.click);
             }
             if (button({660, 650, 320, 52}, "MASCOT ADVENTURE", true)) {
                 match.mascot = true;
+                opponent = drawHomeRival(arena, rosterRng);
                 screen = Screen::Setup;
                 audio.play(audio.click);
             }
@@ -623,7 +627,7 @@ int main(int argc, char **argv) {
         } else if (screen == Screen::Scores || screen == Screen::Help) {
             modal({184, 35, 912, 730}, screen == Screen::Scores ? "HALL OF FAME" : "HOW TO BOWL");
             if (screen == Screen::Scores) {
-                portraitCard(portraits, 0, {290, 242, 200, 270}, "THE BIG LEAGUER");
+                portraitCard(portraits, profile.avatar, {290, 242, 200, 270}, "THE BIG LEAGUER");
                 arcadeCenter(std::to_string(profile.wins) + " WINS  /  " +
                                  std::to_string(profile.matches) + " GAMES",
                              770, 267, 32);
@@ -657,13 +661,24 @@ int main(int argc, char **argv) {
             panel({486, 154, 308, 180});
             DrawTexturePro(scene.texture, {0, 0, float(W), -float(H)}, {502, 172, 276, 143}, {0, 0}, 0,
                            WHITE);
-            if (button({425, 211, 54, 58}, "<"))
-                arena = (arena + 9) % 10;
-            if (button({801, 211, 54, 58}, ">"))
-                arena = (arena + 1) % 10;
+            int parkStep = 0;
+            if (button({425, 211, 54, 58}, "<")) parkStep = -1;
+            if (button({801, 211, 54, 58}, ">")) parkStep = 1;
+            if (parkStep) {
+                arena = (arena + parkStep + 10) % 10;
+                opponent = drawHomeRival(arena, rosterRng);
+            }
+            int step = 0;
+            if (button({225, 430, 48, 66}, "<") || IsKeyPressed(KEY_LEFT)) step = -1;
+            if (button({489, 430, 43, 66}, ">") || IsKeyPressed(KEY_RIGHT)) step = 1;
+            if (step) {
+                profile.avatar = (profile.avatar + step + 6) % 6;
+                avatarSaveFailed = !saveCareer();
+                audio.play(audio.click);
+            }
             arcadeCenter(arenas[arena].name, 640, 341, 28);
-            portraitCard(portraits, 0, {275, 343, 212, 246}, "PLAYER ONE");
-            portraitCard(portraits, rivalPortrait(homeRival(arena)), {793, 343, 212, 246}, "HOME RIVAL");
+            portraitCard(portraits, profile.avatar, {275, 343, 212, 246}, "PLAYER ONE");
+            portraitCard(portraits, opponent, {793, 343, 212, 246}, "HOME RIVAL");
             arcadeCenter("VS", 640, 387, 76, {170, 255, 64, 255});
             if (plaqueButton({495, 487, 290, 68}, match.mascot ? "MASCOT RIDE" : "STADIUM BOWLING"))
                 match.mascot = !match.mascot;
@@ -680,7 +695,7 @@ int main(int argc, char **argv) {
                 hint = "THREE TOKENS IN ONE RIDE EARNS TOUCH TANK";
             else if (!match.mascot && arena == 0 && !profile.completed(Challenge::WrigleyWin))
                 hint = "BEAT THE HOME RIVAL TO EARN IVY LEAGUE CUB";
-            arcadeCenter(hint, 640, 608, 24, unlocked ? cream : gold);
+            arcadeCenter(avatarSaveFailed ? "AVATAR SAVE FAILED" : hint, 640, 608, 24, unlocked ? cream : gold);
             if (plaqueButton({395, 650, 226, 65}, unlocked ? "START" : "LOCKED", unlocked) ||
                 (IsKeyPressed(KEY_ENTER) && unlocked)) {
                 screen = Screen::Lane;
@@ -753,9 +768,9 @@ int main(int argc, char **argv) {
             if (plaqueButton({891, 657, 216, 64}, "BACK"))
                 screen = lockerReturn;
         } else {
-            baseballHud(portraits, art.pinGauge, rivalPortrait(match.rival), view.standingPins());
+            baseballHud(portraits, art.pinGauge, profile.avatar, opponent, view.standingPins());
             scoreRail(match.games[0], art.scoreRails[0], false, "YOU", match.player == 0, gold);
-            scoreRail(match.games[1], art.scoreRails[1], true, rivalName(match.rival), match.player == 1,
+            scoreRail(match.games[1], art.scoreRails[1], true, roster[opponent].name, match.player == 1,
                       {142, 232, 220, 255});
             title(splitDrill ? "FENWAY 7-10 DRILL" : match.mascot ? "RAYS ADVENTURE" : arenas[arena].name,
                   184, 122, 20, cream);
@@ -781,7 +796,7 @@ int main(int argc, char **argv) {
                 if (!rivalLine.empty())
                 {
                     panel({240, 292, 535, 58});
-                    sprite(art.reactions[int(match.rival)], {211, 279, 75, 75});
+                    rosterPortrait(portraits, opponent, {211, 279, 75, 75});
                     title(rivalLine, 293, 307, 24, cream);
                 }
             }
@@ -793,7 +808,6 @@ int main(int argc, char **argv) {
                                   int(280 + std::cos(i * 3.f) * phase * 240 + phase * phase * 90), 7, 5,
                                   i % 2 ? gold : aqua);
                 }
-            bool enabled = turn == Turn::Ready && match.player == 0 && !paused;
             if (turn == Turn::Complete) {
                 DrawRectangle(0, 0, W, H, {0, 0, 0, 110});
                 panel({292, 187, 696, 458});
@@ -805,7 +819,7 @@ int main(int argc, char **argv) {
                     arcadeCenter(reward, 640, 405, 24, gold);
                 } else {
                     const int winner = scoreTotal(match.games[0]) >= scoreTotal(match.games[1])
-                                           ? 0 : rivalPortrait(match.rival);
+                                           ? profile.avatar : opponent;
                     portraitCard(portraits, winner, {548, 280, 184, 200}, "TOP BOWLER");
                     center(reward, 640, 506, std::min(18.f, 600.f * 18 / std::max(1.f, tw(reward, 18))), cream);
                     if (!rivalLine.empty())
@@ -868,14 +882,8 @@ int main(int argc, char **argv) {
                     arcadeCenter(std::to_string(int(shot.power * 100)) + "%", 1045, 559, 26, gold);
                 }
             }
-            {
-                for (int i = 0; i < powerCount; ++i)
-                    if (powerButton(art.badges[i], i, match.stock[0][i], human && match.equipped == Power(i + 1),
-                                    enabled && !splitDrill && match.canEquip(Power(i + 1))))
-                        match.equip(Power(i + 1));
-            }
         }
-        if (canBrowse && button({11, 653, 137, 42}, "GEAR CASE [P]")) {
+        if (canBrowse && plaqueButton({6, 265, 150, 47}, "GEAR CASE [P]")) {
             equipmentOpen = true;
             charge = stadiumArmed = false;
         }

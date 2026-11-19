@@ -58,10 +58,19 @@ int main() {
     auto path = (std::filesystem::temp_directory_path() / "blb-campaign-test.txt").string();
     require(p.save(path), "save");
     Profile restored;
+    std::mt19937 rosterRng(54);
+    for (int park = 0; park < 10; ++park) {
+        std::array<bool, roster.size()> seen{};
+        for (int draw = 0; draw < 160; ++draw) seen.at(drawHomeRival(park, rosterRng)) = true;
+        require(park == 9 ? seen[0] && seen[3] && seen[24] : seen[6+park] && seen[15+park],
+                "home roster includes both eras and Raymond at Tropicana");
+        require(std::count(seen.begin(), seen.end(), true) == (park == 9 ? 3 : 2), "home roster only");
+    }
     require(restored.load(path) && restored.xp == p.xp && restored.cleared == p.cleared &&
                 restored.completed(Challenge::WrigleyWin), "restore challenge profile");
     p.xp += 80;
-    require(p.save(path) && restored.load(path) && restored.xp == p.xp, "save replacement");
+    p.avatar = 4;
+    require(p.save(path) && restored.load(path) && restored.avatar == 4 && restored.xp == p.xp, "save replacement");
     {
         std::ofstream f(path);
         f << "BLB 1 80 1 2 100 1";

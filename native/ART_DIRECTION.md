@@ -6,7 +6,7 @@ Stadium shot order is explicitly **Spot → Curve → Power**. Confirm each stag
 
 Preserve native/src/lane_geometry.hpp during graphics work: width 10, foul line 2, head pin 162, run 160. Full power reaches the rack in about 3.5 seconds. Camera presets and regression bounds stay fixed; never shrink the lane to fit new art. See PROPORTIONS.md. Decoration transforms exclude playable lane/ball/rack.
 
-Stadium mode takes place on the field inside the selected baseball stadium. Keep actual sourced stadium/team marks, scoreboards and park landmarks. Mascot mode is a separate Rays fantasy course; the mascot is a continuous three-dimensional ray mesh with swept fins, ivory underside, expressive face and tube, not a sprite. HUD and versus rivals use the baseball-portraits.png atlas (cap player, helmet batter, umpire, ball boy), never primitive object-based faces.
+Stadium mode takes place on the field inside the selected baseball stadium. Keep actual sourced stadium/team marks, scoreboards and park landmarks. Mascot mode is a separate Rays fantasy course; the mascot is a continuous three-dimensional ray mesh with swept fins, ivory underside, expressive face and tube, not a sprite. HUD and versus rivals use the illustrated ballpark-roster.jpg atlas (six player choices and stadium-specific opponents), never primitive object-based faces.
 
 Keep all 64 ball unlocks (30 team, 30 fun, 4 Rays), ten stadiums ending with Tropicana, AI, powers and profile persistence. Commit/push/verify finished work per AGENTS.md. Windows runtime still requires testing on Windows.
 
