@@ -1,3 +1,7 @@
+# Current milestone
+
+Ballpark challenges, home-rival styles, pin-deck replays, Tropicana events, mascot motion and six randomized power-ups are implemented in C++. See [Astra art handoff](native/docs/ASTRA_HANDOFF.md) for the playable scenes, render hooks and planned visual work.
+
 The 64-ball locker now ships separate club logo, illustrated club, and Rays special wraps. The supplied MLB reference kit guides marks and themes. Left/right arrows rotate the selected locker preview. The existing unlock slots and XP thresholds still apply.
 
 Current character assets are the textured GLBs in native/assets/models. Editable geometry and paint live in native/art. The ready and impact previews are native/docs/ray-model.png and native/docs/pin-model.png.

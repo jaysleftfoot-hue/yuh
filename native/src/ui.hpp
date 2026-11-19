@@ -1,4 +1,5 @@
 #pragma once
+#include "campaign.hpp"
 #include "raylib.h"
 #include <algorithm>
 #include <array>
@@ -128,29 +129,19 @@ inline bool plaqueButton(Rectangle r, const std::string &s, bool enabled = true)
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
     return hover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
 }
+inline constexpr std::array<Color, bowling::powerCount> powerColors{{
+    {223, 184, 108, 255}, {109, 209, 223, 255}, {154, 221, 112, 255},
+    {249, 143, 63, 255}, {186, 151, 233, 255}, {235, 94, 97, 255}}};
+
 inline bool powerButton(int index, int stock, bool selected, bool enabled) {
-    float x = 79, y = 350 + index * 104.f;
-    bool hover = enabled && !uiBlocked && CheckCollisionPointCircle(GetMousePosition(), {x, y}, 40);
-    DrawCircle(x + 3, y + 5, 39, {0, 0, 0, 150});
-    DrawCircleGradient(x, y, 39, selected ? gold : Color{167, 179, 180, 255}, {37, 48, 55, 255});
-    DrawCircleGradient(x, y, 31, hover ? Color{80, 161, 176, 255} : Color{34, 74, 89, 255},
-                       {8, 23, 36, 255});
-    Color c = enabled ? cream : GRAY;
-    if (index == 0) {
-        DrawCircleGradient(x, y, 20, c, {104, 99, 82, 255});
-        for (int i = 0; i < 3; ++i)
-            DrawCircle(x - 7 + i * 6, y - 7 + (i % 2) * 5, 3, ink);
-    } else if (index == 1) {
-        DrawRing({x, y - 4}, 12, 20, 0, 180, 24, c);
-        DrawRectangle(x - 20, y - 19, 8, 17, red);
-        DrawRectangle(x + 12, y - 19, 8, 17, aqua);
-    } else {
-        DrawLineEx({x - 17, y - 19}, {x - 17, y + 19}, 7, c);
-        DrawLineEx({x + 17, y - 19}, {x + 17, y + 19}, 7, c);
-        DrawCircle(x, y, 9, gold);
-    }
-    const char *names[] = {"HEAVY", "MAGNET", "BUMPERS"};
-    center(std::string(names[index]) + "  " + std::to_string(stock), x, y + 43, 13, c);
-    center(std::to_string(index + 1), x - 34, y - 39, 14, gold);
+    const float x = 78, y = 323 + index * 60.f;
+    bool hover = enabled && !uiBlocked && CheckCollisionPointRec(GetMousePosition(), {18, y - 17, 120, 46});
+    const Color iconColor = stock ? powerColors[index] : Color{100, 110, 107, 255};
+    DrawCircle(x - 40, y + 2, 16, {0, 0, 0, 160});
+    DrawCircleGradient(x - 41, y, 15, selected || hover ? gold : iconColor, {37, 48, 55, 255});
+    arcadeCenter(std::to_string(index + 1), x - 41, y - 10, 19, stock ? cream : GRAY);
+    title(bowling::powerName(bowling::Power(index + 1)), x - 21, y - 11, 17,
+          selected ? gold : stock ? cream : GRAY);
+    text(std::to_string(stock), x - 21, y + 9, 12, iconColor);
     return hover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
 }

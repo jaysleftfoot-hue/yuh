@@ -7,7 +7,7 @@
 using namespace bowling;
 constexpr int W = 1280, H = 800;
 enum class Screen { Title, Lane, Locker, Setup, Scores, Help };
-enum class Turn { Ready, Rolling, Reaction, Complete };
+enum class Turn { Ready, Rolling, Reaction, Complete, Replay };
 std::string marks(const std::vector<int> &r, int f) {
     std::string s;
     for (size_t j = 0; j < r.size(); ++j) {
@@ -49,6 +49,7 @@ void scoreCard(const Game &g, float x, const char *who) {
 }
 int main(int argc, char **argv) {
     bool smoke = false, startInGame = false, smokeMascot = false, demoShot = false;
+    bool demoStrike = false, splitPreview = false;
     int captureFrame = 90;
     int previewArena = -1;
     RivalDifficulty selectedDifficulty = RivalDifficulty::Pro;
@@ -57,6 +58,10 @@ int main(int argc, char **argv) {
         std::string a = argv[i];
         if (a == "--demo-shot")
             demoShot = true;
+        if (a == "--demo-strike")
+            demoShot = demoStrike = true;
+        if (a == "--preview-split")
+            splitPreview = true;
         if (a == "--capture-frame" && i + 1 < argc)
             captureFrame = std::clamp(std::atoi(argv[++i]), 1, 3600);
         if (a == "--smoke")
@@ -85,6 +90,11 @@ int main(int argc, char **argv) {
         if (a == "--screenshot" && i + 1 < argc)
             screenshot = argv[++i];
     }
+    if (splitPreview) {
+        previewArena = 1;
+        startInGame = true;
+        smokeMascot = smoke = false;
+    }
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(W, H, "Big League Bowling - Ballpark Tour");
     if (!IsWindowReady())
@@ -104,6 +114,7 @@ int main(int argc, char **argv) {
     RenderTexture2D scene = LoadRenderTexture(W, H);
     Shader antialias =
         LoadShader(nullptr, (std::string(GetApplicationDirectory()) + "assets/antialias.fs").c_str());
+    RenderTexture2D replayFeed = LoadRenderTexture(512, 288);
     RenderTexture2D target = LoadRenderTexture(W, H);
     SetTextureFilter(target.texture, TEXTURE_FILTER_BILINEAR);
     Art art;
@@ -152,6 +163,15 @@ int main(int argc, char **argv) {
     match.mascot = smokeMascot;
     Shot shot;
     StadiumSetup stadiumSetup;
+    PinReplay replay;
+    MascotMotion mascotMotion;
+    MascotTokens tokens;
+    PowerPickups pickups;
+    StadiumCue stadiumCue = StadiumCue::None;
+    float cueSeconds = 0, pickupSeconds = 0;
+    std::string pickupMessage, challengeMessage, rivalLine;
+    bool splitDrill = splitPreview;
+    std::mt19937 pickupRng(smoke || !screenshot.empty() ? 271u : std::random_device{}());
     Turn turn = Turn::Ready;
     Screen screen = startInGame || smoke ? Screen::Lane : Screen::Title;
     Screen lockerReturn = Screen::Title;
@@ -168,11 +188,41 @@ int main(int argc, char **argv) {
         stadiumSetup.reset();
         stadiumArmed = false;
     };
+    auto saveCareer = [&]() {
+        return smoke || !screenshot.empty() || previewArena >= 0 || profile.save(save);
+    };
+    auto completeChallenge = [&](Challenge challenge) {
+        if (!profile.finish(challenge))
+            return;
+        for (const auto &item : challenges)
+            if (item.challenge == challenge)
+                challengeMessage = "CHALLENGE COMPLETE | " + ballName(item.ball) + " UNLOCKED";
+        if (!saveCareer())
+            challengeMessage += " | SAVE FAILED";
+    };
+    auto preparePickups = [&]() {
+        tokens = {};
+        if (!splitDrill)
+            pickups.spawn(pickupRng);
+        else
+            pickups.items.clear();
+        pickupSeconds = 0;
+    };
     auto restart = [&]() {
         bool mode = match.mascot;
         match = Match{};
         match.mascot = mode;
         match.stage = arena;
+        match.rival = homeRival(arena);
+        if (splitDrill)
+            setSevenTenRack(match.lanes[0]);
+        preparePickups();
+        mascotMotion = {};
+        replay.reset();
+        stadiumCue = StadiumCue::None;
+        cueSeconds = 0;
+        challengeMessage.clear();
+        rivalLine.clear();
         match.difficulty = selectedDifficulty;
         rolls = 0;
         celebration = accum = 0;
@@ -189,7 +239,11 @@ int main(int argc, char **argv) {
     int lastLoggedScreen = -1;
     auto launch = [&]() {
         if (turn == Turn::Ready && !paused) {
+            replay.reset();
+            if (match.mascot)
+                mascotMotion.release();
             match.launch(shot);
+            rivalLine.clear();
             turn = Turn::Rolling;
             charge = false;
             audio.play(audio.bowl);
@@ -212,8 +266,13 @@ int main(int argc, char **argv) {
         float dt = smoke ? 1.f / 15 : !screenshot.empty() ? 1.f / 60 : std::min(GetFrameTime(), .25f);
         time += dt;
         ++ticks;
-        if (demoShot && ticks == 30 && screen == Screen::Lane)
+        if (demoShot && ticks == 30 && screen == Screen::Lane) {
+            if (splitDrill)
+                shot = {2.f, 0.f, 1.f, 0.f};
+            else if (demoStrike)
+                shot = {4.5f, 0.f, .72f, 0.f};
             launch();
+        }
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
         float scale = std::min(GetScreenWidth() / float(W), GetScreenHeight() / float(H));
         Vector2 offset{(GetScreenWidth() - W * scale) / 2, (GetScreenHeight() - H * scale) / 2};
@@ -305,13 +364,16 @@ int main(int argc, char **argv) {
                             if (!mouseCharge)
                                 shot.power = heldPower(chargeTime);
                         }
+                        mascotMotion.aim(charge ? std::clamp((shot.power - .15f) / .85f, 0.f, 1.f) : 0.f,
+                                         charge ? shot.aim : 0.f);
                         if (charge && ((!mouseCharge && IsKeyReleased(KEY_SPACE)) ||
                                        (mouseCharge && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))))
                             launch();
                     }
-                    for (int i = 0; i < 3; ++i)
-                        if (IsKeyPressed(KEY_ONE + i))
-                            match.equip(Power(i + 1));
+                    if (!splitDrill)
+                        for (int i = 0; i < powerCount; ++i)
+                            if (IsKeyPressed(KEY_ONE + i))
+                                match.equip(Power(i + 1));
                 }
             }
             if (turn == Turn::Rolling && match.mascot) {
@@ -332,51 +394,126 @@ int main(int argc, char **argv) {
                     match.boost();
             }
             accum += dt;
-            while (accum >= 1.f / 120) {
-                int impacts = sim.impacts;
-                if (turn == Turn::Rolling && match.step(1.f / 120)) {
-                    turn = Turn::Reaction;
-                    reaction = smoke ? .1f : 1.4f;
-                    int n = sim.knocked();
-                    result = n == 10  ? "STRIKE! OUT OF THE PARK!"
-                             : n == 0 ? "JUST A BIT OUTSIDE!"
-                                      : std::to_string(n) + " PINS DOWN!";
-                    if (n >= 7) {
-                        celebration = 2;
-                        audio.play(audio.cheer);
+            while (turn == Turn::Rolling && accum >= 1.f / 120) {
+                constexpr float step = 1.f / 120;
+                const Body before = sim.ball;
+                const int impacts = sim.impacts;
+                const bool finished = match.step(step);
+                if (match.mascot) {
+                    mascotMotion.update(step, sim);
+                    if (human && !profile.completed(Challenge::MascotPickups)) {
+                        tokens.sweep(before, sim);
+                        if (tokens.count == int(tokens.layout.size()))
+                            completeChallenge(Challenge::MascotPickups);
                     }
                 }
+                if (Power picked = pickups.sweep(before, match); picked != Power::None && human) {
+                    pickupMessage = std::string(powerName(picked)) + " PICKED UP";
+                    pickupSeconds = 1.6f;
+                }
+                if (!smoke)
+                    replay.record(sim, finished);
                 if (sim.impacts > impacts)
                     audio.play(audio.hit);
-                accum -= 1.f / 120;
+                accum -= step;
+                if (!finished)
+                    continue;
+
+                const auto roll = match.outcome();
+                const auto cue = strikeCue(arena, match.mascot, match.strikeStreak[match.player], roll);
+                if (cue != StadiumCue::None) {
+                    stadiumCue = cue;
+                    cueSeconds = 4.f;
+                }
+                result = cue == StadiumCue::Turkey ? "TURKEY! RAYS UP!"
+                         : roll.strike ? "STRIKE! OUT OF THE PARK!"
+                         : roll.split ? "7-10 SPLIT CONVERTED!"
+                         : roll.spare ? "SPARE!"
+                         : roll.knocked == 0 ? "JUST A BIT OUTSIDE!"
+                                             : std::to_string(roll.knocked) + " PINS DOWN!";
+                if (human && !match.mascot && arena == 1 && roll.split)
+                    completeChallenge(Challenge::FenwaySplit);
+                if (!splitDrill)
+                    rivalLine = rivalReaction(match.rival, roll, human);
+                if (roll.knocked >= 7 || roll.split) {
+                    celebration = 2;
+                    audio.play(audio.cheer);
+                }
+                if (replay.available(roll))
+                    turn = Turn::Replay;
+                else {
+                    turn = Turn::Reaction;
+                    reaction = smoke ? .1f : 1.4f;
+                }
+            }
+            if (turn != Turn::Rolling)
+                accum = 0;
+            if (turn == Turn::Replay) {
+                replay.seconds += dt;
+                const Rectangle replaySkip{500, 716, 280, 58};
+                if (replay.finished() || IsKeyReleased(KEY_SPACE) || IsKeyReleased(KEY_ENTER) ||
+                    (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) &&
+                     CheckCollisionPointRec(GetMousePosition(), replaySkip))) {
+                    turn = Turn::Reaction;
+                    reaction = .65f;
+                }
             }
             if (turn == Turn::Reaction) {
                 reaction -= dt;
                 if (reaction <= 0) {
-                    match.settle();
                     ++rolls;
-                    turn = match.complete() ? Turn::Complete : Turn::Ready;
-                    aiWait = smoke ? 0 : .9f;
-                    resetShot();
+                    if (splitDrill) {
+                        turn = Turn::Complete;
+                    } else {
+                        match.settle();
+                        turn = match.complete() ? Turn::Complete : Turn::Ready;
+                        aiWait = smoke ? 0 : .9f;
+                        resetShot();
+                        mascotMotion = {};
+                        preparePickups();
+                    }
                 }
             }
             if (turn == Turn::Complete && !awarded) {
-                int yours = *match.games[0].scores()[9], theirs = *match.games[1].scores()[9];
-                result = yours > theirs    ? "YOU WIN!"
-                         : yours == theirs ? "A TIE! REMATCH?"
-                                           : "RIVAL WINS - KEEP SWINGING!";
-                int old = profile.balls(), oldA = profile.stadiums();
-                int xp = profile.award(yours, theirs, arena);
-                reward = "+" + std::to_string(xp) + " XP | " + std::to_string(profile.balls()) +
-                         " / 64 BALLS";
-                if (profile.balls() > old)
-                    reward += " | NEW BALLS!";
-                if (profile.stadiums() > oldA)
-                    reward += " | NEXT STADIUM OPEN!";
-                if (!smoke && screenshot.empty() && previewArena < 0 && !profile.save(save))
-                    reward += " | SAVE FAILED";
+                if (!splitDrill) {
+                    int yours = scoreTotal(match.games[0]), theirs = scoreTotal(match.games[1]);
+                    result = yours > theirs    ? "YOU WIN!"
+                             : yours == theirs ? "A TIE! REMATCH?"
+                                               : "RIVAL WINS - KEEP SWINGING!";
+                    int old = profile.balls(), oldA = profile.stadiums();
+                    int xp = profile.award(yours, theirs, arena);
+                    if (!match.mascot && arena == 0 && yours > theirs)
+                        completeChallenge(Challenge::WrigleyWin);
+                    reward = "+" + std::to_string(xp) + " XP | " + std::to_string(profile.balls()) +
+                             " / 64 BALLS";
+                    if (profile.balls() > old)
+                        reward += " | NEW BALLS!";
+                    if (profile.stadiums() > oldA) {
+                        if (profile.stadiums() == 10) {
+                            stadiumCue = StadiumCue::TropicanaUnlocked;
+                            cueSeconds = 5.f;
+                        } else
+                            reward += " | NEXT STADIUM OPEN!";
+                    }
+                    if (closeFinish(yours, theirs)) {
+                        constexpr const char *closeLines[] = {"THAT WENT RIGHT TO THE WIRE.",
+                                                               "CLOSE CALL. LET'S GO AGAIN.",
+                                                               "I WAS HOLDING MY BREATH!"};
+                        rivalLine = closeLines[int(match.rival)];
+                    } else
+                        rivalLine.clear();
+                    if (!saveCareer())
+                        reward += " | SAVE FAILED";
+                } else {
+                    reward = match.outcome().split ? "FENWAY CHALLENGE COMPLETE" : "TRY A FIRM SHOT ON THE INSIDE EDGE";
+                }
                 awarded = true;
             }
+            pickupSeconds = std::max(0.f, pickupSeconds - dt);
+            if (turn != Turn::Replay)
+                cueSeconds = std::max(0.f, cueSeconds - dt);
+            if (cueSeconds == 0 && stadiumCue == StadiumCue::Turkey)
+                stadiumCue = StadiumCue::None;
         }
         audio.update();
         celebration = std::max(0.f, celebration - dt);
@@ -385,11 +522,26 @@ int main(int argc, char **argv) {
         art.arena = arena;
         art.skin = skin;
         art.mascot = match.mascot;
-        art.slingPower = charge ? shot.power : 0;
-        art.updateScoreboard(match);
+        art.mascotPose = mascotMotion.pose;
+        art.powerPickups = &pickups;
+        art.mascotTokens = match.mascot && match.player == 0 &&
+                           !profile.completed(Challenge::MascotPickups) ? &tokens : nullptr;
+        art.cue = screen == Screen::Lane ? stadiumCue : StadiumCue::None;
+        art.cueSeconds = cueSeconds;
+        const bool replaying = screen == Screen::Lane && turn == Turn::Replay;
+        if (replaying) {
+            // Use a deck-only render for the stadium board to avoid video feedback.
+            const Camera3D boardCamera{{-7, 6, geometry::headPin - 10}, {0, 1, geometry::headPin + 2},
+                                       {0, 1, 0}, 44, CAMERA_PERSPECTIVE};
+            BeginTextureMode(replayFeed);
+            ClearBackground({12, 30, 39, 255});
+            art.world(replay.view(), shot, false, arenas[arena].team, boardCamera, replay.seconds, true);
+            EndTextureMode();
+        }
+        art.updateScoreboard(match, paused ? 0.f : dt, replaying ? &replayFeed.texture : nullptr);
         const auto cameraStyle = match.mascot ? geometry::mascotCamera : geometry::stadiumCamera;
         camera.fovy = cameraStyle.fov;
-        const auto &view = match.lanes[match.player];
+        const auto &view = replaying ? replay.view() : match.lanes[match.player];
         Vector3 desired{geometry::renderX(shot.position) * .25f, cameraStyle.height, cameraStyle.back},
             look{0, cameraStyle.targetHeight, geometry::headPin};
         if (screen != Screen::Lane) {
@@ -402,7 +554,11 @@ int main(int argc, char **argv) {
             look = {std::clamp(geometry::renderX(view.ball.x) * .3f, -1.5f, 1.5f),
                     match.mascot ? 1.5f : .9f, z + 12};
         }
-        if (screen == Screen::Lane && turn == Turn::Ready) {
+        if (replaying) {
+            desired = {-9, 5.4f, geometry::headPin - 13};
+            look = {1.f, 3.f, geometry::headPin + 7};
+        }
+        if (screen == Screen::Lane && (turn == Turn::Ready || replaying)) {
             camera.position = desired;
             camera.target = look;
         }
@@ -415,7 +571,7 @@ int main(int argc, char **argv) {
         DrawRectangleGradientV(0, 0, W, 550, {17, 39, 75, 255}, {140, 182, 193, 255});
         if (screen == Screen::Lane || screen == Screen::Setup)
             art.world(view, shot, turn == Turn::Ready && screen == Screen::Lane, arenas[arena].team,
-                      camera, time);
+                      camera, replaying ? replay.seconds : time);
         EndTextureMode();
         BeginTextureMode(target);
         ClearBackground(BLACK);
@@ -476,8 +632,12 @@ int main(int argc, char **argv) {
                 arcadeCenter("MASCOT: GRAB THE TUBE AND PULL BACK", 640, 450, 30, gold);
                 arcadeCenter("PULL SIDEWAYS TO AIM. RELEASE TO LAUNCH.", 640, 493, 25);
                 arcadeCenter("A / D OR ARROWS: STEER. SPACE: BOOST.", 640, 533, 25);
-                center("1 / 2 / 3: power-ups   |   Escape: pause   |   M: sound   |   F11: fullscreen",
-                       640, 589, 16, cream);
+                center("Collect lane pickups. Press 1–6 to equip one before your next shot.",
+                       640, 571, 16, cream);
+                center("Fastball: faster shot   |   Changeup: smaller rival ball   |   Wild Pitch: rival drift",
+                       640, 596, 14, cream);
+                center("Space: skip replay   |   Escape: pause   |   M: sound   |   F11: fullscreen",
+                       640, 619, 16, cream);
             }
             if (plaqueButton({516, 650, 248, 64}, "BACK"))
                 screen = Screen::Title;
@@ -493,7 +653,7 @@ int main(int argc, char **argv) {
                 arena = (arena + 1) % 10;
             arcadeCenter(arenas[arena].name, 640, 341, 28);
             portraitCard(portraits, 0, {275, 343, 212, 246}, "PLAYER ONE");
-            portraitCard(portraits, 1 + arena % 3, {793, 343, 212, 246}, "THE RIVAL");
+            portraitCard(portraits, rivalPortrait(homeRival(arena)), {793, 343, 212, 246}, "HOME RIVAL");
             arcadeCenter("VS", 640, 387, 76, {170, 255, 64, 255});
             if (plaqueButton({495, 487, 290, 68}, match.mascot ? "MASCOT RIDE" : "STADIUM BOWLING"))
                 match.mascot = !match.mascot;
@@ -502,13 +662,19 @@ int main(int argc, char **argv) {
                 audio.play(audio.click);
             }
             bool unlocked = arena < profile.stadiums();
-            arcadeCenter(unlocked ? (match.mascot ? "PULL BACK. LET FLY. RIDE THE RAY!"
-                                                  : "SPOT. CURVE. POWER. TAKE ON THE RIVAL!")
-                                  : "WIN AT " + std::string(arenas[arena - 1].name) + " TO UNLOCK",
-                         640, 608, 24, unlocked ? cream : gold);
+            std::string hint = match.mascot ? "PULL BACK. LET FLY. RIDE THE RAY!"
+                                            : "SPOT. CURVE. POWER. TAKE ON THE RIVAL!";
+            if (!unlocked)
+                hint = "WIN AT " + std::string(arenas[arena - 1].name) + " TO UNLOCK";
+            else if (match.mascot && !profile.completed(Challenge::MascotPickups))
+                hint = "THREE TOKENS IN ONE RIDE EARNS TOUCH TANK";
+            else if (!match.mascot && arena == 0 && !profile.completed(Challenge::WrigleyWin))
+                hint = "BEAT THE HOME RIVAL TO EARN IVY LEAGUE CUB";
+            arcadeCenter(hint, 640, 608, 24, unlocked ? cream : gold);
             if (plaqueButton({395, 650, 226, 65}, unlocked ? "START" : "LOCKED", unlocked) ||
                 (IsKeyPressed(KEY_ENTER) && unlocked)) {
                 screen = Screen::Lane;
+                splitDrill = false;
                 restart();
                 audio.play(audio.cheer);
             }
@@ -520,7 +686,14 @@ int main(int argc, char **argv) {
                 lockerReturn = Screen::Setup;
                 screen = Screen::Locker;
             }
-            arcadeCenter("PARK " + std::to_string(arena + 1) + " / 10", 900, 598, 20, gold);
+            if (arena == 1 && unlocked && !match.mascot) {
+                if (button({808, 591, 184, 37}, "7-10 SPLIT DRILL")) {
+                    splitDrill = true;
+                    screen = Screen::Lane;
+                    restart();
+                }
+            } else
+                arcadeCenter("PARK " + std::to_string(arena + 1) + " / 10", 900, 598, 20, gold);
         } else if (screen == Screen::Locker) {
             modal({74, 12, 1132, 778}, "THE BALL LOCKER");
             arcadeCenter("30 CLUBS. 30 FUN DESIGNS. 4 RAYS SPECIALS.", 640, 134, 23);
@@ -528,7 +701,7 @@ int main(int argc, char **argv) {
             for (int id = 0; id < 64; ++id) {
                 int col = id % 8, row = id / 8;
                 Rectangle cell{139 + col * 84.f, 193 + row * 58.f, 78, 55};
-                bool unlocked = id < profile.balls();
+                bool unlocked = profile.ballUnlocked(id);
                 if (id == selectedSkin)
                     DrawRing({cell.x + 39, cell.y + 23}, 24, 27, 0, 360, 40, gold);
                 ballIcon(art.skins[id], cell.x + 16, cell.y, 46, unlocked);
@@ -553,12 +726,16 @@ int main(int argc, char **argv) {
             float size = std::min(
                 24.f, 230.f / std::max(1.f, MeasureTextEx(arcadeFont, name.c_str(), 24, 1).x) * 24);
             arcadeCenter(name, 994, 439, size);
-            arcadeCenter(selectedSkin < profile.balls()
+            arcadeCenter(profile.ballUnlocked(selectedSkin)
                              ? "UNLOCKED"
                              : std::to_string(selectedSkin * 80) + " CAREER XP",
                          994, 484, 22, gold);
+            if (const auto *challenge = ballChallenge(selectedSkin); challenge && !profile.ballUnlocked(selectedSkin)) {
+                const std::string hint = std::string("OR ") + challenge->instruction;
+                center(hint, 994, 515, std::min(13.f, 235.f * 13 / tw(hint, 13)), cream);
+            }
             if (plaqueButton({892, 533, 204, 57}, skin == selectedSkin ? "EQUIPPED" : "EQUIP",
-                             selectedSkin < profile.balls())) {
+                             profile.ballUnlocked(selectedSkin))) {
                 skin = selectedSkin;
                 audio.play(audio.click);
             }
@@ -566,17 +743,32 @@ int main(int argc, char **argv) {
             if (plaqueButton({891, 657, 216, 64}, "BACK"))
                 screen = lockerReturn;
         } else {
-            baseballHud(portraits, 1 + arena % 3, match.lanes[match.player].standingPins());
+            baseballHud(portraits, rivalPortrait(match.rival), view.standingPins());
             scoreCard(match.games[0], 16, "YOU");
-            scoreCard(match.games[1], 654, difficultyName(match.difficulty));
-            title(match.mascot ? "RAYS ADVENTURE" : arenas[arena].name, 184, 122, 20, cream);
+            scoreCard(match.games[1], 654, rivalName(match.rival));
+            title(splitDrill ? "FENWAY 7-10 DRILL" : match.mascot ? "RAYS ADVENTURE" : arenas[arena].name,
+                  184, 122, 20, cream);
+            if (art.mascotTokens && turn != Turn::Complete)
+                arcadeCenter(std::to_string(tokens.count) + " / 3 TOUCH TANK TOKENS", 948, 142, 21, aqua);
+            if (pickupSeconds > 0)
+                title(pickupMessage, 172, 685, 25, gold);
+            const Power trick = turn == Turn::Ready ? match.queuedTrick[match.player] : match.activeTrick;
+            if (trick != Power::None && turn != Turn::Complete)
+                arcadeCenter(std::string(powerName(trick)) + " ON THIS SHOT", 965, 177, 23, gold);
 
             title(turn == Turn::Complete ? "MATCH COMPLETE"
                   : match.player == 0    ? "YOUR TURN"
                                          : "RIVAL'S TURN",
                   184, 148, 19, gold);
+            if (turn == Turn::Replay) {
+                arcadeCenter(result, 640, 204, 41, gold);
+                arcadeCenter("PIN DECK REPLAY", 640, 251, 26, cream);
+                button({500, 716, 280, 58}, "SKIP REPLAY / SPACE");
+            }
             if (turn == Turn::Reaction) {
                 title(result, 260, 245, 46, gold);
+                if (!rivalLine.empty())
+                    title(rivalLine, 264, 300, 25, cream);
             }
 
             if (celebration > 0)
@@ -591,20 +783,29 @@ int main(int argc, char **argv) {
                 DrawRectangle(0, 0, W, H, {0, 0, 0, 110});
                 panel({292, 187, 696, 458});
                 arcadeCenter(result, 640, 231, 39, {170, 255, 64, 255});
-                portraitCard(portraits,
-                             *match.games[0].scores()[9] >= *match.games[1].scores()[9] ? 0
-                                                                                        : 1 + arena % 3,
-                             {548, 296, 184, 210}, "TOP BOWLER");
-                center(reward, 640, 526, std::min(18.f, 600.f / std::max(1.f, tw(reward, 18)) * 18),
-                       cream);
-                if (plaqueButton({382, 568, 225, 60}, "REMATCH"))
+                if (splitDrill) {
+                    arcadeCenter("FENWAY 7-10 SPLIT", 640, 335, 35, cream);
+                    arcadeCenter(reward, 640, 405, 24, gold);
+                } else {
+                    const int winner = scoreTotal(match.games[0]) >= scoreTotal(match.games[1])
+                                           ? 0 : rivalPortrait(match.rival);
+                    portraitCard(portraits, winner, {548, 280, 184, 200}, "TOP BOWLER");
+                    center(reward, 640, 506, std::min(18.f, 600.f * 18 / std::max(1.f, tw(reward, 18))), cream);
+                    if (!rivalLine.empty())
+                        center(rivalLine, 640, 532, 15, cream);
+                }
+                if (stadiumCue == StadiumCue::TropicanaUnlocked)
+                    arcadeCenter("FINAL PARK UNLOCKED: TROPICANA FIELD", 640, 637, 31, gold);
+                if (plaqueButton({382, 568, 225, 60}, splitDrill ? "TRY AGAIN" : "REMATCH"))
                     restart();
-                if (plaqueButton({673, 568, 225, 60}, "CLUBHOUSE")) {
-                    screen = Screen::Title;
-                    paused = false;
-                    charge = false;
+                if (plaqueButton({673, 568, 225, 60}, splitDrill ? "BACK TO SETUP" : "CLUBHOUSE")) {
+                    screen = splitDrill ? Screen::Setup : Screen::Title;
+                    splitDrill = paused = charge = false;
                 }
             }
+            if (!challengeMessage.empty() && (turn == Turn::Complete || turn == Turn::Replay ||
+                                              turn == Turn::Reaction))
+                arcadeCenter(challengeMessage, 640, 677, 24, gold);
             if (match.mascot && turn == Turn::Ready && human) {
                 title(charge ? "LET IT FLY!" : "GRAB THE TUBE", 180, 194, 25, gold);
                 text("PULL BACK, AIM, RELEASE", 180, 225, 16, cream);
@@ -618,6 +819,8 @@ int main(int argc, char **argv) {
                 const char *labels[] = {"1. SPOT - MOVE THE BALL", "2. CURVE - SHAPE YOUR SHOT",
                                         "3. POWER - TIME YOUR RELEASE"};
                 title(labels[int(stadiumSetup.phase)], 180, 194, 27, gold);
+                if (splitDrill)
+                    title("BANK A CORNER PIN WITH A FIRM INSIDE-EDGE HIT", 180, 287, 21, cream);
                 title(stadiumSetup.phase == ShotPhase::Power ? "CLICK / SPACE TO BOWL!"
                                                              : "CLICK / SPACE TO LOCK",
                       180, 227, 22, cream);
@@ -649,9 +852,9 @@ int main(int argc, char **argv) {
                 }
             }
             {
-                for (int i = 0; i < 3; ++i)
-                    if (powerButton(i, match.stock[0][i], match.equipped == Power(i + 1),
-                                    enabled && match.stock[0][i] > 0))
+                for (int i = 0; i < powerCount; ++i)
+                    if (powerButton(i, match.stock[0][i], human && match.equipped == Power(i + 1),
+                                    enabled && !splitDrill && match.canEquip(Power(i + 1))))
                         match.equip(Power(i + 1));
             }
         }
@@ -710,6 +913,7 @@ int main(int argc, char **argv) {
     UnloadShader(antialias);
     UnloadRenderTexture(scene);
     UnloadRenderTexture(target);
+    UnloadRenderTexture(replayFeed);
     CloseWindow();
     return smoke && !ok ? 1 : 0;
 }

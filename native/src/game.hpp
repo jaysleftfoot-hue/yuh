@@ -90,7 +90,7 @@ struct Simulation {
     Body ball{};
     bool active = false, hasBall = false, gutter = false;
     float elapsed = 0, curve = 0;
-    int impacts = 0;
+    int impacts = 0, bankedPin = -1;
     Simulation() {
         resetRack();
     }
@@ -117,6 +117,7 @@ struct Simulation {
         gutter = false;
         elapsed = 0;
         impacts = 0;
+        bankedPin = -1;
         return true;
     }
     void collide(Body &a, Body &b, bool isBall) {
@@ -169,8 +170,22 @@ struct Simulation {
                 p.x = std::clamp(p.x, p.r, geometry::width - p.r);
                 p.vx *= -.3f;
             }
-            if (!gutter && ball.z < geometry::deckEnd)
+            if (!gutter && ball.z < geometry::deckEnd && p.id != bankedPin) {
+                const bool wasStanding = !p.down;
+                const float contactOffset = ball.x - p.x;
                 collide(ball, p, true);
+                if (wasStanding && p.down && pins.size() == 2 && pins[0].id == 6 && pins[1].id == 9) {
+                    Body &opposite = p.id == 6 ? pins[1] : pins[0];
+                    const float inward = opposite.x > p.x ? 1.f : -1.f;
+                    const float graze = contactOffset * inward;
+                    // A firm inside-edge hit can bank a corner pin across the deck in the 7–10.
+                    if (!opposite.down && graze > .35f && graze < 1.15f && ball.vz > 35.f) {
+                        bankedPin = p.id;
+                        p.vx = inward * 28.f;
+                        p.vz = (opposite.z - p.z) * 3.f;
+                    }
+                }
+            }
         }
         for (size_t i = 0; i < pins.size(); ++i)
             for (size_t j = i + 1; j < pins.size(); ++j)

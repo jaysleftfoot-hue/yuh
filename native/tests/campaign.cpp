@@ -1,4 +1,4 @@
-#include "campaign.hpp"
+#include "presentation.hpp"
 #include "alley_controls.hpp"
 #include <iostream>
 #include <set>
@@ -44,6 +44,9 @@ int main() {
         names.insert(ballName(i));
     require(names.size() == 64, "64 distinct designs");
     require(std::string(arenas[9].name) == "Tropicana Field", "Tropicana finale");
+    require(p.finish(Challenge::WrigleyWin) && !p.finish(Challenge::WrigleyWin), "challenge completion is one-time");
+    require(p.ballUnlocked(34) && !p.ballUnlocked(33) && p.balls() == 2,
+            "challenge unlocks its specific ball without opening intervening slots");
     p.award(100, 150, 0);
     require(p.stadiums() == 1 && p.balls() > 1, "loss gives XP, no stadium");
     for (int arena = 0; arena < 9; ++arena) {
@@ -55,9 +58,16 @@ int main() {
     auto path = (std::filesystem::temp_directory_path() / "blb-campaign-test.txt").string();
     require(p.save(path), "save");
     Profile restored;
-    require(restored.load(path) && restored.xp == p.xp && restored.cleared == p.cleared, "restore");
+    require(restored.load(path) && restored.xp == p.xp && restored.cleared == p.cleared &&
+                restored.completed(Challenge::WrigleyWin), "restore challenge profile");
     p.xp += 80;
     require(p.save(path) && restored.load(path) && restored.xp == p.xp, "save replacement");
+    {
+        std::ofstream f(path);
+        f << "BLB 1 80 1 2 100 1";
+    }
+    require(restored.load(path) && restored.xp == 80 && restored.stadiums() == 2 &&
+                restored.completedChallenges == 0, "load existing version 1 save");
     {
         std::ofstream f(path);
         f << "BLB 1 -1 0 0 300 0";
@@ -66,9 +76,10 @@ int main() {
     std::filesystem::remove(path);
     std::filesystem::remove(path + ".bak");
     Match m;
-    require(m.equip(Power::Heavy), "equip heavy");
+    require(!m.equip(Power::Heavy), "power inventory starts empty");
+    require(m.storePower(Power::Heavy) && m.equip(Power::Heavy), "equip collected heavy");
     m.launch({5, 0, .7f, 0});
-    require(m.stock[0][0] == 1 && m.lanes[0].ball.r > .8f, "heavy consumes one charge");
+    require(m.stock[0][0] == 0 && m.lanes[0].ball.r > .8f, "heavy consumes one charge");
     require(!m.equip(Power::Magnet), "no equipping mid-flight");
     Match a, b;
     a.mascot = b.mascot = true;
@@ -92,6 +103,7 @@ int main() {
     lateSteering.step(1.f / 120);
     require(lateSteering.lanes[0].ball.vx > 0, "mascot steering remains active near distant pin deck");
     Match bumper;
+    bumper.storePower(Power::Bumpers);
     bumper.equip(Power::Bumpers);
     bumper.launch({.7f, -1, .7f, 0});
     for (int i = 0; i < 150; ++i)
@@ -108,6 +120,93 @@ int main() {
     require(lane.standingPins() == standing && lane.pins.size() == 8, "spare keeps original pin IDs");
     rack.settle();
     require(rack.player == 1 && rack.lanes[1].standingCount() == 10, "rival gets its own rack");
+    Match drill;
+    auto &splitLane = drill.lanes[0];
+    setSevenTenRack(splitLane);
+    require(sevenTen(splitLane), "split drill leaves only the two corner pins");
+    PinReplay replay;
+    drill.launch({2.f, 0.f, 1.f, 0.f});
+    while (splitLane.active) {
+        const bool finished = drill.step(1.f / 120);
+        replay.record(splitLane, finished);
+    }
+    require(drill.outcome().split && drill.outcome().spare, "inside-edge bank can convert the 7-10");
+    require(replay.available(drill.outcome()) && replay.view().knocked() < 2, "split replay starts before impact");
+    replay.seconds = PinReplay::maxSeconds;
+    require(replay.view().knocked() == 2 && splitLane.standingCount() == 0 &&
+                drill.games[0].frames[0].empty(), "replay shows both falls without advancing live score");
+    require(strikeCue(9, false, 2, {10, true, false, false, false}) == StadiumCue::Turkey &&
+                strikeCue(9, true, 2, {10, true, false, false, false}) == StadiumCue::None &&
+                strikeCue(0, false, 2, {10, true, false, false, false}) == StadiumCue::None,
+            "turkey cue is specific to Tropicana stadium");
+
+    Match battingPractice;
+    battingPractice.lanes[0].ball = {5, 50};
+    PowerPickups pickups;
+    pickups.items = {{{5, 48}, Power::Fastball}, {{7.9f, 48}, Power::Magnet}};
+    Body before{5, 47};
+    require(pickups.sweep(before, battingPractice) == Power::Fastball &&
+                battingPractice.stock[0][int(Power::Fastball) - 1] == 1 &&
+                pickups.sweep(before, battingPractice) == Power::None,
+            "swept pickup goes into active inventory once, wide miss collects nothing");
+    require(battingPractice.equip(Power::Fastball), "equip pickup next shot");
+    battingPractice.launch({5, 0, 1, 0});
+    require(battingPractice.lanes[0].ball.vz > geometry::maxLaunchSpeed, "Fastball increases speed");
+
+    Match trick;
+    trick.storePower(Power::Changeup);
+    require(trick.equip(Power::Changeup), "equip opponent trick");
+    trick.launch({});
+    require(trick.lanes[0].ball.r == geometry::ballRadius && trick.queuedTrick[1] == Power::Changeup,
+            "trick queues against opponent without affecting owner's shot");
+    trick.player = 1;
+    trick.equipped = Power::None;
+    trick.launch({});
+    require(trick.lanes[1].ball.r < geometry::ballRadius && trick.queuedTrick[1] == Power::None,
+            "Changeup shrinks only opponent's next shot");
+    trick.lanes[1].active = false;
+    trick.launch({});
+    require(trick.lanes[1].ball.r == geometry::ballRadius, "trick expires after one shot");
+
+    Match drift;
+    drift.queuedTrick[0] = Power::WildPitch;
+    drift.launch({5, 0, .72f, 0});
+    for (int i = 0; i < 60; ++i)
+        drift.step(1.f / 120);
+    require(drift.lanes[0].ball.x < 5 && drift.queuedTrick[0] == Power::None,
+            "Wild Pitch deflects one shot");
+
+    std::mt19937 rng{109};
+    std::set<Power> types;
+    std::set<size_t> amounts;
+    for (int i = 0; i < 120; ++i) {
+        pickups.spawn(rng);
+        amounts.insert(pickups.items.size());
+        for (const auto &item : pickups.items) {
+            types.insert(item.power);
+            require(!item.claimed && item.position.x >= geometry::launchMin &&
+                        item.position.x <= geometry::launchMax &&
+                        item.position.z > geometry::arrowZ && item.position.z < geometry::headPin,
+                    "spawn stays between rails and clear of pins");
+        }
+        if (pickups.items.size() == 2)
+            require(pickups.items[0].position.z != pickups.items[1].position.z, "no overlapping slots");
+    }
+    require(amounts == std::set<size_t>{0, 1, 2} && types.size() == powerCount, "random counts and six kinds");
+    MascotTokens tokens;
+    for (const auto &token : tokens.layout) {
+        Simulation lane;
+        lane.ball = {token.x, token.z + .4f};
+        tokens.sweep({token.x, token.z - .4f}, lane);
+        tokens.sweep({token.x, token.z - .4f}, lane);
+    }
+    require(tokens.count == 3 && MascotTokens{}.count == 0, "three unique pickups within one shot");
+
+    Match slugger, umpire;
+    umpire.rival = RivalStyle::Umpire;
+    const Shot drive = slugger.aiShot(), spareLine = umpire.aiShot();
+    require(drive.power > spareLine.power && drive.curve > 0 && spareLine.curve == 0,
+            "rivals differ in power and hook at the same difficulty");
     for (bool mascot : {false, true}) {
         int previousScore = -1;
         for (auto difficulty :

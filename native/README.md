@@ -8,9 +8,12 @@ C++17 + raylib 5.5 desktop prototype. The native work lost in the cloud refresh 
 - Rookie, Pro and All-Star rivals in both modes. Click the AI label in Ballpark Showdown to cycle the difficulty. Pro is the default, and the selection carries into rematches.
 - The pin triangle and standing count follow the active rack in real time, including spare attempts and changes of player.
 - Mascot Ride: an original ray mascot on an inflatable tube; steering after launch and one boost per shot.
-- Heavy Ball, Magnet and Bumpers; two charges of each per player per match.
+- Heavy, Magnet, Bumpers, Fastball, Changeup and Wild Pitch are random lane pickups. Both bowlers start with empty inventories. Bowl through a pickup and equip it on a later shot, one power per shot and up to three charges of each. Fastball adds speed. Changeup shrinks the opponent's ball for their next shot. Wild Pitch gives their next shot a brief sideways push. Tricks cannot stack.
+- Home rivals have different shot plans at the same difficulty. The Slugger throws hard hooks on full racks, the Umpire favors a straight line and spare conversions, and the Ball Boy favors Bumpers and Wild Pitch. Rivals react to strikes, spares, gutters and finishes within ten points.
+- Pin-deck replays play after strikes and 7–10 conversions. Press Space, Enter, or the Skip Replay label to continue. The stadium scoreboard shows the replay feed while the live match waits.
+- Three challenges can unlock existing balls ahead of their XP thresholds. Beat the Wrigley Slugger in Stadium to earn **Ivy League Cub**. Convert a 7–10 at Fenway in a match or via the **7–10 Split Drill** in setup to earn **The Green Monster**. Collect all three gold tokens in one Mascot shot for **Touch Tank**. The drill can be repeated without adding career games or XP.
 - Ten-frame bowling with strikes, spares and tenth-frame bonus balls. Players alternate after each completed frame, with independent racks.
-- Exactly 64 named unlocks: 30 MLB logo balls, 30 individually illustrated club designs, and four Rays specials (Sunburst, Devil Ray, Touch Tank, Tropicana Finale). Use left/right arrows in the locker to inspect the reverse artwork. The first ball is unlocked; each 80 XP unlocks the next, all 64 at 5,040 XP.
+- Exactly 64 named unlocks: 30 MLB logo balls, 30 individually illustrated club designs, and four Rays specials (Sunburst, Devil Ray, Touch Tank, Tropicana Finale). Use left/right arrows in the locker to inspect the reverse artwork. The first ball is unlocked. Each slot has an 80 XP spacing and all 64 are available at 5,040 XP. Challenges unlock their individual ball early.
 - Completed matches award 120 + score XP, plus 150 for a win. Abandoned matches award nothing.
 - Ten stadium-themed layouts open by winning at the previous stop: Wrigley, Fenway, Oracle, PNC, Coors, Kauffman, Chase, T-Mobile, Yankee, and **Tropicana Field last**.
 - Local profile with XP, wins, stadium unlocks and best score. Saved under APPDATA, XDG_DATA_HOME or HOME as big-league-bowling-profile.txt, with .bak recovery. Failed persistence is reported on screen.
@@ -23,7 +26,7 @@ Stadium bowling has three separate phases:
 2. **Curve:** move left/right (or arrows/Q/E) to set hook. Click or release Space/Enter to lock.
 3. **Power:** watch the cycling vertical meter. Click or release Space/Enter to bowl at that power.
 
-Backspace returns to the previous step before launch. Locked position and curve do not change while timing power. Each new shot starts at Spot. Mascot Ride keeps its separate pull-back slingshot: grab the course, pull backward and sideways, release; steer with A/D or arrows, boost with Space. Keys 1/2/3 select powers. Escape pauses, M toggles sound, F11 toggles fullscreen.
+Backspace returns to the previous step before launch. Locked position and curve do not change while timing power. Each new shot starts at Spot. Mascot Ride keeps its separate pull-back slingshot: grab the course, pull backward and sideways, release; steer with A/D or arrows, boost with Space. Keys 1–6 select powers by inventory slot. Escape pauses, M toggles sound, F11 toggles fullscreen.
 
 
 ## Graphics and proportions
@@ -83,7 +86,9 @@ Source, shader, font/license, procedural assets, tests, build instructions, art 
 
 ## Stadium scoreboards
 
-Blue title panels have been replaced with ballpark scoreboards. Wrigley uses painted green manual panels, white league grids, a clock, flags and lamps inspired by the supplied photograph. Fenway uses a green manual face; other parks and Rays Adventure use dark LED faces with amber numbers. Bowling frame scores and totals update with the match; the decorative baseball grids do not represent live MLB results.
+Blue title panels have been replaced with ballpark scoreboards. Wrigley uses painted green manual panels, white league grids, a clock, flags and lamps inspired by the supplied photograph. Fenway uses a green manual face; other parks and Rays Adventure use dark LED faces with amber numbers. Bowling scores and totals update with the match. Wrigley and Fenway flip score tiles as values change. Three consecutive strikes by the same bowler at Tropicana Stadium trigger a Rays scoreboard celebration and a brief wash of blue light on the lane. Unlocking Tropicana gets its own notification after winning at Yankee Stadium.
+
+See [Astra's art handoff](docs/ASTRA_HANDOFF.md) for presentation hooks, previews and power-up references.
 
 ## Easy Windows installation
 

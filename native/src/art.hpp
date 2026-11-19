@@ -1,5 +1,5 @@
 #pragma once
-#include "campaign.hpp"
+#include "presentation.hpp"
 #include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
@@ -14,7 +14,13 @@ struct Art {
     std::array<Texture2D, 10> parkLogos{}, teamLogos{};
     std::string scoreboardKey;
     int arena = 0, skin = 0;
-    float slingPower = 0;
+    bowling::MascotPose mascotPose;
+    const bowling::PowerPickups *powerPickups = nullptr;
+    const bowling::MascotTokens *mascotTokens = nullptr;
+    bowling::StadiumCue cue = bowling::StadiumCue::None;
+    float cueSeconds = 0, tileSeconds = 0;
+    using Tiles = std::array<std::array<std::string, 10>, 2>;
+    Tiles visibleTiles{}, oldTiles{};
     bool mascot = false, inSceneryTransform = false;
     Mesh courseMesh() {
         constexpr int rings = 26 + int(geo::sceneryExtension / 2) + 1, sides = 24;
@@ -135,7 +141,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
             SetTextureFilter(teamLogos[i], TEXTURE_FILTER_TRILINEAR);
         }
     }
-    void updateScoreboard(const bowling::Match &match) {
+    void updateScoreboard(const bowling::Match &match, float dt, const Texture2D *replayFeed) {
         int pinsStanding = match.lanes[match.player].standingCount();
         std::string key = std::to_string(arena) + ":" + std::to_string(mascot) + ":" +
                           std::to_string(match.player) + ":" + std::to_string(pinsStanding);
@@ -147,19 +153,39 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                     key += std::to_string(roll) + ",";
             }
         }
-        if (key == scoreboardKey)
+        Tiles nextTiles;
+        for (int player = 0; player < 2; ++player) {
+            const auto &game = match.games[player];
+            const auto scores = game.scores();
+            for (int i = 0; i < 10; ++i) {
+                const auto &rolls = game.frames[i];
+                if (scores[i])
+                    nextTiles[player][i] = std::to_string(*scores[i]);
+                else if (rolls.empty())
+                    nextTiles[player][i] = "-";
+                else if (rolls[0] == 10)
+                    nextTiles[player][i] = "X";
+                else if (rolls.size() >= 2 && rolls[0] + rolls[1] == 10)
+                    nextTiles[player][i] = "/";
+                else
+                    nextTiles[player][i] = std::to_string(rolls[0]);
+            }
+        }
+        const bool flipped = nextTiles != visibleTiles;
+        if (flipped) {
+            oldTiles = visibleTiles;
+            visibleTiles = nextTiles;
+            tileSeconds = .42f;
+        }
+        const bool animating = tileSeconds > 0;
+        tileSeconds = std::max(0.f, tileSeconds - dt);
+        key += ":" + std::to_string(int(cue)) + ":" + std::to_string(bool(replayFeed));
+        if (key == scoreboardKey && !animating && !replayFeed)
             return;
         scoreboardKey = key;
         bool manual = !mascot && (arena == 0 || arena == 1);
         Color paint = manual ? Color{58, 77, 51, 255} : Color{9, 13, 14, 255};
         Color letters = manual ? Color{231, 232, 207, 255} : Color{249, 195, 70, 255};
-        auto total = [](const bowling::Game &game) {
-            int value = 0;
-            for (auto v : game.scores())
-                if (v)
-                    value = *v;
-            return value;
-        };
         BeginTextureMode(scoreboard);
         ClearBackground(paint);
         if (manual) {
@@ -228,20 +254,33 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                 DrawRectangle(x, 119, 332, 6,
                               side ? Color{91, 201, 221, 255} : Color{255, 206, 87, 255});
                 center(side ? "RIVAL" : "YOU", x + 166, 139, 24, WHITE);
-                center(std::to_string(total(match.games[side])), x + 166, 172, 85, WHITE);
+                center(std::to_string(bowling::scoreTotal(match.games[side])), x + 166, 172, 85, WHITE);
                 center("FRAME " + std::to_string(std::min(10, match.games[side].frame + 1)), x + 166,
                        274, 18, cream);
             }
             letters = WHITE;
         }
-        // These frame scores are live game data, not invented real-world MLB results.
+        // Dedicated video area. The feed draws only the deck, so it cannot sample this board.
+        if (replayFeed) {
+            DrawRectangle(132, 13, 760, 323, {7, 18, 25, 255});
+            DrawTexturePro(*replayFeed, {0, 0, float(replayFeed->width), -float(replayFeed->height)},
+                           {245, 18, 534, 300}, {0, 0}, 0, WHITE);
+            arcadeCenter("PIN DECK", 186, 140, 26, gold);
+            arcadeCenter("REPLAY", 835, 140, 26, gold);
+        }
+        if (!replayFeed && cue == bowling::StadiumCue::Turkey) {
+            DrawRectangleGradientH(0, 85, 1024, 250, {9, 24, 61, 255}, {34, 101, 173, 255});
+            DrawTexturePro(teamLogos[9], {0, 0, float(teamLogos[9].width), float(teamLogos[9].height)},
+                           {89, 101, 226, 214}, {0, 0}, 0, WHITE);
+            arcadeCenter("TURKEY! RAYS UP!", 640, 165, 83, gold);
+        }
+        // These frame scores are live game data.
         text("BOWLING", 25, 351, 17, letters);
         for (int frame = 0; frame < 10; ++frame)
             center(std::to_string(frame + 1), 245 + frame * 60, 349, 17, letters);
         center("TOTAL", 945, 349, 16, letters);
         for (int player = 0; player < 2; ++player) {
             const auto &game = match.games[player];
-            auto scores = game.scores();
             float y = 377 + player * 45.f;
             text(player ? "RIVAL" : "YOU", 28, y + 6, 24, letters);
             for (int frame = 0; frame < 10; ++frame) {
@@ -249,18 +288,35 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                 DrawRectangleLinesEx({x, y, 56, 37}, 1, Fade(letters, .55f));
                 if (frame == game.frame && player == match.player)
                     DrawRectangleLinesEx({x, y, 56, 37}, 3, letters);
-                center(scores[frame] ? std::to_string(*scores[frame]) : "-", x + 28, y + 8, 23, letters);
+                const auto &value = visibleTiles[player][frame];
+                const auto &old = oldTiles[player][frame];
+                if (manual && tileSeconds > 0 && old != value) {
+                    const float phase = 1.f - tileSeconds / .42f;
+                    const float faceHeight = std::abs(std::cos(PI * phase));
+                    const float height = 35.f * faceHeight;
+                    DrawRectangleRec({x + 2, y + 19 - height / 2, 52, height},
+                                     ColorBrightness(paint, phase < .5f ? -.18f : .16f));
+                    if (faceHeight > .12f)
+                        center(phase < .5f ? old : value, x + 28, y + 19 - 11.5f * faceHeight,
+                               23 * faceHeight, letters);
+                } else
+                    center(value, x + 28, y + 8, 23, letters);
             }
-            center(std::to_string(total(game)), 945, y + 4, 30, letters);
+            center(std::to_string(bowling::scoreTotal(game)), 945, y + 4, 30, letters);
         }
         DrawRectangle(0, 476, 1024, 36, {5, 8, 9, 255});
         std::string welcome =
-            mascot ? "RAYS UP!" : std::string("WELCOME TO ") + bowling::arenas[arena].name;
+            cue == bowling::StadiumCue::TropicanaUnlocked ? "TROPICANA FIELD UNLOCKED"
+                   : mascot ? "RAYS UP!" : std::string("WELCOME TO ") + bowling::arenas[arena].name;
         float size = std::min(28.f, 960.f / std::max(1.f, tw(welcome, 28)) * 28);
         center(welcome, 512, 480, size, cream);
         EndTextureMode();
-        GenTextureMipmaps(&scoreboard.texture);
-        SetTextureFilter(scoreboard.texture, TEXTURE_FILTER_TRILINEAR);
+        if (tileSeconds > 0 || replayFeed) {
+            SetTextureFilter(scoreboard.texture, TEXTURE_FILTER_BILINEAR);
+        } else {
+            GenTextureMipmaps(&scoreboard.texture);
+            SetTextureFilter(scoreboard.texture, TEXTURE_FILTER_TRILINEAR);
+        }
     }
     void sign(Texture2D t, Vector3 p, float w, float h, bool image = false) {
         rlSetTexture(t.id);
@@ -314,11 +370,13 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         DrawModel(pin, {0, 0, 0}, 1, WHITE);
         rlPopMatrix();
     }
-    void rider(Vector3 p, float time, bool ready = false, float bank = 0) {
+    void rider(Vector3 p, float time, bool ready, bowling::MascotPose pose, bool gutter) {
+        const float bank = pose.bank * 7.f;
+        const float wipeout = gutter ? pose.wipeout : 0.f;
         rlPushMatrix();
-        rlTranslatef(p.x, p.y + std::sin(time * 3) * .035f, p.z);
-        rlRotatef(std::sin(time * 3) * 2 - bank * 3.5f, 0, 0, 1);
-        rlRotatef(bank * 2, 0, 1, 0);
+        rlTranslatef(p.x, p.y + std::sin(time * 3) * .035f - wipeout * .24f, p.z + pose.recoil * .18f);
+        rlRotatef(std::sin(time * 3) * 2 - bank * 3.5f + wipeout * (p.x < 0 ? -74.f : 74.f), 0, 0, 1);
+        rlRotatef(bank * 2 + wipeout * 55.f, 0, 1, 0);
         DrawModel(tube, {0, 0, 0}, 1, WHITE);
         rlPushMatrix();
         rlTranslatef(0, .12f, 0);
@@ -464,10 +522,14 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
             for (int side : {-1, 1}) {
                 for (int i = 0; i < 3; ++i) {
                     float z = 8 + i * (9.f + extra / 3);
-                    orb({side * 7.1f, 4.4f + .3f * std::sin(time + i), z}, {.65f, .12f, .6f},
+                    const float swimPhase = time * .75f + i * 1.7f + side;
+                    const float swimZ = z + std::sin(swimPhase) * 3.4f;
+                    const float swimX = side * (7.1f + .25f * std::cos(swimPhase));
+                    const float swimY = 4.4f + .35f * std::sin(swimPhase * 2);
+                    orb({swimX, swimY, swimZ}, {.65f, .12f, .6f},
                         {30, 70, 121, 255});
                     for (int d : {-1, 1})
-                        orb({side * 7.1f + d * .65f, 4.4f + .3f * std::sin(time + i), z - .1f},
+                        orb({swimX + d * .65f, swimY + d * .08f * std::cos(swimPhase * 4), swimZ - .1f},
                             {.7f, .06f, .33f}, {31, 82, 133, 255});
                     for (int j = 0; j < 5; ++j) {
                         float y = std::fmod(time * .55f + j * 1.13f + i, 5.f) + 1;
@@ -727,7 +789,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         }
     }
     void world(const bowling::Simulation &sim, const bowling::Shot &shot, bool aim, int selected,
-               Camera3D cam, float time) {
+               Camera3D cam, float time, bool deckOnly = false) {
         Color team = mascot ? Color{16, 52, 94, 255} : GetColor(teams[selected].color);
         SetShaderValue(shader, GetShaderLocation(shader, "eye"), &cam.position, SHADER_UNIFORM_VEC3);
         Vector3 shadow[10];
@@ -743,19 +805,26 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         SetShaderValue(shader, GetShaderLocation(shader, "ballShadow"), &shadowBall,
                        SHADER_UNIFORM_VEC3);
         SetShaderValue(shader, GetShaderLocation(shader, "sceneTime"), &time, SHADER_UNIFORM_FLOAT);
+        const float glow = cue == bowling::StadiumCue::Turkey
+                               ? std::min(1.f, cueSeconds) * (.65f + .35f * std::sin(time * 6))
+                               : 0.f;
+        const Vector2 boardLight{glow, geo::headPin};
+        SetShaderValue(shader, GetShaderLocation(shader, "boardLight"), &boardLight, SHADER_UNIFORM_VEC2);
         BeginMode3D(cam);
-        rlPushMatrix();
-        rlTranslatef(0, 0, 2.f - 2.f * sceneryDepthScale);
-        rlScalef(1, 1, sceneryDepthScale);
-        inSceneryTransform = true;
-        material(0);
-        box({0, -.7f, 15}, {95, 1, 95}, {17, 39, 43, 255});
-        if (!mascot)
-            stadiumScenery(time, team);
-        else
-            mascotScenery(time, {16, 52, 94, 255});
-        rlPopMatrix();
-        inSceneryTransform = false;
+        if (!deckOnly) {
+            rlPushMatrix();
+            rlTranslatef(0, 0, 2.f - 2.f * sceneryDepthScale);
+            rlScalef(1, 1, sceneryDepthScale);
+            inSceneryTransform = true;
+            material(0);
+            box({0, -.7f, 15}, {95, 1, 95}, {17, 39, 43, 255});
+            if (!mascot)
+                stadiumScenery(time, team);
+            else
+                mascotScenery(time, {16, 52, 94, 255});
+            rlPopMatrix();
+            inSceneryTransform = false;
+        }
         material(mascot ? 5 : 1);
         box({0, -.06f, geo::surfaceCenter}, {geo::width, .2f, geo::surfaceLength},
             mascot ? Color{158, 213, 224, 255} : Color{222, 171, 103, 255});
@@ -779,13 +848,32 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         }
         for (int i = -2; i <= 2; ++i)
             DrawSphere({i * 1.1f, .05f, geo::dotsZ}, .045f, ink);
+        if (!deckOnly && (aim || sim.active)) {
+            if (powerPickups)
+                for (const auto &item : powerPickups->items) {
+                    if (item.claimed)
+                        continue;
+                    const float x = geo::renderX(item.position.x);
+                    const float y = 1.04f + .13f * std::sin(time * 3.2f + item.position.z);
+                    orb({x, y, item.position.z}, {.38f, .38f, .38f},
+                        powerColors[int(item.power) - 1]);
+                }
+            if (mascotTokens)
+                for (size_t i = 0; i < mascotTokens->layout.size(); ++i) {
+                    if (mascotTokens->collected[i])
+                        continue;
+                    const auto token = mascotTokens->layout[i];
+                    orb({geo::renderX(token.x), .82f + .14f * std::sin(time * 4 + i), token.z},
+                        {.55f, .46f, .30f}, gold);
+                }
+        }
         for (const auto &p : sim.pins)
             drawPin(p, time);
         if (ballPos.z < geo::surfaceEnd) {
             if (mascot)
-                rider({ballPos.x + (aim ? shot.aim * 1.6f : 0), .57f,
-                       ballPos.z - (aim ? slingPower * 2.7f : 0)},
-                      time, aim, sim.active ? sim.ball.vx : 0);
+                rider({ballPos.x + (aim ? mascotPose.sideways * 1.6f : 0), .57f,
+                       ballPos.z - (aim ? mascotPose.pull * 2.7f : 0)},
+                      time, aim, mascotPose, sim.gutter);
             else
                 bowlingBall({ballPos.x, sim.gutter ? .28f : (sim.hasBall ? sim.ball.r : geo::ballRadius),
                              ballPos.z},
@@ -793,13 +881,14 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
                             sim.hasBall ? sim.ball.r : geo::ballRadius);
         }
         if (aim && mascot) {
-            float pull = slingPower * 2.7f;
+            float pull = mascotPose.pull * 2.7f;
             // Sling attaches to the front of the tube, below the ray's fins.
-            Vector3 center{ballPos.x + shot.aim * 1.6f, .40f, ballPos.z - pull - 1.f};
+            Vector3 center{ballPos.x + mascotPose.sideways * 1.6f, .40f, ballPos.z - pull - 1.f};
             for (int side : {-1, 1}) {
                 cyl({side * 4.8f, .04f, 2.4f}, .24f, 1.3f, {24, 69, 110, 255});
                 orb({side * 4.8f, 1.4f, 2.4f}, {.31f, .34f, .31f}, gold);
-                beam({side * 4.8f, 1.15f, 2.4f}, center, .095f, {220, 44, 60, 255});
+                beam({side * 4.8f, 1.15f, 2.4f}, center, .095f - .03f * mascotPose.pull,
+                     {220, 44, 60, 255});
             }
         }
         if (aim)

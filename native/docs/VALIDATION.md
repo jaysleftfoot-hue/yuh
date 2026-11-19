@@ -1,3 +1,10 @@
+# Challenges, replays and random pickups
+
+- Native scoring, lane geometry and campaign tests passed. Coverage includes version 1 save migration, individual challenge unlocks, a simulated 7–10 conversion, replay isolation, strike cues, six pickup types, lane placement, one-time pickup credit and opponent trick expiry.
+- Complete headless matches ran in Stadium and Mascot. The X11 input flow still requires separate Spot, Curve and Power confirmations. Native captures show the Wrigley replay and board video, Fenway split and Mascot setup and pin impact.
+- Windows x64 ZIP and NSIS installer rebuilt. ZIP CRC and byte comparisons of assets and executable passed. Windows runtime and installer execution remain unverified.
+- Read ASTRA_HANDOFF.md for the graphics interfaces, reference sources and capture commands.
+
 # Illustrated ball collection
 
 - Verified 64 distinct 768 × 384 textures and compared every packaged asset and the executable against the Windows build. The portable ZIP passed its CRC check.

@@ -11,6 +11,7 @@ uniform vec3 eye;
 uniform vec3 pinShadows[10];
 uniform vec3 ballShadow;
 uniform float sceneTime;
+uniform vec2 boardLight;
 out vec4 finalColor;
 // GLSL pow(x,n) is undefined for x<0, even for integer-valued n.
 // Signed floor reflections previously produced NaNs on some Windows drivers.
@@ -69,6 +70,9 @@ void main() {
         float seam=abs(fract(world.x*.33+.5)-.5);
         lit+=vec3(.18,.24,.26)*exp(-seam*100.0)*.35;
         lit+=vec3(.07,.14,.17)*sin(world.z*.24+world.x*.6);
+        float caustic=.5+.5*sin(world.x*2.8+world.z*.38+sin(world.z*.72-sceneTime*1.4)*.7);
+        float ripple=.5+.5*sin(world.x*1.5-world.z*.52+sceneTime*.96);
+        lit+=vec3(.07,.14,.17)*(pow(caustic*ripple,5.0));
     }
     if(floorMaterial) {
         float shadow=0.0;
@@ -88,6 +92,8 @@ void main() {
             float fresnel=.12+.35*pow(1.0-clamp(dot(n,v),0.0,1.0),4.0);
             lit+=vec3(1.0,.87,.62)*bands*across*fresnel;
         }
+        float screenReach=exp(-square((world.z-boardLight.y)/24.0)-square(world.x/4.0));
+        lit+=vec3(.15,.28,.49)*boardLight.x*screenReach;
         float edge=exp(-square((abs(world.x)-4.8)/.6));
         lit+=vec3(.03,.16,.22)*edge;
     }
