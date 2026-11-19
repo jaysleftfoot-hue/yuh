@@ -1,1 +1,1 @@
-Mascot Ride QA handoff build from 34ca6cda3111c5746ec03deb9d641f23a37716d0. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
+Aquarium graphics build from ba3525905e8afc6b992dce88c5837841b53d73b0. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
