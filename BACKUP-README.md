@@ -1,1 +1,1 @@
-Independent medal drops build from 5a315a0b251331a11fb5767076e388d616e9cb2e. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
+Arcade scoreboard build from 06285922f8d0a1e0c041d397fee43c8525c0fe66. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
