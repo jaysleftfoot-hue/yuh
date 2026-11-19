@@ -1,1 +1,1 @@
-Ballpark artwork build from 9ac6193a7821f84aa542ea6206a00cfe32722222. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
+Dugout equipment build from 648cdec8f631badbb1c49208f90c21e13ed0df30. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
