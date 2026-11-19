@@ -312,7 +312,8 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*vertexNormal);world=vec3(matM
         center(welcome, 512, 480, size, cream);
         EndTextureMode();
         if (tileSeconds > 0 || replayFeed) {
-            SetTextureFilter(scoreboard.texture, TEXTURE_FILTER_BILINEAR);
+            // Only the base level changes during playback. Sample it until new mipmaps are ready.
+            rlTextureParameters(scoreboard.texture.id, RL_TEXTURE_MIN_FILTER, RL_TEXTURE_FILTER_LINEAR);
         } else {
             GenTextureMipmaps(&scoreboard.texture);
             SetTextureFilter(scoreboard.texture, TEXTURE_FILTER_TRILINEAR);

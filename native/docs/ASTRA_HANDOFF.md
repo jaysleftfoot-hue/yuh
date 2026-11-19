@@ -10,7 +10,7 @@ Build with `python3 native/build.py`. These native-window captures use a fixed s
 | --- | --- |
 | Wrigley from the foul line | `--play --screenshot artifacts/wrigley.png --capture-frame 5` |
 | Strike replay with board video | `--play --demo-strike --screenshot artifacts/strike.png --scoreboard-screenshot artifacts/strike-board.png --capture-frame 465` |
-| Fenway 7–10 conversion | `--preview-split --demo-shot --screenshot artifacts/fenway-split.png --capture-frame 450` |
+| Fenway 7–10 conversion | `--preview-split --demo-shot --screenshot artifacts/fenway-split.png --capture-frame 440` |
 | Mascot route and pickups | `--play --mascot --screenshot artifacts/touch-tank.png --capture-frame 5` |
 | Tropicana from the foul line | `--play --arena 9 --screenshot artifacts/tropicana.png --capture-frame 5` |
 
