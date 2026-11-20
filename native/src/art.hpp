@@ -9,6 +9,10 @@ inline constexpr float sceneryDepthScale = geo::sceneryDepthScale;
 struct Art {
     Model cube{}, sphere{}, cylinder{}, pin{}, tube{}, course{}, rayBody{};
     Shader shader{};
+    bowling::PinsetterCycle setter;
+    float strikeSalute = 0; // 0..1 during the live post-strike sweep
+    float crowdCheer = 0;
+    Texture2D strikePennant{};
     Texture2D gearCase{}, wrigley{}, tank{}, reef{}, spray{}, trop{}, sunburst{}, tokenMedal{};
     Texture2D manualBoard{}, electricBoard{}, scorePlates{}, enamelLettering{}, pinGauge{};
     std::array<Texture2D, 2> scoreRails{};
@@ -25,6 +29,7 @@ struct Art {
             SetTextureFilter(texture, TEXTURE_FILTER_TRILINEAR);
             return texture;
         };
+        strikePennant = load("strike-pennant.png");
         manualBoard = load("manual-board.jpg");
         electricBoard = load("electric-board.jpg");
         enamelLettering = load("enamel-lettering.png");
@@ -145,12 +150,24 @@ struct Art {
 in vec2 vertexTexCoord;out vec2 uv;in vec3 vertexPosition;in vec3 vertexNormal;in vec4 vertexColor;uniform mat4 mvp;uniform mat4 matModel;uniform mat4 matNormal;out vec3 normal;out vec3 world;out vec3 localPos;out vec4 color;
 uniform int woodMode;
 uniform float sceneTime;
+uniform float capTip;
 uniform vec3 finLoad; // draw, signed turn and launch recoil
 void main(){
 localPos=vertexPosition;
 vec3 pos=vertexPosition;
 vec3 norm=vertexNormal;
 if(woodMode==6){
+    // Cap crown, brim and button have their own painted UV islands on the GLB.
+    bool crown=vertexTexCoord.x>=.55 && vertexTexCoord.y>=.645;
+    bool trim=vertexTexCoord.x>=.499 && vertexTexCoord.x<=.506 &&
+              vertexTexCoord.y>=.734 && vertexTexCoord.y<=.791;
+    bool cap=crown || trim;
+    if(cap){
+        float angle=-.62*capTip;
+        mat2 tilt=mat2(cos(angle),sin(angle),-sin(angle),cos(angle));
+        pos.yz=tilt*(pos.yz-vec2(.85,-.18))+vec2(.85+.11*capTip,-.18);
+        norm.yz=tilt*norm.yz;
+    }
     float wing=pow(clamp((abs(pos.x)-.57)/1.46,0.0,1.0),2.0);
     float stroke=.21*sin(sceneTime*3.8+pos.z*2.3)-.31*finLoad.x
         +.55*sign(pos.x)*finLoad.y+.25*finLoad.z;
@@ -557,9 +574,10 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
             SetTextureFilter(skins[id], TEXTURE_FILTER_TRILINEAR);
         }
     }
-    void bowlingBall(Vector3 p, float roll, float radius = .51f) {
+    void bowlingBall(Vector3 p, float roll, float radius, float sideRoll) {
         rlPushMatrix();
         rlTranslatef(p.x, p.y, p.z);
+        rlRotatef(sideRoll, 0, 0, 1);
         rlRotatef(roll, 1, 0, 0);
         Texture2D original = sphere.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture;
         sphere.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = skins[skin];
@@ -569,14 +587,27 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         sphere.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = original;
         rlPopMatrix();
     }
-    void drawPin(const bowling::Body &p, float time) {
+    void drawPin(const bowling::Body &p, float time, geo::LaneLayout lane) {
+        if (!p.down && setter.progress > 0) {
+            float grip = bowling::PinsetterCycle::ease(setter.progress, .03f, .17f)
+                       - bowling::PinsetterCycle::ease(setter.progress, .92f, 1.f);
+            if (grip > .01f) {
+                float y = geo::pinHeight + setter.lift() + (1-grip)*1.65f;
+                Vector3 at{geo::renderX(p.x), y, p.z};
+                beam(at, {at.x, y+.88f*grip, at.z}, .085f, {132, 147, 144, 255});
+                DrawCylinderEx({at.x,y-.16f,at.z}, {at.x,y+.11f,at.z}, .27f*grip, .19f*grip,
+                               14, {61, 73, 70, 255});
+            }
+        }
         rlPushMatrix();
         const float tilt = p.down ? p.fall * 86.f : std::sin(time * 3 + p.id) * 2.f;
         const float tip = std::sin(std::abs(tilt) * DEG2RAD);
         // As the pin tips over, its contact point moves from the foot to the belly.
         const float lift =
             p.down ? std::max(.30f * tip, geo::pinRadius * tip - .9f * std::cos(tilt * DEG2RAD)) : 0.f;
-        rlTranslatef(geo::renderX(p.x), .06f + lift, p.z);
+        float z = setter.pinZ(p, lane);
+        float pitDrop = bowling::PinsetterCycle::ease(z, lane.surfaceEnd() - .4f, lane.surfaceEnd() + 1.f);
+        rlTranslatef(geo::renderX(p.x), .06f + lift + (p.down ? -1.3f * pitDrop : setter.lift()), z);
         rlRotatef(tilt, p.id % 2 ? 1.f : -1.f, 0, .4f);
         rlScalef(geo::pinRadius / .40f, geo::pinHeight / 2.05f, geo::pinRadius / .40f);
         material(9);
@@ -597,13 +628,20 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         DrawModel(tube, {0, 0, 0}, 1, WHITE);
         rlPopMatrix();
         rlTranslatef(0, .12f - pose.pull * .10f, -.09f * pose.pull);
-        rlRotatef(ready ? 180.f + std::sin(time * 1.5f) * 4.f : pose.bank * 10, 0, 1, 0);
+        float glance = bowling::PinsetterCycle::ease(pose.pull, .68f, 1.f);
+        float turn = ready ? 180.f + std::sin(time * 1.5f) * 4.f + glance * 30.f : pose.bank * 10;
+        turn += 155.f * bowling::PinsetterCycle::ease(strikeSalute, 0, .28f);
+        rlRotatef(turn, 0, 1, 0);
+        const float tip = std::sin(PI * bowling::PinsetterCycle::ease(strikeSalute, .16f, .89f));
+        SetShaderValue(shader, GetShaderLocation(shader, "capTip"), &tip, SHADER_UNIFORM_FLOAT);
         rlRotatef(pose.pull * 7 - pose.recoil * 9, 1, 0, 0);
         const Vector3 finLoad{pose.pull, pose.bank, pose.recoil};
         SetShaderValue(shader, GetShaderLocation(shader, "finLoad"), &finLoad, SHADER_UNIFORM_VEC3);
         material(6);
         DrawModel(rayBody, {0, 0, 0}, 1, WHITE);
         material(0);
+        const float level = 0;
+        SetShaderValue(shader, GetShaderLocation(shader, "capTip"), &level, SHADER_UNIFORM_FLOAT);
         const Vector3 resting{};
         SetShaderValue(shader, GetShaderLocation(shader, "finLoad"), &resting, SHADER_UNIFORM_VEC3);
         rlPopMatrix();
@@ -879,13 +917,94 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         // sign() expects render textures (inverted Y); loaded PNGs use opposite UVs.
         sign(texture, position, w, h, true);
     }
+    void pinsetter(geo::LaneLayout lane, Color paint) {
+        const float end = lane.surfaceEnd(), z = setter.bladeZ(lane);
+        const float y = 4.32f - 3.83f * setter.lowered();
+        const Color metal = mascot ? Color{183, 141, 82, 255} : Color{157, 173, 174, 255};
+        const Color frame = mascot ? Color{26, 82, 86, 255} : Color{49, 64, 68, 255};
+        const Color rubber{31, 34, 36, 255};
+        // Behind the playable maple is a shallow conveyor and a row of rubber impact flaps.
+        box({0, -.91f, end + 1.55f}, {10.9f, .28f, 3.25f}, rubber);
+        for (int i = -6; i <= 6; ++i) {
+            float x = i * .82f;
+            box({x, .48f, end + 2.78f}, {.79f, 1.83f, .22f}, i % 2 ? rubber : Color{40, 44, 45, 255});
+            beam({x - .21f, 1.28f, end + 2.64f}, {x + .21f, 1.28f, end + 2.64f}, .038f, metal);
+        }
+        for (int side : {-1, 1}) {
+            const float x = side * 5.48f;
+            box({x, -.23f, end + 1.45f}, {.41f, 1.24f, 3.4f}, frame);
+            box({x, 2.35f, end + 1.78f}, {.32f, 4.9f, .47f}, frame);
+            box({x, 4.67f, (lane.headPin()+end)*.5f}, {.28f, .25f, 17.f}, metal);
+            Vector3 trolley{x, 4.48f, z}, elbow{x, (y + 4.53f)*.5f, z + .55f};
+            beam(trolley, elbow, .095f, metal);
+            beam(elbow, {x, y, z}, .092f, frame);
+            orb(elbow, {.15f, .15f, .15f}, metal);
+            box(trolley, {.51f, .26f, .62f}, frame);
+            if (mascot) {
+                // Slender glazing with a bright top edge beside the brass pit frame.
+                DrawCubeV({x, .48f, end + 1.55f}, {.069f, .67f, 3.12f}, {126, 224, 218, 122});
+                box({x, .83f, end + 1.55f}, {.16f, .05f, 3.14f}, metal);
+            }
+        }
+        box({0, 1.49f, end+2.8f}, {11.4f, .22f, .4f}, frame);
+        box({0, y, z}, {11.13f, .52f, .35f}, metal);
+        box({0, y, z-.19f}, {10.88f, .35f, .05f}, mascot ? frame : paint);
+        box({0, y-.27f, z}, {10.9f, .15f, .37f}, rubber);
+        for (int side : {-1, 1}) {
+            for (int stripe = 0; stripe < 3; ++stripe) {
+                float x = side*(3.2f + stripe*.46f);
+                beam({x, y-.11f, z-.24f}, {x+side*.22f, y+.11f, z-.24f}, .052f, cream);
+            }
+            orb({side*5.18f, y, z-.23f}, {.087f, .087f, .034f}, metal);
+        }
+        orb({0, y, z-.22f}, {.36f, .36f, .07f}, metal);
+        sign(teamLogos[mascot ? 9 : arena], {0, y, z-.30f}, .55f, .55f, true);
+    }
+
+    void fieldBox(float x, float z, float time, Color team) {
+        const Color rail{77, 99, 91, 255};
+        box({x, .37f, z}, {8.3f, .85f, 1.6f}, rail);
+        for (int i = 0; i < 7; ++i) {
+            float sx = x + (i-3)*1.07f;
+            float rise = crowdCheer * (.8f + .2f * std::sin(time*6.f + i));
+            float y = 1.37f + rise*.72f + (i%3)*.066f;
+            Color jersey = i%3 == 0 ? cream : (i%3 == 1 ? team : Color{156, 67, 50, 255});
+            Color skinTone = i%2 ? Color{173, 116, 76, 255} : Color{220, 166, 125, 255};
+            orb({sx, y, z}, {.29f, .44f, .20f}, jersey);
+            orb({sx, y+.52f, z}, {.195f,.25f,.19f}, skinTone);
+            orb({sx, y+.68f, z}, {.21f,.14f,.20f}, team);
+            box({sx, y+.64f, z-.17f}, {.36f,.045f,.24f}, team);
+            for (int hand : {-1,1}) {
+                float sway = std::sin(time*8.f+i+hand)*rise*.18f;
+                Vector3 shoulder{sx+hand*.21f, y+.22f, z};
+                Vector3 elbow{sx+hand*(.33f+.09f*rise), y+.02f+rise*.49f, z-.10f};
+                Vector3 palm{elbow.x+sway, y+.02f+rise*.87f, z-.25f};
+                beam(shoulder, elbow, .10f, jersey);
+                beam(elbow, palm, .066f, skinTone);
+                if (hand == 1 && i % 3 == 1) {
+                    Vector3 tip{palm.x + sway, palm.y + .67f, palm.z};
+                    beam(palm, tip, .024f, cream);
+                    Vector3 fly{tip.x-.54f, tip.y-.17f+.08f*rise*std::sin(time*10+i), tip.z};
+                    DrawTriangle3D(tip, fly, {tip.x, tip.y-.31f, tip.z}, team);
+                    DrawTriangle3D(tip, {tip.x, tip.y-.31f, tip.z}, fly, team);
+                }
+            }
+        }
+        box({x, 1.21f, z-.47f}, {8.45f,.13f,.14f}, rail);
+    }
+
     void stadiumScenery(float time, Color team) {
-        // The playable lane sits on the diamond, with a full ballpark around it.
         const float extra = geo::sceneryExtension;
         material(8);
-        for (int stripe = 0; stripe < 18 + int(extra / 4) + 2; ++stripe)
-            box({0, -.24f, -12 + stripe * 4.f}, {118, .12f, 4.01f},
-                stripe % 2 ? Color{47, 111, 57, 255} : Color{58, 129, 65, 255});
+        for (int stripe = 0; stripe < 18 + int(extra / 4) + 2; ++stripe) {
+            float z = -12.f + stripe * 4;
+            Color grass = stripe % 2 ? Color{47, 111, 57, 255} : Color{58, 129, 65, 255};
+            float worldZ = 2.f + (z-2.f)*sceneryDepthScale;
+            if (std::abs(worldZ - (geo::stadiumLane.surfaceEnd()+1.5f)) < 6.f) {
+                for (int side : {-1, 1})
+                    box({side*32.19f, -.24f, z}, {53.62f, .12f, 4.01f}, grass);
+            } else box({0, -.24f, z}, {118, .12f, 4.01f}, grass);
+        }
         material(0);
         for (int side : {-1, 1}) {
             fieldPath({0, -.13f, -8}, {side * 21.f, -.13f, 10}, 2.8f, {166, 112, 67, 255});
@@ -899,9 +1018,6 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         }
         box({0, .03f, -8}, {.8f, .08f, .8f}, cream);
         box({0, .03f, 30}, {.8f, .08f, .8f}, cream);
-        // Low pin return keeps the stadium visible above the deck.
-        box({0, .6f, 31 + extra}, {11, 1.2f, 1.2f}, {11, 28, 43, 255});
-        box({0, 1.25f, 31 + extra}, {11.3f, .12f, 1.3f}, team);
         const bool paintedPark = arena == 0 || arena == 9;
         if (paintedPark) {
             Texture2D backdrop = arena == 0 ? wrigley : trop;
@@ -975,6 +1091,20 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                         orb({side * 36.f - 2 + col, 21.5f + row, z - .3f}, {.28f, .28f, .08f},
                             {255, 235, 185, 255});
             }
+        for (int side : {-1, 1})
+            fieldBox(side * 11.7f, 34 + extra, time, team);
+        if (arena == 0) {
+            // Exposed brick at the base of the ivy; the painted outfield wraps behind it.
+            material(2);
+            box({0, .66f, 43.8f+extra}, {103, 1.48f, .85f}, {145, 79, 55, 255});
+            material(0);
+            box({0, 1.40f, 43.8f+extra}, {103, .12f, .98f}, {176, 124, 84, 255});
+            for (int bay = 0; bay < 3; ++bay) {
+                float x = -23.5f + bay * 5.7f;
+                beam({x, 1.4f, 42+extra}, {x+5.7f, 7.2f, 42+extra}, .16f, {87, 104, 93, 255});
+                beam({x+5.7f, 1.4f, 42+extra}, {x, 7.2f, 42+extra}, .16f, {87, 104, 93, 255});
+            }
+        }
         // Stadium identity belongs on the outfield infrastructure, not over the pins.
         Color boardPaint = (arena == 0 || arena == 1) ? Color{58, 77, 51, 255} : Color{19, 23, 25, 255};
         float boardX = arena == 9 ? 0.f : -15.f, boardW = arena == 9 ? 39.f : (arena == 0 ? 19.f : 23.f);
@@ -1060,14 +1190,19 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         for (size_t i = 0; i < sim.pins.size(); ++i) {
             const auto &pinBody = sim.pins[i];
             float lean = std::sin(pinBody.fall * 86.f * DEG2RAD);
-            shadow[i] = {geo::renderX(pinBody.x), pinBody.id % 2 ? lean : -lean, pinBody.z};
+            shadow[i] = {geo::renderX(pinBody.x), pinBody.id % 2 ? lean : -lean, setter.pinZ(pinBody, sim.layout)};
         }
         SetShaderValueV(shader, GetShaderLocation(shader, "pinShadows"), shadow, SHADER_UNIFORM_VEC3,
                         10);
         Vector3 ballPos{geo::renderX(sim.hasBall ? sim.ball.x : shot.position), 0,
                         sim.hasBall ? sim.ball.z : geo::foulLine};
         const float slingDraw = mascot && aim ? mascotPose.pull * 2.7f : 0.f;
-        Vector3 shadowBall{ballPos.x, 0, ballPos.z - slingDraw};
+        if (sim.hasBall && setter.progress > 0) {
+            const float coast = bowling::PinsetterCycle::ease(setter.progress, 0, .42f);
+            if (!mascot) ballPos.z += coast * (sim.layout.surfaceEnd() + 1.4f - ballPos.z);
+            else ballPos.x += coast * ((ballPos.x < 0 ? -4.25f : 4.25f) - ballPos.x);
+        }
+        Vector3 shadowBall{ballPos.x, sim.hasBall ? sim.ball.r : geo::ballRadius, ballPos.z - slingDraw};
         SetShaderValue(shader, GetShaderLocation(shader, "ballShadow"), &shadowBall,
                        SHADER_UNIFORM_VEC3);
         SetShaderValue(shader, GetShaderLocation(shader, "sceneTime"), &time, SHADER_UNIFORM_FLOAT);
@@ -1149,20 +1284,22 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                                   1.5f, time);
                 }
         }
+        pinsetter(sim.layout, team);
         for (const auto &p : sim.pins)
-            drawPin(p, time);
+            drawPin(p, time, sim.layout);
         if (mascot && sim.active && ballPos.z < sim.layout.headPin() && !sim.gutter)
             rideWake(ballPos, sim.ball, sim.elapsed);
-        if (ballPos.z < surfaceEnd) {
+        if (ballPos.z < surfaceEnd + .95f) {
             if (mascot)
                 rider({ballPos.x, .57f,
                        ballPos.z - (aim ? mascotPose.pull * 2.7f : 0)},
                       time, aim, mascotPose, sim.gutter);
             else
-                bowlingBall({ballPos.x, sim.gutter ? .28f : (sim.hasBall ? sim.ball.r : geo::ballRadius),
+                bowlingBall({ballPos.x, (sim.gutter ? .28f : shadowBall.y) -
+                                 1.45f * bowling::PinsetterCycle::ease(ballPos.z, surfaceEnd - .3f, surfaceEnd + 1.f),
                              ballPos.z},
                             sim.hasBall ? (ballPos.z - geo::foulLine) * RAD2DEG / sim.ball.r : 0.f,
-                            sim.hasBall ? sim.ball.r : geo::ballRadius);
+                            shadowBall.y, sim.hasBall ? (sim.ball.x - shot.position) * RAD2DEG / sim.ball.r : 0.f);
         }
         if (mascot && !deckOnly && (aim || (sim.active && sim.elapsed < .48f))) {
             const float spring = aim ? 0 : std::exp(-10 * sim.elapsed) * std::cos(23 * sim.elapsed);
@@ -1194,7 +1331,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
     void close() {
         for (auto texture : reactions)
             UnloadTexture(texture);
-        for (auto texture : {gearCase, wrigley, tank, reef, spray, trop, sunburst, tokenMedal, manualBoard, electricBoard,
+        for (auto texture : {strikePennant, gearCase, wrigley, tank, reef, spray, trop, sunburst, tokenMedal, manualBoard, electricBoard,
                              scorePlates, enamelLettering, pinGauge, scoreRails[0], scoreRails[1]})
             UnloadTexture(texture);
         for (auto texture : badges)

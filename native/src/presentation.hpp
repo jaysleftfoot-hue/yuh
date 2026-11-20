@@ -180,6 +180,26 @@ inline bool closeFinish(int yours, int theirs) {
     return std::abs(yours - theirs) <= 10;
 }
 
+// Visual timing in the existing interval between a delivery and the next rack.
+struct PinsetterCycle {
+    static constexpr float duration = 1.4f;
+    float progress = 0;
+    static float ease(float t, float start, float end) {
+        t = std::clamp((t - start) / (end - start), 0.f, 1.f);
+        return t * t * (3 - 2 * t);
+    }
+    float forward() const { return ease(progress, 0, .17f) - ease(progress, .39f, .77f); }
+    float lowered() const { return ease(progress, .16f, .32f) - ease(progress, .78f, .94f); }
+    float lift() const { return 1.42f * (ease(progress, .16f, .34f) - ease(progress, .82f, .99f)); }
+    float bladeZ(geometry::LaneLayout lane) const {
+        return lane.surfaceEnd() + .40f - forward() * (lane.surfaceEnd() + .40f - (lane.headPin() - 1.9f));
+    }
+    float pinZ(const Body &pin, geometry::LaneLayout lane) const {
+        if (!pin.down || progress <= .39f) return pin.z;
+        return std::max(pin.z, bladeZ(lane) + .65f);
+    }
+};
+
 struct MascotPose {
     float pull = 0;     // 0 at rest, 1 fully drawn.
     float recoil = 0;   // Signed damped release spring.

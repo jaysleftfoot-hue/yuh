@@ -45,6 +45,8 @@ Backspace returns to the previous step before launch. Locked position and curve 
 
 ## Graphics and proportions
 
+Both pin decks have a mechanical sweep. During the 1.4-second reset, the machine lifts standing pins, clears fallen pins into the pit and lowers the spare leave. After a strike, the score rail drops a hinged enamel pennant. Stadium fans wave and the aquarium rider turns to tip its cap. [Watch the native game](docs/pinsetter-in-play.mp4).
+
 Stadium Bowling places the playable lane on the baseball field: striped turf, base paths, dugouts, outfield walls, a seating bowl, crowd, floodlights and stadium landmark silhouettes surround it. There is no generic indoor bowling-hall ceiling or concourse. Wrigley has ivy/brick cues; Tropicana has a roof framework and touch-tank cues. These remain stylized interpretations, not architectural replicas.
 
 Rays Adventure is a separate fantasy course inspired by the supplied Polar/Shrek visuals: navy/aqua surroundings, water channels, rays, bubbles, foliage accents and an original ray riding an inflatable tube. Its downward-tilted opening view and shorter run follow the screen proportions of the supplied Polar Bowler clip. See [the measured framing and lane dimensions](PROPORTIONS.md).

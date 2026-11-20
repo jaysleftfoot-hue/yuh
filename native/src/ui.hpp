@@ -86,7 +86,11 @@ inline void scoreboardLights(const std::string &value, float cx, float top, floa
         left += 6 * pitch;
     }
 }
-inline void baseballHud(Texture2D portraits, Texture2D pinGauge, int player, int rival, const std::array<bool, 10> &standing) {
+inline void baseballHud(Texture2D portraits, Texture2D pinGauge, int player, int rival, const bowling::Simulation &lane) {
+    const auto standing = lane.standingPins();
+    std::array<float, 10> afterglow{};
+    for (const auto &p : lane.pins)
+        if (p.down) afterglow[p.id] = 1.f - p.fall;
     // Painted turf/rock cornice connects the shallow slate scoreboards.
     DrawTexturePro(uiFrame, {0, 0, float(uiFrame.width), uiFrame.height * .135f}, {0, 58, 1280, 55},
                    {0, 0}, 0, WHITE);
@@ -97,11 +101,12 @@ inline void baseballHud(Texture2D portraits, Texture2D pinGauge, int player, int
         for (int col = 0; col <= row; ++col) {
             const float x = 640 + (row * .5f - col) * 19;
             const float y = 139 - row * 15;
-            const bool lit = standing[pin++];
+            float glow = standing[pin] ? 1.f : afterglow[pin] * afterglow[pin];
+            ++pin;
             DrawCircleV({x, y}, 6.5f, {41, 31, 17, 255});
-            DrawCircleV({x, y - .5f}, 5.f, lit ? Color{154, 225, 74, 255} : Color{65, 70, 55, 255});
-            if (lit)
-                DrawCircleV({x - 1, y - 1.5f}, 2.f, {233, 255, 173, 255});
+            DrawCircleV({x, y - .5f}, 5.f, ColorLerp({65, 70, 55, 255}, {154, 225, 74, 255}, glow));
+            if (glow > .01f)
+                DrawCircleV({x - 1, y - 1.5f}, 2.f, Fade({233, 255, 173, 255}, glow));
         }
     arcadeCenter(std::to_string(std::count(standing.begin(), standing.end(), true)) + " STANDING", 640,
                  164, 19);

@@ -8,8 +8,24 @@ using namespace bowling;
 constexpr int W = 1280, H = 800;
 enum class Screen { Title, Lane, Locker, Setup, Scores, Help };
 enum class Turn { Ready, Rolling, Reaction, Complete, Replay };
+struct RailTile {
+    struct Face {
+        std::string marks, score;
+    };
+    Face old, current;
+    float phase = 1;
+
+    void update(Face next, float dt) {
+        if (next.marks != current.marks || next.score != current.score) {
+            old = current;
+            current = std::move(next);
+            phase = 0;
+        }
+        phase = std::min(1.f, phase + dt / .39f);
+    }
+};
 // Each stitched rail carries a complete ten-frame scorebook.
-void scoreRail(const Game &game, Texture2D rail, bool rivalSide, const char *name, bool atBat, Color inkColor) {
+void scoreRail(const Game &game, std::array<RailTile, 10> &tiles, float dt, Texture2D rail, bool rivalSide, const char *name, bool atBat, Color inkColor) {
     const float x = rivalSide ? 652 : 4;
     sprite(rail, {x, 0, 624, 77});
     const auto scores = game.scores();
@@ -23,15 +39,21 @@ void scoreRail(const Game &game, Texture2D rail, bool rivalSide, const char *nam
             DrawCircleV({cx - 14, 15}, 4.5f, {93, 62, 24, 255});
             DrawCircleV({cx - 14, 14}, 2.8f, gold);
         }
-        const auto rolls = game.marks(frame);
-        if (!rolls.empty())
-            arcadeCenter(rolls, cx, 23, 18, cream);
-        else
-            DrawLineEx({cx - 4, 34}, {cx + 4, 33}, 2, {106, 112, 102, 235});
-        if (scores[frame]) {
-            total = *scores[frame];
-            arcadeCenter(std::to_string(total), cx, 40, 23, inkColor);
-        }
+        RailTile &tile = tiles[frame];
+        tile.update({game.marks(frame), scores[frame] ? std::to_string(*scores[frame]) : ""}, dt);
+        const auto &face = tile.phase < .5f ? tile.old : tile.current;
+        if (scores[frame]) total = *scores[frame];
+        const float hinge = std::abs(std::cos(PI * tile.phase));
+        rlPushMatrix();
+        rlTranslatef(cx, 40, 0);
+        rlScalef(1, std::max(.015f, hinge), 1);
+        // The shaded back and the pivot are visible only while a tile turns over.
+        if (tile.phase < 1)
+            DrawRectangle(-21, -17, 42, 38, Fade({74, 61, 46, 255}, .85f*(1-hinge)));
+        if (!face.marks.empty()) arcadeCenter(face.marks, 0, -17, 18, cream);
+        else DrawLineEx({-4, -6}, {4, -7}, 2, {106, 112, 102, 235});
+        if (!face.score.empty()) arcadeCenter(face.score, 0, 0, 23, inkColor);
+        rlPopMatrix();
         // Short scorekeeper's ticks leave the face a single continuous surface.
         DrawLineEx({cx + 25, 25}, {cx + 23, 54}, 1.5f, {142, 137, 116, 128});
     }
@@ -171,6 +193,8 @@ int main(int argc, char **argv) {
     StadiumSetup stadiumSetup;
     PinReplay replay;
     MascotMotion mascotMotion;
+    std::array<std::array<RailTile, 10>, 2> railTiles{};
+    float strikeSeconds = 0;
     MascotTokens tokens;
     RidePickups ridePickups;
     std::mt19937 rideRng(smoke || captureRequested ? 628u : std::random_device{}());
@@ -196,6 +220,7 @@ int main(int argc, char **argv) {
     std::string result = "WELCOME TO THE TOUR", reward;
     Camera3D camera{{0, 3.0f, -6.2f}, {0, 1.7f, 23}, {0, 1, 0}, 43, CAMERA_PERSPECTIVE};
     auto resetShot = [&]() {
+        strikeSeconds = 0;
         shot = Shot{};
         stadiumSetup.reset();
         ridePickups = {};
@@ -221,6 +246,7 @@ int main(int argc, char **argv) {
         pickupSeconds = 0;
     };
     auto restart = [&]() {
+        railTiles = {};
         match = Match(match.mascot);
         match.stage = arena;
         match.rival = roster[opponent].style;
@@ -516,7 +542,7 @@ int main(int argc, char **argv) {
                     turn = Turn::Replay;
                 else {
                     turn = Turn::Reaction;
-                    reaction = smoke ? .1f : 1.4f;
+                    reaction = smoke ? .1f : PinsetterCycle::duration;
                 }
             }
             if (turn != Turn::Rolling)
@@ -528,7 +554,7 @@ int main(int argc, char **argv) {
                     (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) &&
                      CheckCollisionPointRec(GetMousePosition(), replaySkip))) {
                     turn = Turn::Reaction;
-                    reaction = .65f;
+                    reaction = PinsetterCycle::duration;
                 }
             }
             if (turn == Turn::Reaction) {
@@ -609,6 +635,15 @@ int main(int argc, char **argv) {
         art.cue = screen == Screen::Lane ? stadiumCue : StadiumCue::None;
         art.cueSeconds = cueSeconds;
         const bool replaying = screen == Screen::Lane && turn == Turn::Replay;
+        const auto &view = replaying ? replay.view() : match.lanes[match.player];
+        const bool strike = screen == Screen::Lane && turn != Turn::Ready && turn != Turn::Complete &&
+                            match.outcome().strike && view.knocked() == 10;
+        if (!strike) strikeSeconds = 0;
+        else if (!paused) strikeSeconds += dt;
+        art.setter.progress = turn == Turn::Reaction
+            ? std::clamp(1.f - reaction / (smoke ? .1f : PinsetterCycle::duration), 0.f, 1.f) : 0;
+        art.strikeSalute = strike ? art.setter.progress : 0;
+        art.crowdCheer = PinsetterCycle::ease(strikeSeconds, 0, .26f);
         art.mascotPose = replaying ? replay.frame().rider : mascotMotion.pose;
         art.wave = ridePickups.wave;
         if (replaying) {
@@ -624,7 +659,6 @@ int main(int argc, char **argv) {
         art.updateScoreboard(match, paused ? 0.f : dt, replaying ? &replayFeed.texture : nullptr);
         const auto cameraStyle = match.mascot ? geometry::mascotCamera : geometry::stadiumCamera;
         camera.fovy = cameraStyle.fov;
-        const auto &view = replaying ? replay.view() : match.lanes[match.player];
         const float rack = view.layout.headPin();
         Vector3 desired{geometry::renderX(shot.position) * .25f, cameraStyle.height, cameraStyle.back},
             look{0, cameraStyle.targetHeight, rack};
@@ -850,9 +884,9 @@ int main(int argc, char **argv) {
             if (plaqueButton({891, 657, 216, 64}, "BACK"))
                 screen = lockerReturn;
         } else {
-            baseballHud(portraits, art.pinGauge, profile.avatar, opponent, view.standingPins());
-            scoreRail(match.games[0], art.scoreRails[0], false, "YOU", match.player == 0, gold);
-            scoreRail(match.games[1], art.scoreRails[1], true, roster[opponent].name, match.player == 1,
+            baseballHud(portraits, art.pinGauge, profile.avatar, opponent, view);
+            scoreRail(match.games[0], railTiles[0], paused ? 0.f : dt, art.scoreRails[0], false, "YOU", match.player == 0, gold);
+            scoreRail(match.games[1], railTiles[1], paused ? 0.f : dt, art.scoreRails[1], true, roster[opponent].name, match.player == 1,
                       {142, 232, 220, 255});
             title(splitDrill ? "FENWAY 7-10 DRILL" : match.mascot ? (powerRide ? "POWER RIDE" : "STRAIGHT RIDE") : arenas[arena].name,
                   184, 122, 20, cream);
@@ -872,22 +906,33 @@ int main(int argc, char **argv) {
                   : match.player == 0    ? "YOUR TURN"
                                          : "RIVAL'S TURN",
                   184, 148, 19, gold);
+            if (strikeSeconds > 0 && strikeSeconds < 1.8f) {
+                const float t = strikeSeconds;
+                float angle = -74.f * std::exp(-4.8f*t) * std::cos(12*t)
+                              - 85.f * PinsetterCycle::ease(t, 1.48f, 1.8f);
+                float y = 108.f - 88.f*(1-PinsetterCycle::ease(t, 0, .24f))
+                                - 88.f*PinsetterCycle::ease(t, 1.48f, 1.8f);
+                BeginScissorMode(322, 99, 215, 132);
+                DrawTexturePro(art.strikePennant, {0, 0, float(art.strikePennant.width), float(art.strikePennant.height)},
+                               {343, y, 182, 62}, {9, 7}, angle, WHITE);
+                EndScissorMode();
+            }
             if (turn == Turn::Replay) {
-                arcadeCenter(result, 640, 204, 41, gold);
+                if (!match.outcome().strike) arcadeCenter(result, 640, 204, 41, gold);
                 arcadeCenter("PIN DECK REPLAY", 640, 251, 26, cream);
                 button({500, 716, 280, 58}, "SKIP REPLAY / SPACE");
             }
             if (turn == Turn::Reaction) {
-                title(result, 260, 245, 46, gold);
-                if (!rivalLine.empty())
-                {
-                    panel({240, 292, 535, 58});
-                    rosterPortrait(portraits, opponent, {211, 279, 75, 75});
-                    title(rivalLine, 293, 307, 24, cream);
+                if (strikeSeconds == 0 || strikeSeconds >= 1.8f)
+                    title(result, 178, 192, 30, gold);
+                if (!rivalLine.empty()) {
+                    const float size = std::min(22.f, 345.f * 22 /
+                        MeasureTextEx(arcadeFont, rivalLine.c_str(), 22, 1).x);
+                    title(rivalLine, 178, 230, size, cream);
                 }
             }
 
-            if (celebration > 0)
+            if (celebration > 0 && !strike && turn != Turn::Replay)
                 for (int i = 0; i < 65; ++i) {
                     float phase = 2 - celebration;
                     DrawRectangle(int(640 + std::sin(i * 9.f) * phase * 450),

@@ -53,6 +53,13 @@ void main() {
     lit+=tex*max(dot(n,normalize(vec3(.7,.2,.6))),0.0)*vec3(.09,.20,.30);
     float gloss=pow(max(dot(n,normalize(key+v)),0.0),floorMaterial?100.0:62.0);
     lit+=vec3(.85,.91,1.0)*gloss*(floorMaterial?.48:.46)+rim*vec3(.035,.07,.09);
+    if(woodMode==7) {
+        // Two long diffusers reflected in clear resin; the team paint rolls beneath them.
+        vec3 r=reflect(-v,n);
+        float boxLight=1.-smoothstep(.88,1.08,max(abs(r.x+.32)/.36,abs(r.y-.72)/.095));
+        float strip=1.-smoothstep(.78,1.15,max(abs(r.x-.61)/.085,abs(r.y-.48)/.30));
+        lit+=max(-r.z,0.)*(boxLight*vec3(.77,.73,.65)+strip*vec3(.30,.37,.46));
+    }
     if(woodMode==1) {
         float plank=floor((world.x+30.0)*3.4);
         float grain=sin(world.x*165.0+noise(vec3(world.x*8.0,0,world.z*.7))*3.0);
@@ -93,9 +100,10 @@ void main() {
             vec2 d=(offset-axis*along)/vec2(.50,.85);
             shadow+=exp(-dot(d,d)*2.0)*mix(.52,.32,along);
         }
-        vec2 footprint=woodMode==5 ? vec2(1.46,1.63) : vec2(.8,1.2);
+        vec2 footprint=woodMode==5 ? vec2(1.46,1.63) : ballShadow.y*vec2(.90,1.13);
         vec2 d=(world.xz-ballShadow.xz)/footprint;
-        shadow+=exp(-dot(d,d)*1.8)*.60;
+        shadow+=exp(-dot(d,d)*1.8)*.58;
+        if(woodMode==1) shadow+=exp(-dot(d,d)*9.)*.24;
         lit*=1.0-min(shadow,.75);
         // Soft elongated ceiling-light glints in the varnish, not scene reflections.
         vec3 r=reflect(-v,n);

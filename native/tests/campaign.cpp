@@ -8,6 +8,23 @@ void require(bool b, const char *s) {
         throw std::runtime_error(s);
 }
 int main() {
+    for (auto lane : {geometry::stadiumLane, geometry::mascotLane}) {
+        Simulation rack(lane);
+        Body fallen = rack.pins.front();
+        fallen.down = true;
+        PinsetterCycle cycle;
+        require(cycle.pinZ(fallen, lane) == fallen.z && cycle.lift() == 0, "rack stays put at release");
+        cycle.progress = .36f;
+        require(cycle.bladeZ(lane) < lane.headPin() && cycle.lift() > 1,
+                "spare pins lift before the low sweep moves back");
+        cycle.progress = .8f;
+        require(cycle.pinZ(fallen, lane) > lane.surfaceEnd() &&
+                cycle.pinZ(rack.pins.back(), lane) == rack.pins.back().z,
+                "only fallen pins travel to the pit");
+        cycle.progress = 1;
+        require(cycle.lift() == 0 && cycle.lowered() == 0, "pinsetter parks for the next delivery");
+    }
+
     Shot input{};
     input.position = 3;
     input.curve = .2f;

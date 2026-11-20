@@ -1,3 +1,12 @@
+# Pinsetter and score rail animations
+
+- Ran the native scoring, geometry and campaign suites. The new presentation checks exercise both lane layouts and verify clearance above the sweep, fallen-pin travel, and the standing pins’ positions at reset.
+- Captured the normal launch and rack views in Stadium and Mascot. The Wrigley demo shot leaves two pins up. The sweep carries the other eight away and the second delivery opens with those same two pins. The strike preview shows the enamel pennant, crowd and outfield scoreboard. The aquarium strike shows the cap salute.
+- To inspect a reset at Wrigley, run `python3 native/headless.py --play --demo-shot --capture-frame 476 --screenshot artifacts/sweep.png`. Use `--demo-strike` at frame 308 for the celebration, and `--demo-wave` at frame 543 for the aquarium reaction.
+- Verified full Stadium, Straight Ride and Power Ride matches in the Linux build. The Windows package was cross-built and checked for CRC, asset contents and SHA-256. Windows playback and physical audio still need a target-machine playtest.
+
+[Native gameplay clip](pinsetter-in-play.mp4)
+
 # Rays aquarium graphics
 
 - Linux scoring, geometry, physics and campaign suites passed, including checks that Wave Crash starts at the recorded hit and rider pose follows the displayed replay sample.

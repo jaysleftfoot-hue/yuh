@@ -1,6 +1,6 @@
 # Current milestone
 
-**Current milestone.** The Rays aquarium graphics pass covers the sling, rider motion, power pickups, Wave Crash replay, underwater exhibits and pin finish. [In-game captures](native/docs/aquarium-ride.jpg) · [Graphics notes and repeatable shots](native/docs/ASTRA_HANDOFF.md)
+**Current milestone.** Both native modes now have an animated pinsetter, impact flaps and a recessed pit. The ball has lacquer reflections and lateral roll, Wrigley has exposed brick and scoreboard bracing, stadium fans celebrate, and the ray glances back and tips its cap. The score rails flip and the pin lamps dim as pins fall. [Gameplay clip](native/docs/pinsetter-in-play.mp4) · [Earlier aquarium artwork](native/docs/ASTRA_HANDOFF.md)
 
 The 64-ball locker now ships separate club logo, illustrated club, and Rays special wraps. The supplied MLB reference kit guides marks and themes. Left/right arrows rotate the selected locker preview. The existing unlock slots and XP thresholds still apply.
 
