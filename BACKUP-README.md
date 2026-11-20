@@ -1,1 +1,1 @@
-Aquarium graphics build from ba3525905e8afc6b992dce88c5837841b53d73b0. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
+Pinsetter and scoreboard build from 0d04b08941b6835ea4b99e3ccdcfe8cdbf7034c7. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
