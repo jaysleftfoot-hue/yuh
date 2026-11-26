@@ -1,5 +1,9 @@
 # Current milestone
 
+The live manual board is set into Fenway’s riveted wall. Kauffman has synchronized outfield fountains, and a riverboat passes beneath the yellow bridge at PNC. All ten parks have moving lane-side scenery. The home rival watches from the bench and reacts to strikes, a 7–10 leave and their own gutter. Stadium machines have numbered panels. The aquarium return carries moving water behind brass and glass. [In-game gallery](native/docs/park-milestones.jpg)
+
+Profile version 6 remembers newly earned balls for the pro shop display. Opening an older save leaves its existing collection available immediately. Unlocking the last park for the first time starts a skippable Tropicana fly-in. The installer and portable game are distributed together on [GitHub Releases](https://github.com/jaysleftfoot-hue/yuh/releases/latest).
+
 The native scene now renders at the size of the playable window area. Painted interface art and type are drawn at display resolution. Wrigley’s manual board tallies each delivery, and Mascot Ride uses turquoise pin lamps and a brass pressure gauge for the sling. The opening camera eases into the chase, and the pinsetter reset reveals the next shot. The aquarium light pattern follows the ray and tube. The captured deliveries include the next ready view.
 
 [Wrigley strike](native/docs/wrigley-delivery.mp4) · [Wrigley miss](native/docs/wrigley-miss-delivery.mp4) · [Aquarium strike](native/docs/aquarium-delivery.mp4) · [Aquarium miss](native/docs/aquarium-miss-delivery.mp4)

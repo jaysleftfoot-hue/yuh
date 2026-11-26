@@ -114,6 +114,21 @@ int main() {
     require(route.bonus(6) == 0 && !route.impact(ride, 0), "ride powers expire before the next shot");
     Profile p;
     require(p.balls() == 1 && p.stadiums() == 1, "initial unlocks");
+    Profile showcase;
+    showcase.award(0, 1, 0);
+    require(showcase.nextShowcase() == 1, "first earned ball waits in locker");
+    showcase.unseenBalls = 0;
+    showcase.finish(Challenge::FenwaySplit);
+    require(showcase.nextShowcase() == 33, "challenge ball enters the same showcase");
+    showcase.unseenBalls = 0;
+    showcase.xp = 33*80;
+    showcase.finish(Challenge::WrigleyWin);
+    showcase.unseenBalls = 0;
+    showcase.award(0, 1, 0);
+    require(showcase.nextShowcase() == -1, "XP does not repeat an acknowledged challenge ball");
+    showcase.xp = 5039;
+    showcase.award(0, 1, 0);
+    require(showcase.nextShowcase() == 63, "last design survives the 64-bit boundary");
     std::set<std::string> names;
     for (int i = 0; i < 64; ++i)
         names.insert(ballName(i));
@@ -154,7 +169,7 @@ int main() {
         require(std::count(seen.begin(), seen.end(), true) == (park == 9 ? 3 : 2), "home roster only");
     }
     require(restored.load(path) && restored.xp == p.xp && restored.cleared == p.cleared &&
-                restored.completed(Challenge::WrigleyWin), "restore challenge profile");
+                restored.unseenBalls == p.unseenBalls && restored.completed(Challenge::WrigleyWin), "restore challenge profile");
     p.xp += 80;
     p.avatar = 4;
     p.bestStraightRide = 165;
@@ -167,7 +182,18 @@ int main() {
         f << "BLB 1 80 1 2 100 1";
     }
     require(restored.load(path) && restored.xp == 80 && restored.stadiums() == 2 &&
-                restored.completedChallenges == 0 && restored.equippedBall == 0, "load existing version 1 save");
+                restored.unseenBalls == 0 && restored.completedChallenges == 0 && restored.equippedBall == 0, "load existing version 1 save");
+    {
+        std::ofstream f(path);
+        f << "BLB 5 160 1 2 100 1 0 0 0 0 2";
+    }
+    require(restored.load(path) && restored.equippedBall == 2 && restored.nextShowcase() < 0,
+            "upgrading keeps equipped design and skips retroactive unlock showcases");
+    {
+        std::ofstream f(path);
+        f << "BLB 6 0 0 0 0 0 0 0 0 0 0 8";
+    }
+    require(!restored.load(path), "locked balls cannot be queued in a save");
     {
         std::ofstream f(path);
         f << "BLB 1 -1 0 0 300 0";

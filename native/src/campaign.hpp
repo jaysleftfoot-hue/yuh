@@ -1,6 +1,7 @@
 #pragma once
 #include "game.hpp"
 #include "teams.hpp"
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <random>
@@ -57,12 +58,16 @@ struct Profile {
     int avatar = 0, bestStraightRide = 0, bestPowerRide = 0;
     int xp = 0, wins = 0, matches = 0, best = 0, equippedBall = 0;
     unsigned cleared = 0, completedChallenges = 0;
+    std::uint64_t unseenBalls = 0;
     bool completed(Challenge challenge) const {
         return (completedChallenges & challengeBit(challenge)) != 0;
     }
     bool finish(Challenge challenge) {
         if (completed(challenge))
             return false;
+        for (const auto &reward : challenges)
+            if (reward.challenge == challenge && !ballUnlocked(reward.ball))
+                unseenBalls |= std::uint64_t{1} << reward.ball;
         completedChallenges |= challengeBit(challenge);
         return true;
     }
@@ -70,6 +75,17 @@ struct Profile {
         const auto *reward = ballChallenge(ball);
         return ball >= 0 && ball < 64 &&
                (xp >= ball * 80 || (reward && completed(reward->challenge)));
+    }
+    std::uint64_t unlockedMask() const {
+        std::uint64_t mask = 0;
+        for (int id = 0; id < 64; ++id)
+            if (ballUnlocked(id)) mask |= std::uint64_t{1} << id;
+        return mask;
+    }
+    int nextShowcase() const {
+        for (int id = 0; id < 64; ++id)
+            if (unseenBalls & (std::uint64_t{1} << id)) return id;
+        return -1;
     }
     int balls() const {
         int count = 0;
@@ -89,7 +105,7 @@ struct Profile {
         int version;
         Profile p;
         if (!(f >> magic >> version >> p.xp >> p.wins >> p.matches >> p.best >> p.cleared) ||
-            magic != "BLB" || (version < 1 || version > 5) || p.xp < 0 || p.xp > 100000000 || p.wins < 0 ||
+            magic != "BLB" || (version < 1 || version > 6) || p.xp < 0 || p.xp > 100000000 || p.wins < 0 ||
             p.matches < p.wins || p.best < 0 || p.best > 300 || p.cleared > 1023)
             return false;
         if (version >= 2 && (!(f >> p.completedChallenges) || p.completedChallenges > 7))
@@ -101,6 +117,8 @@ struct Profile {
             p.bestPowerRide < 0 || p.bestPowerRide > 420))
             return false;
         if (version >= 5 && (!(f >> p.equippedBall) || !p.ballUnlocked(p.equippedBall)))
+            return false;
+        if (version >= 6 && (!(f >> p.unseenBalls) || (p.unseenBalls & ~p.unlockedMask())))
             return false;
         *this = p;
         return true;
@@ -116,9 +134,9 @@ struct Profile {
         const auto temp = path + ".tmp";
         {
             std::ofstream f(temp);
-            f << "BLB 5 " << xp << ' ' << wins << ' ' << matches << ' ' << best << ' ' << cleared
+            f << "BLB 6 " << xp << ' ' << wins << ' ' << matches << ' ' << best << ' ' << cleared
               << ' ' << completedChallenges << ' ' << avatar << ' ' << bestStraightRide << ' '
-              << bestPowerRide << ' ' << equippedBall << '\n';
+              << bestPowerRide << ' ' << equippedBall << ' ' << unseenBalls << '\n';
             f.close();
             if (!f)
                 return false;
@@ -146,7 +164,9 @@ struct Profile {
             cleared |= 1u << arena;
         }
         int gained = 120 + score + (win ? 150 : 0);
+        const auto before = unlockedMask();
         xp = std::min(100000000, xp + gained);
+        unseenBalls |= unlockedMask() & ~before;
         return gained;
     }
 };

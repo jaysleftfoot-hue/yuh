@@ -162,6 +162,7 @@ int main(int argc, char **argv) {
         throw std::runtime_error("Missing ballpark-roster.jpg");
     GenTextureMipmaps(&portraits);
     SetTextureFilter(portraits, TEXTURE_FILTER_TRILINEAR);
+    art.rivalAtlas = portraits;
     auto uiTexture = [](const char *name) {
         Texture2D t = LoadTexture((std::string(GetApplicationDirectory()) + "assets/" + name).c_str());
         if (!t.id)
@@ -210,6 +211,10 @@ int main(int argc, char **argv) {
     Turn turn = Turn::Ready;
     Screen screen = startInGame || smoke ? Screen::Lane : Screen::Title;
     Screen lockerReturn = Screen::Title;
+    int featuredBall = -1;
+    float showcaseTime = 0, flyInLeft = 0;
+    constexpr float flyInDuration = 4.8f;
+    const Match arrivalMatch(false);
     int arena = previewArena < 0 ? 0 : previewArena;
     std::mt19937 rosterRng(smoke || captureRequested ? 391u : std::random_device{}());
     int opponent = drawHomeRival(arena, rosterRng);
@@ -233,6 +238,14 @@ int main(int argc, char **argv) {
     };
     auto saveCareer = [&]() {
         return smoke || captureRequested || previewArena >= 0 || profile.save(save);
+    };
+    auto openLocker = [&](Screen from) {
+        selectedSkin = skin;
+        featuredBall = profile.nextShowcase();
+        previewAngle = showcaseTime = 0;
+        lockerSaveFailed = false;
+        lockerReturn = from;
+        screen = Screen::Locker;
     };
     auto completeChallenge = [&](Challenge challenge) {
         if (!profile.finish(challenge))
@@ -264,6 +277,7 @@ int main(int argc, char **argv) {
         mascotMotion = {};
         replay.reset();
         stadiumCue = StadiumCue::None;
+        flyInLeft = 0;
         cueSeconds = 0;
         challengeMessage.clear();
         rivalLine.clear();
@@ -340,7 +354,11 @@ int main(int argc, char **argv) {
             equipmentOpen = !equipmentOpen;
             charge = stadiumArmed = false;
         }
-        if (equipmentOpen && IsKeyPressed(KEY_ESCAPE))
+        if (flyInLeft > 0 && IsKeyPressed(KEY_ESCAPE))
+            flyInLeft = 0;
+        else if (screen == Screen::Locker && featuredBall >= 0 && IsKeyPressed(KEY_ESCAPE))
+            featuredBall = -1;
+        else if (equipmentOpen && IsKeyPressed(KEY_ESCAPE))
             equipmentOpen = false;
         else if (IsKeyPressed(KEY_ESCAPE)) {
             if (screen == Screen::Lane) {
@@ -609,6 +627,7 @@ int main(int argc, char **argv) {
                         if (profile.stadiums() == 10) {
                             stadiumCue = StadiumCue::TropicanaUnlocked;
                             cueSeconds = 5.f;
+                            flyInLeft = flyInDuration;
                         } else
                             reward += " | NEXT STADIUM OPEN!";
                     }
@@ -637,9 +656,12 @@ int main(int argc, char **argv) {
         const bool previewTick = captureAtTick && ticks == captureFrame;
         if (smoke && ticks % 12 && !match.complete() && !previewTick)
             continue;
-        art.arena = arena;
+        const bool flyIn = flyInLeft > 0 && screen == Screen::Lane;
+        art.arrival = flyIn ? 1.f - flyInLeft/flyInDuration : 1.f;
+        art.arena = flyIn ? 9 : arena;
+        art.rivalId = flyIn ? 3 : opponent;
         art.skin = skin;
-        art.mascot = match.mascot;
+        art.mascot = !flyIn && match.mascot;
         const auto &pickup = pickups[match.player].item;
         art.powerPickup = !splitDrill && !match.mascot && pickup ? &*pickup : nullptr;
         art.ridePickups = match.mascot && (charge || turn == Turn::Rolling) ? &ridePickups : nullptr;
@@ -649,7 +671,15 @@ int main(int argc, char **argv) {
         art.cueSeconds = cueSeconds;
         art.pickupBurst = std::clamp((pickupSeconds-1.2f)/.4f,0.f,1.f);
         const bool replaying = screen == Screen::Lane && turn == Turn::Replay;
-        const auto &view = replaying ? replay.view() : match.lanes[match.player];
+        const auto &view = flyIn ? arrivalMatch.lanes[0] : replaying ? replay.view() : match.lanes[match.player];
+        art.cameo = Art::Cameo::Rest;
+        if (turn == Turn::Reaction && !match.mascot) {
+            const auto roll = match.outcome();
+            art.cameoPhase = std::clamp(1.f-reaction/PinsetterCycle::duration,0.f,1.f);
+            if (roll.strike) art.cameo = Art::Cameo::Tip;
+            else if (!human && roll.gutter) art.cameo = Art::Cameo::Wince;
+            else if (sevenTen(view)) art.cameo = Art::Cameo::Lean;
+        } else if (turn == Turn::Ready && sevenTen(view)) art.cameo = Art::Cameo::Lean;
         const bool strike = screen == Screen::Lane && turn != Turn::Ready && turn != Turn::Complete &&
                             match.outcome().strike && view.knocked() == 10;
         if (!strike) strikeSeconds = 0;
@@ -671,7 +701,7 @@ int main(int argc, char **argv) {
             art.world(replay.view(), shot, false, arenas[arena].team, boardCamera, replay.seconds, true);
             EndTextureMode();
         }
-        art.updateScoreboard(match, paused ? 0.f : dt, replaying ? &replayFeed.texture : nullptr);
+        art.updateScoreboard(flyIn ? arrivalMatch : match, paused ? 0.f : dt, replaying ? &replayFeed.texture : nullptr);
         const auto cameraStyle = match.mascot ? geometry::mascotCamera : geometry::stadiumCamera;
         camera.fovy = cameraStyle.fov;
         const float rack = view.layout.headPin();
@@ -708,6 +738,12 @@ int main(int argc, char **argv) {
             Vector3Lerp(camera.position, desired, std::min(1.f, dt * (turn == Turn::Rolling ? 18 : 5)));
         camera.target =
             Vector3Lerp(camera.target, look, std::min(1.f, dt * (turn == Turn::Rolling ? 18 : 5)));
+        if (flyIn) {
+            float t = PinsetterCycle::ease(art.arrival,0,1);
+            camera.position = Vector3Lerp({19,24,69},{-3,6.2f,129},t);
+            camera.target = Vector3Lerp({-8,21,137},{0,8.4f,192},t);
+            camera.fovy = 57.f-9.f*t;
+        }
         const int sceneWidth = std::max(1,int(std::round(W*scale)));
         const int sceneHeight = std::max(1,int(std::round(H*scale)));
         if (sceneWidth != requestedSceneWidth || sceneHeight != requestedSceneHeight) {
@@ -728,7 +764,7 @@ int main(int argc, char **argv) {
             DrawTexturePro(art.tank, {0, 0, float(art.tank.width), float(art.tank.height)},
                            {0, 0, sceneSource.width, -sceneSource.height}, {}, 0, {72, 122, 145, 255});
         if (screen == Screen::Lane || screen == Screen::Setup)
-            art.world(view, shot, turn == Turn::Ready && screen == Screen::Lane, arenas[arena].team,
+            art.world(view, shot, turn == Turn::Ready && screen == Screen::Lane, arenas[art.arena].team,
                       camera, replaying ? replay.seconds : time);
         EndTextureMode();
         BeginDrawing();
@@ -766,11 +802,7 @@ int main(int argc, char **argv) {
                 audio.play(audio.click);
             }
             if (button({145, 718, 190, 42}, "BALL LOCKER")) {
-                selectedSkin = skin;
-                previewAngle = 0;
-                lockerSaveFailed = false;
-                lockerReturn = Screen::Title;
-                screen = Screen::Locker;
+                openLocker(Screen::Title);
             }
             if (button({350, 718, 145, 42}, "SCORES"))
                 screen = Screen::Scores;
@@ -864,11 +896,7 @@ int main(int argc, char **argv) {
             if (plaqueButton({659, 650, 226, 65}, "BACK"))
                 screen = Screen::Title;
             if (button({275, 594, 212, 35}, "BALL LOCKER")) {
-                selectedSkin = skin;
-                previewAngle = 0;
-                lockerSaveFailed = false;
-                lockerReturn = Screen::Setup;
-                screen = Screen::Locker;
+                openLocker(Screen::Setup);
             }
             if (arena == 1 && unlocked && !match.mascot) {
                 if (button({808, 591, 184, 37}, "7-10 SPLIT DRILL")) {
@@ -883,6 +911,31 @@ int main(int argc, char **argv) {
                 }
             } else
                 arcadeCenter("PARK " + std::to_string(arena + 1) + " / 10", 900, 598, 20, gold);
+        } else if (screen == Screen::Locker && featuredBall >= 0) {
+            showcaseTime += dt;
+            sprite(art.shop,{0,0,W,H});
+            DrawRectangle(0,0,W,H,{15,10,9,202});
+            // Frame the painted brass turntable under the shop's own lamp.
+            const float sx=art.shop.width/640.f, sy=art.shop.height/400.f;
+            DrawTexturePro(art.shop,{392*sx,0,232*sx,281*sy},{292,-20,696,843},{},0,WHITE);
+            arcadeCenter("NEW IN YOUR LOCKER",640,141,35,gold);
+            auto name=ballName(featuredBall);
+            arcadeCenter(name,640,700,std::min(40.f,428.f*40.f/tw(name,40)),cream);
+            const float angle=std::fmod(showcaseTime*.19f,1.f);
+            SetShaderValue(uiBallShader,lockerLongitude,&angle,SHADER_UNIFORM_FLOAT);
+            ballIcon(art.skins[featuredBall],458,215,364);
+            const float front=0;
+            SetShaderValue(uiBallShader,lockerLongitude,&front,SHADER_UNIFORM_FLOAT);
+            const bool equip=plaqueButton({37,632,255,67},"EQUIP BALL");
+            if (equip || plaqueButton({988,632,255,67},"CONTINUE") || IsKeyPressed(KEY_ENTER)) {
+                selectedSkin=featuredBall;
+                if(equip) skin=featuredBall;
+                profile.unseenBalls &= ~(std::uint64_t{1} << featuredBall);
+                lockerSaveFailed=!saveCareer();
+                featuredBall=profile.nextShowcase();
+                showcaseTime=previewAngle=0;
+            }
+            if (button({495,757,290,39},"BROWSE LOCKER")) featuredBall=-1;
         } else if (screen == Screen::Locker) {
             sprite(art.shop, {0, 0, W, H});
             arcadeCenter("THE BALL LOCKER", 446, 103, 52, cream);
@@ -942,6 +995,12 @@ int main(int argc, char **argv) {
             arcadeCenter(lockerSaveFailed ? "SAVE FAILED" : "EQUIPPED: " + ballName(skin), 445, 704, 22, gold);
             if (plaqueButton({1028, 722, 164, 55}, "BACK"))
                 screen = lockerReturn;
+        } else if (flyIn) {
+            arcadeCenter("FINAL PARK UNLOCKED",640,68,29,gold);
+            arcadeCenter("TROPICANA FIELD",640,111,57,cream);
+            if (button({484,715,312,60},"SKIP FLY-IN") || IsKeyPressed(KEY_SPACE) ||
+                IsKeyPressed(KEY_ENTER)) flyInLeft=0;
+            else flyInLeft=std::max(0.f,flyInLeft-dt);
         } else {
             baseballHud(portraits, art.pinGauge, profile.avatar, opponent, view, match.mascot);
             scoreRail(match.games[0], railTiles[0], paused ? 0.f : dt, art.scoreRails[0], false, "YOU", match.player == 0, match.mascot ? aqua : gold, match.mascot);
@@ -1085,7 +1144,7 @@ int main(int argc, char **argv) {
             equipmentOpen = true;
             charge = stadiumArmed = false;
         }
-        if (screen == Screen::Lane && button({8, 724, 144, 64}, "MENU")) {
+        if (!flyIn && screen == Screen::Lane && button({8, 724, 144, 64}, "MENU")) {
             paused = true;
             charge = false;
             stadiumArmed = false;

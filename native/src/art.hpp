@@ -14,6 +14,11 @@ struct Art {
     float strikeSalute = 0; // 0..1 during the live post-strike sweep
     float crowdCheer = 0, deckRattle = 0, pickupBurst = 0;
     Texture2D strikePennant{}, shop{};
+    enum class Cameo { Rest, Tip, Wince, Lean };
+    Cameo cameo = Cameo::Rest;
+    float cameoPhase = 0, arrival = 1;
+    Texture2D rivalAtlas{};
+    int rivalId = 0;
     bool returningBall = false;
     Texture2D gearCase{}, tank{}, kelp{}, reef{}, spray{}, sunburst{}, tokenMedal{};
     std::array<Texture2D, 10> outfield{};
@@ -376,10 +381,10 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
             SetTextureFilter(scoreboard.texture, TEXTURE_FILTER_TRILINEAR);
         }
     }
-    void sign(Texture2D t, Vector3 p, float w, float h, bool image = false) {
+    void sign(Texture2D t, Vector3 p, float w, float h, bool image = false, Color tint = WHITE) {
         rlSetTexture(t.id);
         rlBegin(RL_QUADS);
-        rlColor4ub(255, 255, 255, 255);
+        rlColor4ub(tint.r,tint.g,tint.b,tint.a);
         rlNormal3f(0, 0, -1);
         rlTexCoord2f(1, image ? 1 : 0);
         rlVertex3f(p.x - w / 2, p.y - h / 2, p.z);
@@ -678,64 +683,159 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         rlPopMatrix();
     }
 
-    void landmarks(float time) {
-        Color brick = {145, 72, 48, 255};
-        if (arena == 1) {
-            box({-7, 5, 16}, {1, 10, 35}, {30, 99, 68, 255});
-            for (int i = 0; i < 12; ++i)
-                box({-6.45f, 5, 1.f + i * 3}, {.05f, 9.5f, .08f}, cream);
+    void pennant(Vector3 foot, float height, float time, Color color) {
+        const Vector3 top{foot.x, foot.y + height, foot.z};
+        beam(foot, top, .065f, cream);
+        Vector3 last = top, lower{top.x, top.y - 1.15f, top.z};
+        for (int i = 1; i <= 5; ++i) {
+            const float t = i / 5.f;
+            Vector3 next{top.x + t*3.1f, top.y - .48f*t,
+                         top.z + t*.5f*std::sin(time*3.2f-t*7.f+foot.x)};
+            Vector3 hem{next.x, next.y - 1.15f*(1.f-t), next.z};
+            DrawTriangle3D(last, lower, next, color);
+            DrawTriangle3D(lower, hem, next, color);
+            DrawTriangle3D(next, lower, last, color);
+            DrawTriangle3D(next, hem, lower, color);
+            last = next;
+            lower = hem;
         }
-        if (arena == 2) {
-            box({12, -.02f, 14}, {13, .1f, 42}, {29, 128, 177, 255});
-            for (int i = 0; i < 9; ++i)
-                box({12, .05f, float(i * 5)}, {9, .02f, .1f}, aqua);
+    }
+
+    void landmarks(float time, Color team) {
+        // Coordinates here share the outfield board's decorative space.
+        const float z = 40.f + geo::stadiumLane.sceneryExtension();
+        const Color bronze{192,151,70,255}, steel{67,92,91,255};
+        if (arena == 0) {
             for (int i = 0; i < 4; ++i)
-                box({-9, 1.5f, float(i * 9)}, {3, 3, 3}, brick);
-        }
-        if (arena == 3)
-            for (float z : {4.f, 28.f}) {
-                box({-10, 5, z}, {.5f, 10, .5f}, gold);
-                box({10, 5, z}, {.5f, 10, .5f}, gold);
-                box({0, 10, z}, {21, .45f, .5f}, gold);
-                for (int i = -4; i <= 4; ++i)
-                    beam({i * 2.f, 10, z}, {i * 2.f, 7, z}, .04f, gold);
+                pennant({5.f+i*6,4.1f,z+2},3.6f,time,i%2 ? cream : team);
+        } else if (arena == 1) {
+            // Riveted Monster panels behind the live manual score tiles.
+            material(13);
+            for (int bay = 0; bay < 12; ++bay) {
+                float x = 44.f - bay*4.f;
+                box({x, 7.6f, z+3.7f}, {3.98f,15.2f,1.2f},
+                    ColorBrightness({56,103,77,255}, .018f*(bay%3)));
+                box({x-1.96f,7.6f,z+2.98f},{.10f,15.2f,.10f},steel);
+                for (float y : {2.f,6.f,10.f,14.f})
+                    DrawCubeV({x-1.96f,y,z+2.91f},{.19f,.18f,.09f},bronze);
             }
-        if (arena == 5)
-            for (int side : {-1, 1})
-                for (float z : {7.f, 17.f, 28.f}) {
-                    cyl({side * 8.f, 0, z}, 1.5f, .3f, cream);
-                    cyl({side * 8.f, .32f, z}, 1.3f, .1f, {25, 129, 186, 255});
-                    for (int j = 0; j < 10; ++j) {
-                        float a = j * PI / 5;
-                        orb({side * 8.f + std::sin(a) * .6f, 1.4f + std::sin(time * 3 + j) * .5f,
-                             z + std::cos(a) * .6f},
-                            {.08f, 1, .08f}, aqua);
-                    }
+            box({22,15.23f,z+3.4f},{48.2f,.32f,1.65f},steel);
+            for (float x : {2.25f,1.45f})
+                beam({x,.65f,z+2.6f},{x,15.9f,z+2.6f},.08f,cream);
+            for (int r=0;r<18;++r)
+                beam({2.25f,1.f+r*.8f,z+2.6f},{1.45f,1.f+r*.8f,z+2.6f},.065f,cream);
+            material(0);
+            pennant({5,15.4f,z+3},3.1f,time,team);
+        } else if (arena == 2 || arena == 6) {
+            const bool cove = arena == 2;
+            const float x = cove ? 14.f : -15.f, waterZ = z-9.f;
+            const float width = cove ? 17.f : 11.f;
+            material(2);
+            box({x,.36f,waterZ},{width+1.f,.72f,8.5f},cove ? Color{150,75,56,255} : cream);
+            material(0);
+            box({x,.73f,waterZ},{width,.08f,7.6f},cove ? Color{36,126,153,255} : aqua);
+            for (int i=0;i<12;++i) {
+                float phase=time*1.4f+i;
+                float dx=std::sin(i*8.1f)*(width*.41f);
+                beam({x+dx,.80f,waterZ-3+i*.49f},{x+dx+1.1f+.65f*std::sin(phase),.81f,waterZ-3+i*.49f},
+                     .048f,{164,220,216,255});
+            }
+            if (cove) {
+                float kx=x+4.8f*std::sin(time*.24f), bob=.12f*std::sin(time*2);
+                orb({kx,1.04f+bob,waterZ},{1.75f,.32f,.48f},gold);
+                orb({kx,1.48f+bob,waterZ},{.37f,.54f,.25f},team);
+                beam({kx-1,1.85f+bob,waterZ},{kx+1,1.15f+bob,waterZ},.065f,cream);
+            } else {
+                for (float lx : {x+2,x+3})
+                    beam({lx,.82f,waterZ-3.9f},{lx,2.f,waterZ-3.9f},.10f,cream);
+                orb({x+3.5f*std::sin(time*.5f),1.23f,waterZ+1},{.55f,.55f,.55f},gold);
+            }
+        } else if (arena == 3) {
+            // Clemente Bridge, seen between the riverfront stands.
+            constexpr float left=1, right=37;
+            for (float depth : {z-2,z+1}) {
+                box({19,4.1f,depth},{36,.55f,.66f},bronze);
+                for (float x : {7.f,31.f}) {
+                    box({x,6.6f,depth},{.73f,13.2f,.77f},gold);
+                    beam({x,12.8f,z-2},{x,12.8f,z+1},.28f,bronze);
                 }
-        if (arena == 6) {
-            box({11, .1f, 24}, {7, .2f, 12}, {37, 172, 197, 255});
-        }
-        if (arena == 7) {
-            for (float z : {1.f, 12.f, 23.f, 34.f}) {
-                box({0, 11, z}, {24, .3f, .4f}, {123, 148, 156, 255});
-                for (int side : {-1, 1})
-                    box({side * 11.f, 5.5f, z}, {.4f, 11, .4f}, {123, 148, 156, 255});
+                Vector3 last{};
+                for (int i=0;i<=36;++i) {
+                    float x=left+i;
+                    float height=x<7 ? 6.5f+(x-left)*1.05f : x>31 ? 12.8f-(x-31)*1.05f
+                                     : 7.f+5.8f*std::pow((x-19)/12.f,2.f);
+                    Vector3 point{x,height,depth};
+                    if(i) beam(last,point,.18f,gold);
+                    if(i%2==0) beam({x,4.4f,depth},point,.07f,bronze);
+                    last=point;
+                }
             }
-            box({0, 11.5f, 17}, {26, .25f, 40}, {72, 107, 118, 255});
-        }
-        if (arena == 8) {
-            for (int i = -7; i <= 7; ++i) {
-                box({i * 2.f, 5, 34}, {.3f, 4, .5f}, cream);
-                box({i * 2.f, 7, 34}, {1.5f, .45f, .6f}, cream);
+            float boat=left+std::fmod(time*.95f,right-left);
+            orb({boat,1,z-3},{1.25f,.38f,.54f},cream);
+            box({boat,1.42f,z-3},{1.1f,.55f,.6f},team);
+        } else if (arena == 4) {
+            for (int i=0;i<9;++i) {
+                float x=8.f+(i%5)*3.4f, depth=z-7+i*.72f, h=3.7f+(i%3)*1.18f;
+                cyl({x,0,depth},.23f,1.8f,{106,77,54,255});
+                for (int k=0;k<3;++k)
+                    DrawCylinderEx({x,1.f+k*h*.19f,depth},{x+.13f*std::sin(time*1.5f+i),2.3f+k*h*.24f+h*.27f,depth},
+                                   1.36f-k*.3f,.04f,9,k%2 ? Color{39,83,70,255} : Color{50,101,78,255});
             }
-            box({0, 3, 35}, {31, 1, .6f}, cream);
-        }
-        if (arena == 9) {
-            box({9, 1, 19}, {5, 2, 16}, {31, 104, 149, 255});
-            box({9, 2.05f, 19}, {4.5f, .08f, 15.5f}, aqua);
-            for (int i = 0; i < 5; ++i)
-                orb({9 + std::sin(time + i) * 1.5f, 2.2f, 13 + i * 3.f}, {.65f, .06f, .4f},
-                    {24, 75, 108, 255});
+        } else if (arena == 5) {
+            for (int side : {-1,1}) {
+                const float cx=side*12.5f;
+                box({cx,.76f,z-6},{14.4f,1.52f,4.6f},{111,130,145,255});
+                box({cx,1.54f,z-6},{14.f,.1f,4.2f},{43,151,182,255});
+                for(int j=0;j<7;++j) {
+                    const float x=cx-6+j*2.f;
+                    const float crest=3.4f+2.5f*(.5f+.5f*std::cos(j*.63f-time*1.8f));
+                    Vector3 last{x,1.62f,z-4.4f};
+                    for(int k=1;k<=8;++k) {
+                        float t=k/8.f;
+                        Vector3 p{x+.65f*side*t,1.64f+4.f*crest*t*(1.f-t),z-4.4f-3.f*t};
+                        beam(last,p,.113f-.046f*t,k<5 ? Color{107,207,231,255} : Color{197,237,237,255});
+                        last=p;
+                    }
+                    for (int drop=0;drop<4;++drop) {
+                        float t=std::fmod(time*.93f+drop*.25f+j*.12f,1.f);
+                        float dx=std::sin(j*31.f+drop*4.f)*.24f*t;
+                        orb({x+.65f*side*t+dx,1.65f+4.f*(crest+.32f)*t*(1.f-t),
+                             z-4.4f-3.f*t+.14f*std::cos(float(j+drop))},
+                            {.063f,.115f,.063f},{202,240,246,255});
+                    }
+                    float spray=.45f+.22f*std::sin(time*5+j);
+                    orb(last,{spray,.22f,spray},cream);
+                }
+            }
+        } else if (arena == 7) {
+            for (int bay=0;bay<4;++bay) {
+                float depth=z-15.f+bay*4.8f;
+                for(int side : {-1,1}) {
+                    float x=side*26.f;
+                    beam({x,0,depth},{x,16,depth},.36f,steel);
+                    beam({x,16,depth},{side*9.f,20,depth},.32f,steel);
+                    beam({x,13,depth},{side*9.f,20,depth},.15f,cream);
+                }
+                box({-18,18.5f,depth},{19,.3f,4.74f},{89,114,120,255});
+            }
+            pennant({8,1,z-8},7,time,team);
+        } else if (arena == 8) {
+            for (int i=0;i<14;++i) {
+                float x=1.f+i*2.6f;
+                box({x,5.8f,z},{.34f,3.7f,.52f},cream);
+                beam({x,6.5f,z},{x+1.3f,7.8f,z},.15f,cream);
+                beam({x+1.3f,7.8f,z},{x+2.6f,6.5f,z},.15f,cream);
+            }
+            box({19,7.9f,z},{37,.26f,.63f},cream);
+            for(float x : {3.f,16.f,29.f}) pennant({x,8,z},3,time,team);
+        } else if (arena == 9) {
+            box({10.5f,1,z-8},{8,2,9},{39,103,139,255});
+            box({10.5f,2.06f,z-8},{7.6f,.09f,8.55f},aqua);
+            for(int i=0;i<3;++i) {
+                float a=time*.53f+i*2.1f;
+                orb({10.5f+2.25f*std::sin(a),2.14f,z-8+2.9f*std::cos(a)},
+                    {.71f,.075f,.47f},{32,74,93,255});
+            }
         }
     }
     void arch(float z, float width, float height, Color c, float radius) {
@@ -961,10 +1061,112 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         // sign() expects render textures (inverted Y); loaded PNGs use opposite UVs.
         sign(texture, position, w, h, true);
     }
+    void servicePanel(Vector3 center, int number, Color enamel) {
+        const float x=center.x, y=center.y, z=center.z;
+        box(center,{1.64f,.89f,.10f},{63,70,68,255});
+        box({x,y,z-.058f},{1.57f,.82f,.04f},enamel);
+        constexpr unsigned digits[]{63,6,91,79,102,109,125,7,127,111};
+        constexpr Vector4 bars[]{{-.11f,.23f,.11f,.23f},{.13f,.20f,.13f,.025f},
+            {.13f,-.025f,.13f,-.20f},{-.11f,-.23f,.11f,-.23f},{-.13f,-.20f,-.13f,-.025f},
+            {-.13f,.025f,-.13f,.20f},{-.11f,0,.11f,0}};
+        for(int place=0;place<2;++place) {
+            const unsigned mask=digits[place ? number%10 : number/10];
+            const float cx=x+(place ? -.22f : .22f);
+            for(int i=0;i<7;++i) if(mask & (1u<<i)) {
+                const auto b=bars[i];
+                beam({cx-b.x,y+b.y,z-.09f},{cx-b.z,y+b.w,z-.09f},.033f,cream);
+            }
+        }
+        for(int side : {-1,1}) for(int top : {-1,1})
+            DrawCubeV({x+.69f*side,y+.32f*top,z-.084f},{.065f,.065f,.038f},cream);
+    }
+
+    void aquariumReturn(float end, float time) {
+        // Sight glass on the exposed return main. The sweep sends a surge down the pipe.
+        constexpr float x=-6.38f, y=1.03f, length=8.2f;
+        const float front=end-5.35f;
+        rlPushMatrix();
+        rlTranslatef(x,y,front+length);
+        rlRotatef(32.f,0,1,0);
+        rlTranslatef(-x,-y,-front-length);
+        const Color brass{190,146,76,255}, seal{50,83,80,255};
+        beam({x,y,front},{x,y,front+length},.33f,{51,142,152,255});
+        for(int i=0;i<10;++i) {
+            float phase=std::fmod(i*.1f+time*.24f+setter.progress*.84f,1.f);
+            float z=front+(1-phase)*length;
+            float a=phase*9.f+i;
+            orb({x+.24f*std::cos(a),y+.24f*std::sin(a),z},{.12f,.10f,.23f+setter.lowered()*.28f},
+                i%2 ? cream : aqua);
+        }
+        for(float t : {0.f,.5f,1.f}) {
+            float z=front+t*length;
+            beam({x,y,z-.16f},{x,y,z+.16f},.59f,brass);
+            beam({x,y,z-.20f},{x,y,z-.155f},.53f,seal);
+            box({x,.43f,z},{.22f,.56f,.32f},brass);
+        }
+        beam({x,y,front-.23f},{x,y,front+length+.23f},.475f,{154,225,220,65});
+        beam({x+.24f,y+.38f,front},{x+.24f,y+.38f,front+length},.041f,{218,247,234,210});
+        beam({x,y,front+length},{x,.95f,front+length+.7f},.39f,brass);
+        beam({x,.95f,front+length+.7f},{x+1.2f,.95f,front+length+.7f},.39f,brass);
+        rlPopMatrix();
+    }
+
+    void rivalDugout(float time, Color paint) {
+        // A jointed cut-paper portrait, mounted behind the rail in the home bench.
+        const float x=8.65f, z=geo::stadiumLane.headPin()+9.7f;
+        const Color rail{62,83,77,255};
+        material(13);
+        box({x,1.9f,z+1.05f},{5.4f,3.8f,.24f},rail);
+        box({x,4.27f,z},{5.65f,.22f,2.65f},paint);
+        box({x,.66f,z-.62f},{5.48f,1.36f,.34f},rail);
+        for(int side : {-1,1}) beam({x+side*2.5f,0,z-.65f},{x+side*2.5f,4.2f,z-.65f},.085f,cream);
+        for (int panel=-2;panel<=2;++panel) {
+            float px=x+panel*1.03f;
+            box({px,.76f,z-.81f},{1.f,1.17f,.15f},ColorLerp(rail,paint,.23f));
+            for (int side : {-1,1}) {
+                DrawCubeV({px+.41f*side,1.22f,z-.90f},{.06f,.065f,.035f},cream);
+                DrawCubeV({px+.41f*side,.30f,z-.90f},{.06f,.065f,.035f},cream);
+            }
+        }
+        material(0);
+        box({x,4.07f,z-1.23f},{5.72f,.14f,.16f},cream);
+        sign(teamLogos[arena],{x, .76f,z-.91f},.84f,.84f,true);
+        const bool raymond=rivalId==3;
+        // Profile half-widths trace the crown, temples, cheeks and jersey.
+        constexpr float human[]{.11f,.23f,.29f,.30f,.26f,.23f,.26f,.46f,.49f};
+        constexpr float mascotWidth[]{.17f,.26f,.36f,.46f,.47f,.44f,.39f,.43f,.49f};
+        const float pulse=std::sin(PI*cameoPhase);
+        const float salute=cameo==Cameo::Tip ? pulse : 0.f;
+        const float wince=cameo==Cameo::Wince ? pulse : 0.f;
+        const float lean=cameo==Cameo::Lean ? .72f+.28f*std::sin(time*3.f) : 0.f;
+        const float tile=1.f/5.f;
+        rlSetTexture(rivalAtlas.id);
+        rlBegin(RL_QUADS);
+        rlColor4ub(255,255,255,255);
+        for(int row=0;row<8;++row) {
+            for (int corner : {0,1,2,3}) {
+                const int r=row+((corner==0 || corner==3) ? 1 : 0);
+                float v=r/8.f;
+                float u=.5f+(corner<2 ? 1.f : -1.f)*(raymond ? mascotWidth[r] : human[r]);
+                float lift=std::clamp((.37f-v)/.37f,0.f,1.f);
+                float upper=1.f-v;
+                float px=x+(.5f-u)*3.02f+upper*(lean*.72f+wince*.24f);
+                float py=1.05f+upper*2.85f+salute*lift*(.32f+.31f*(.5f-u))
+                         -wince*upper*.62f-lean*upper*.19f;
+                rlTexCoord2f((rivalId%5+u)*tile,(rivalId/5+std::clamp(v,.011f,.988f))*tile);
+                rlVertex3f(px,py,z-upper*(lean*.28f+wince*.28f)-lift*salute*.18f);
+            }
+        }
+        rlEnd();
+        rlSetTexture(0);
+        beam({x-2.7f,1.47f,z-.79f},{x+2.7f,1.47f,z-.79f},.134f,paint);
+    }
+
     void ballReturn(Color paint) {
         // Twin rubber rails lead out of an open, enamelled sheet-metal hood.
         constexpr float x = -7.65f, mouth = 9.3f;
         Color chrome{164, 174, 171, 255}, rubber{36, 40, 44, 255};
+        material(13);
         box({x, .18f, 7.5f}, {2.57f, .36f, 6.85f}, paint);
         for (int side : {-1, 1}) {
             for (float z : {4.5f, 7.2f, 10.3f})
@@ -986,6 +1188,12 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
             DrawTriangle3D(a,c,b,rubber); DrawTriangle3D(b,c,d,rubber);
             beam(a,b,.061f,chrome);
         }
+        servicePanel({x,.48f,4.14f},arena+1,paint);
+        for (int side : {-1,1})
+            for (int wear=0;wear<5;++wear)
+                beam({x+side*.54f,.90f,4.6f+wear*.64f},
+                     {x+side*.55f,.91f,4.86f+wear*.64f},.022f,{102,105,99,255});
+        material(0);
         if (returningBall) {
             const float t = bowling::PinsetterCycle::ease(setter.progress, .63f, .96f);
             float z = 10.6f - 5.45f*t;
@@ -994,7 +1202,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         }
     }
 
-    void pinsetter(geo::LaneLayout lane, Color paint) {
+    void pinsetter(geo::LaneLayout lane, Color paint, float time) {
         const float end = lane.surfaceEnd(), z = setter.bladeZ(lane);
         const float y = 4.32f - 3.83f * setter.lowered();
         const Color metal = mascot ? Color{183, 141, 82, 255} : Color{157, 173, 174, 255};
@@ -1023,6 +1231,18 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                 box({x, .83f, end + 1.55f}, {.16f, .05f, 3.14f}, metal);
             }
         }
+        if (mascot) aquariumReturn(end,time);
+        else {
+            material(13);
+            for(int side : {-1,1}) {
+                float x=side*6.16f;
+                box({x,1.65f,end+1.5f},{1.72f,3.3f,1.2f},paint);
+                servicePanel({x,2.1f,end+.84f},arena+1,ColorBrightness(paint,.12f));
+                for(int louver=0;louver<4;++louver)
+                    box({x,1.38f-louver*.14f,end+.86f},{1.13f,.054f,.08f},rubber);
+            }
+        }
+        material(0);
         box({0, 1.49f, end+2.8f}, {11.4f, .22f, .4f}, frame);
         box({0, y, z}, {11.13f, .52f, .35f}, metal);
         box({0, y, z-.19f}, {10.88f, .35f, .05f}, mascot ? frame : paint);
@@ -1111,6 +1331,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                 box({x-side*2.1f,-.08f,z},{3.9f,.13f,10.f},{160,111,77,255});
                 box({x,1.02f,z},{.52f,2.1f,9.96f},{48,79,68,255});
                 box({x,2.12f,z},{.62f,.14f,9.96f},{188,163,93,255});
+                if (arena == 3 && side == 1 && bay >= 7) continue;
                 for (int row = 0; row < 4; ++row) {
                     float seatX = x + side*(1.35f + row*1.44f);
                     float y = 1.45f + row*.68f;
@@ -1170,18 +1391,20 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         }
         // Stadium identity belongs on the outfield infrastructure, not over the pins.
         Color boardPaint = (arena == 0 || arena == 1) ? Color{58, 77, 51, 255} : Color{19, 23, 25, 255};
-        float boardX = arena == 9 ? 0.f : -15.f, boardW = arena == 9 ? 39.f : (arena == 0 ? 19.f : 23.f);
-        float boardY = arena == 9 ? 16.f : (arena == 0 ? 12.f : 14.f),
+        float boardX = arena == 9 ? 0.f : arena == 1 ? 15.f : -15.f, boardW = arena == 9 ? 39.f : (arena == 0 ? 19.f : 23.f);
+        float boardY = arena == 9 ? 16.f : (arena == 0 ? 12.f : arena == 1 ? 8.4f : 14.f),
               boardH = boardW * .5f;
         box({boardX, boardY, 42 + extra}, {boardW + .7f, boardH + .7f, .8f}, boardPaint);
-        sign(scoreboard.texture, {boardX, boardY, 41.5f + extra}, boardW, boardH);
+        if (arrival > .34f)
+            sign(scoreboard.texture, {boardX, boardY, 41.5f + extra}, boardW, boardH,
+                 false, ColorLerp(BLACK,WHITE,bowling::PinsetterCycle::ease(arrival,.34f,.55f)));
         if (arena != 0) {
             beam({boardX - boardW / 2, boardY + boardH / 2 + 1, 42 + extra},
                  {boardX + boardW / 2, boardY + boardH / 2 + 1, 42 + extra}, .12f, {110, 126, 137, 255});
             logoSign(arena, {boardX, boardY + boardH / 2 + 3.4f, 41.55f + extra}, boardW - 1, 6.2f);
         }
         // Exposed steel legs and diagonal trusses keep the board a stadium structure.
-        for (int side : {-1, 1})
+        if (arena != 1) for (int side : {-1, 1})
             for (int level = 0; level < 5; ++level) {
                 float x = boardX + side * (boardW / 2 + .8f), y = level * 4.f;
                 beam({x, y, 42 + extra}, {x, y + 4, 42 + extra}, .12f, {85, 97, 103, 255});
@@ -1193,7 +1416,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         for (float x : {-22.f, -8.f})
             cyl({x, 0, 42 + extra}, .22f, 8, {66, 77, 72, 255});
         for (int lamp = -3; lamp <= 3; ++lamp) {
-            float x = -15 + lamp * 2.8f;
+            float x = boardX + lamp * 2.8f;
             beam({x, 16.8f, 42 + extra}, {x, 17.5f, 41.5f + extra}, .07f, {103, 116, 110, 255});
             box({x, 17.5f, 41.4f + extra}, {.7f, .4f, .35f}, {31, 40, 36, 255});
             box({x, 17.45f, 41.15f + extra}, {.52f, .24f, .06f}, cream);
@@ -1228,12 +1451,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
             cyl({side * 39.f, 0, 32 + extra}, .10f, 16, gold);
             box({side * 39.f, 14.3f, 32 + extra}, {1.8f, 2.4f, .08f}, gold);
         }
-        // Individual landmark silhouettes visible beyond the diamond.
-        rlPushMatrix();
-        rlTranslatef(0, 0, 18 + extra);
-        rlScalef(2.1f, 1.0f, .75f);
-        landmarks(time);
-        rlPopMatrix();
+        landmarks(time, team);
         if (arena == 9) {
             for (float z : {-2.f, 14.f + extra / 3, 30.f + extra * .66f, 46.f + extra})
                 arch(z, 49, 31, {155, 184, 200, 255}, .15f);
@@ -1247,7 +1465,11 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                     beam(foot,next,.21f,{85,91,96,255});
                     beam({foot.x,foot.y+1,foot.z},{next.x,next.y+1,next.z},.06f,cream);
                     beam(foot,{foot.x,foot.y+1,foot.z},.06f,cream);
-                    if (i%5==0) orb(foot,{.51f,.25f,.38f},{233,240,208,255});
+                    if (i%5==0) {
+                        float start=.08f+i*.011f;
+                        float light=bowling::PinsetterCycle::ease(arrival,start,start+.11f);
+                        orb(foot,{.66f,.32f,.48f},ColorLerp({49,54,56,255},cream,light));
+                    }
                 }
             }
             // Tropicana's roof catwalk, orange landmark and flanking display pylons.
@@ -1285,7 +1507,8 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         const auto &light = mascot ? aquarium : lighting[arena];
         SetShaderValue(shader, GetShaderLocation(shader, "keyDirection"), &light.direction, SHADER_UNIFORM_VEC3);
         SetShaderValue(shader, GetShaderLocation(shader, "keyTint"), &light.tint, SHADER_UNIFORM_VEC3);
-        SetShaderValue(shader, GetShaderLocation(shader, "roofLight"), &light.overhead, SHADER_UNIFORM_FLOAT);
+        const float overhead=light.overhead * arrival;
+        SetShaderValue(shader, GetShaderLocation(shader, "roofLight"), &overhead, SHADER_UNIFORM_FLOAT);
         float run = sim.layout.run;
         SetShaderValue(shader, GetShaderLocation(shader, "laneRun"), &run, SHADER_UNIFORM_FLOAT);
         SetShaderValue(shader, GetShaderLocation(shader, "eye"), &cam.position, SHADER_UNIFORM_VEC3);
@@ -1405,7 +1628,8 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                 }
         }
         if (!mascot && !deckOnly) ballReturn(team);
-        pinsetter(sim.layout, team);
+        pinsetter(sim.layout, team, time);
+        if (!mascot && !deckOnly && rivalAtlas.id) rivalDugout(time,team);
         for (const auto &p : sim.pins)
             drawPin(p, sim.layout);
         if (mascot && sim.active && ballPos.z < sim.layout.headPin() && !sim.gutter)

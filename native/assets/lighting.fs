@@ -204,6 +204,15 @@ void main() {
         float shafts=.5+.5*sin(world.x*1.35+world.z*.31+sceneTime*.19);
         lit+=daylight*vec3(.105,.073,.024)*shafts;
     }
+    if(woodMode==13) {
+        // Orange-peel enamel with primer showing through along rolled steel edges.
+        vec3 d=abs(localPos);
+        float bevel=max(min(d.x,d.y),max(min(d.y,d.z),min(d.x,d.z)));
+        float wear=smoothstep(.46,.498,bevel)*smoothstep(.42,.72,detail);
+        float patina=noise(world*vec3(1.8,.30,2.1));
+        lit=lit*(.81+.23*patina+.10*detail)+keyTint*gloss*.18;
+        lit=mix(lit,vec3(.43,.40,.30),wear*.65);
+    }
     if(woodMode==11) lit=mix(lit,vec3(1.,.47,.049),.56)+vec3(.085,.041,.004)*broad;
     if(aquarium==1 && world.y<8.) {
         vec2 water=world.xz*vec2(1.32,.43)+world.y*vec2(.71,-.49);
