@@ -1,1 +1,1 @@
-Pinsetter and scoreboard build from 0d04b08941b6835ea4b99e3ccdcfe8cdbf7034c7. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. If the bundle has numbered parts, concatenate them in numerical order to restore it. Windows execution is unverified.
+Ballpark tour and pro shop build from aa448025f3b0120df4c42eed6c04762cc75b1c0a. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. Join any numbered parts of an archive in numerical order before opening it. Windows execution is unverified.
