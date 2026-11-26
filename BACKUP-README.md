@@ -1,1 +1,1 @@
-Ballpark tour and pro shop build from aa448025f3b0120df4c42eed6c04762cc75b1c0a. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. Join any numbered parts of an archive in numerical order before opening it. Windows execution is unverified.
+Gameplay fixes build from 655799c63927b6859225cf79fff76b1c391ebba3. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. Join any numbered parts of an archive in numerical order before opening it. Windows execution is unverified.
