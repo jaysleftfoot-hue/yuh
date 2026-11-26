@@ -212,11 +212,12 @@ int main(int argc, char **argv) {
     int arena = previewArena < 0 ? 0 : previewArena;
     std::mt19937 rosterRng(smoke || captureRequested ? 391u : std::random_device{}());
     int opponent = drawHomeRival(arena, rosterRng);
-    int skin = 0, rolls = 0, ticks = 0, selectedSkin = 0;
+    int &skin = profile.equippedBall;
+    int rolls = 0, ticks = 0, selectedSkin = skin;
     float time = 0, accum = 0, reaction = 0, chargeTime = 0, aiWait = .9f, celebration = 0;
     Vector2 dragStart{};
     bool mouseCharge = false, stadiumArmed = false;
-    bool equipmentOpen = false, avatarSaveFailed = false;
+    bool equipmentOpen = false, avatarSaveFailed = false, lockerSaveFailed = false;
     bool paused = false, charge = false, done = false, ok = false, awarded = false;
     std::string result = "WELCOME TO THE TOUR", reward;
     Camera3D camera{{0, 3.0f, -6.2f}, {0, 1.7f, 23}, {0, 1, 0}, 43, CAMERA_PERSPECTIVE};
@@ -344,7 +345,9 @@ int main(int argc, char **argv) {
                 paused = !paused;
                 charge = false;
                 stadiumArmed = false;
-            } else if (screen != Screen::Title)
+            } else if (screen == Screen::Locker)
+                screen = lockerReturn;
+            else if (screen != Screen::Title)
                 screen = Screen::Title;
             else
                 done = true;
@@ -734,6 +737,7 @@ int main(int argc, char **argv) {
             if (button({145, 718, 190, 42}, "BALL LOCKER")) {
                 selectedSkin = skin;
                 previewAngle = 0;
+                lockerSaveFailed = false;
                 lockerReturn = Screen::Title;
                 screen = Screen::Locker;
             }
@@ -831,6 +835,7 @@ int main(int argc, char **argv) {
             if (button({275, 594, 212, 35}, "BALL LOCKER")) {
                 selectedSkin = skin;
                 previewAngle = 0;
+                lockerSaveFailed = false;
                 lockerReturn = Screen::Setup;
                 screen = Screen::Locker;
             }
@@ -888,6 +893,7 @@ int main(int argc, char **argv) {
             if (plaqueButton({829, 722, 187, 55}, skin == selectedSkin ? "EQUIPPED" : "EQUIP",
                              profile.ballUnlocked(selectedSkin))) {
                 skin = selectedSkin;
+                lockerSaveFailed = !saveCareer();
                 audio.play(audio.click);
             }
             constexpr std::array<int, 6> raysShelf{26, 56, 60, 61, 62, 63};
@@ -902,7 +908,7 @@ int main(int argc, char **argv) {
                     previewAngle = 0;
                 }
             }
-            arcadeCenter("EQUIPPED: " + ballName(skin), 445, 704, 22, gold);
+            arcadeCenter(lockerSaveFailed ? "SAVE FAILED" : "EQUIPPED: " + ballName(skin), 445, 704, 22, gold);
             if (plaqueButton({1028, 722, 164, 55}, "BACK"))
                 screen = lockerReturn;
         } else {

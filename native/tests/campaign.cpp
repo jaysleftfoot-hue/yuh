@@ -159,19 +159,24 @@ int main() {
     p.avatar = 4;
     p.bestStraightRide = 165;
     p.bestPowerRide = 319;
+    p.equippedBall = 63;
     require(p.save(path) && restored.load(path) && restored.avatar == 4 && restored.xp == p.xp &&
-                restored.bestStraightRide == 165 && restored.bestPowerRide == 319, "save replacement");
+                restored.bestStraightRide == 165 && restored.bestPowerRide == 319 && restored.equippedBall == 63, "save replacement");
     {
         std::ofstream f(path);
         f << "BLB 1 80 1 2 100 1";
     }
     require(restored.load(path) && restored.xp == 80 && restored.stadiums() == 2 &&
-                restored.completedChallenges == 0, "load existing version 1 save");
+                restored.completedChallenges == 0 && restored.equippedBall == 0, "load existing version 1 save");
     {
         std::ofstream f(path);
         f << "BLB 1 -1 0 0 300 0";
     }
     require(!restored.load(path), "reject corrupt save");
+    require(restored.load(path + ".bak") && restored.balls() == 64, "recover previous career");
+    require(restored.save(path), "write recovered career");
+    require(restored.load(path) && restored.load(path + ".bak") && restored.balls() == 64,
+            "recovery must preserve the good backup when the main file is corrupt");
     std::filesystem::remove(path);
     std::filesystem::remove(path + ".bak");
     Match m;
@@ -200,9 +205,21 @@ int main() {
     bumper.storePower(Power::Bumpers);
     bumper.equip(Power::Bumpers);
     bumper.launch({.7f, -1, .7f, 0});
-    for (int i = 0; i < 150; ++i)
+    for (int i = 0; i < 150; ++i) {
         bumper.step(1.f / 120);
-    require(!bumper.lanes[0].gutter, "bumpers prevent gutter");
+        require(!bumper.lanes[0].gutter, "bumper never reports a gutter contact");
+    }
+    require(bumper.lanes[0].ball.x > 3 && bumper.lanes[0].ball.vx > 0, "bumper reflects a side hit");
+    Match magnet;
+    magnet.storePower(Power::Magnet);
+    magnet.equip(Power::Magnet);
+    magnet.launch({5, 0, .7f, 0});
+    auto &magnetLane = magnet.lanes[0];
+    magnetLane.ball.z = geometry::headPin - 4;
+    for (auto &pin : magnetLane.pins)
+        pin.down = pin.x <= magnetLane.ball.x;
+    magnet.step(1.f / 120);
+    require(magnetLane.ball.vx > 0, "magnet aims past fallen pins toward the standing rack");
     Match rack;
     auto &lane = rack.lanes[0];
     lane.pins[2].down = true;

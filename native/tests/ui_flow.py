@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Native X11 input regression: python3 native/tests/ui_flow.py phases (or keyboard/setup/locker/locked/pause/help/scores/mascot/mascot-pull/mascot-shot/mascot-low-grip/mascot-straight/curve/power). Build Linux first; requires Xorg dummy, libX11 and libXtst. Uses an isolated display and non-saving screenshot mode."""
+"""Native X11 input regression: python3 native/tests/ui_flow.py phases (or keyboard/setup/locker/locker-return/locked/pause/help/scores/mascot/mascot-pull/mascot-shot/mascot-low-grip/mascot-straight/curve/power). Build Linux first; requires Xorg dummy, libX11 and libXtst. Uses an isolated display and non-saving screenshot mode."""
 import ctypes as c,subprocess,time,sys,os
 from pathlib import Path
 x=c.CDLL('libX11.so.6');t=c.CDLL('libXtst.so.6')
@@ -11,7 +11,7 @@ t.XTestFakeMotionEvent.argtypes=[c.c_void_p,c.c_int,c.c_int,c.c_int,c.c_ulong]
 t.XTestFakeButtonEvent.argtypes=[c.c_void_p,c.c_uint,c.c_int,c.c_ulong]
 os.chdir(Path(__file__).resolve().parents[2])
 scenario=sys.argv[1]
-assert scenario in ['phases','keyboard','setup','locker','locked','pause','help','scores','mascot','mascot-pull','mascot-shot','mascot-low-grip','mascot-straight','curve','power','equipment']
+assert scenario in ['phases','keyboard','setup','locker','locker-return','locked','pause','help','scores','mascot','mascot-pull','mascot-shot','mascot-low-grip','mascot-straight','curve','power','equipment']
 old=set(Path('/tmp/.X11-unix').glob('X*'));log=Path('/tmp/arcade-'+scenario+'.log')
 with log.open('w') as f:
  p=subprocess.Popen(['python3','native/headless.py','--capture-frame','3600','--screenshot','artifacts/arcade-'+scenario+'.png'],stdout=f,stderr=f)
@@ -30,6 +30,12 @@ with log.open('w') as f:
   t.XTestFakeKeyEvent(d,k,1,0);x.XFlush(d);time.sleep(.15)
   t.XTestFakeKeyEvent(d,k,0,0);x.XFlush(d);time.sleep(.4)
  if scenario=='locker':click(235,739);click(767,628)
+ elif scenario=='locker-return':
+  click(440,675)
+  click(381,610)
+  key(0xff1b)
+  assert [line.split('screen=')[1].split()[0] for line in log.read_text().splitlines()
+          if line.startswith('UI preview:')] == ['0','3','2','3'], 'Escape must return from locker to setup'
  elif scenario=='help':click(810,739)
  elif scenario=='scores':click(420,739)
  else:

@@ -55,7 +55,7 @@ inline const ChallengeReward *ballChallenge(int ball) {
 
 struct Profile {
     int avatar = 0, bestStraightRide = 0, bestPowerRide = 0;
-    int xp = 0, wins = 0, matches = 0, best = 0;
+    int xp = 0, wins = 0, matches = 0, best = 0, equippedBall = 0;
     unsigned cleared = 0, completedChallenges = 0;
     bool completed(Challenge challenge) const {
         return (completedChallenges & challengeBit(challenge)) != 0;
@@ -89,7 +89,7 @@ struct Profile {
         int version;
         Profile p;
         if (!(f >> magic >> version >> p.xp >> p.wins >> p.matches >> p.best >> p.cleared) ||
-            magic != "BLB" || (version < 1 || version > 4) || p.xp < 0 || p.xp > 100000000 || p.wins < 0 ||
+            magic != "BLB" || (version < 1 || version > 5) || p.xp < 0 || p.xp > 100000000 || p.wins < 0 ||
             p.matches < p.wins || p.best < 0 || p.best > 300 || p.cleared > 1023)
             return false;
         if (version >= 2 && (!(f >> p.completedChallenges) || p.completedChallenges > 7))
@@ -100,40 +100,42 @@ struct Profile {
             p.bestStraightRide < 0 || p.bestStraightRide > 300 ||
             p.bestPowerRide < 0 || p.bestPowerRide > 420))
             return false;
+        if (version >= 5 && (!(f >> p.equippedBall) || !p.ballUnlocked(p.equippedBall)))
+            return false;
         *this = p;
         return true;
     }
     bool save(const std::string &path) const {
-        auto temp = path + ".tmp";
+        std::error_code ec;
+        const auto directory = std::filesystem::path(path).parent_path();
+        if (!directory.empty()) {
+            std::filesystem::create_directories(directory, ec);
+            if (ec)
+                return false;
+        }
+        const auto temp = path + ".tmp";
         {
             std::ofstream f(temp);
-            if (!(f << "BLB 4 " << xp << ' ' << wins << ' ' << matches << ' ' << best << ' ' << cleared
-                    << ' ' << completedChallenges << ' ' << avatar << ' ' << bestStraightRide << ' ' << bestPowerRide << '\n'))
-                return false;
-            f.flush();
+            f << "BLB 5 " << xp << ' ' << wins << ' ' << matches << ' ' << best << ' ' << cleared
+              << ' ' << completedChallenges << ' ' << avatar << ' ' << bestStraightRide << ' '
+              << bestPowerRide << ' ' << equippedBall << '\n';
+            f.close();
             if (!f)
                 return false;
         }
-        std::error_code ec;
-        auto backup = path + ".bak";
-        if (std::filesystem::exists(path)) {
-            std::filesystem::copy_file(path, backup, std::filesystem::copy_options::overwrite_existing,
-                                       ec);
+        Profile previous;
+        if (previous.load(path)) {
+            const auto backup = path + ".bak";
+            const auto stagedBackup = backup + ".tmp";
+            std::filesystem::copy_file(path, stagedBackup, std::filesystem::copy_options::overwrite_existing, ec);
             if (ec)
                 return false;
-            std::filesystem::remove(path, ec);
+            std::filesystem::rename(stagedBackup, backup, ec);
             if (ec)
                 return false;
         }
         std::filesystem::rename(temp, path, ec);
-        if (ec) {
-            std::error_code ignored;
-            if (std::filesystem::exists(backup))
-                std::filesystem::copy_file(backup, path,
-                                           std::filesystem::copy_options::overwrite_existing, ignored);
-            return false;
-        }
-        return true;
+        return !ec;
     }
     int award(int score, int opponent, int arena, int bonus = 0, int opponentBonus = 0) {
         ++matches;
@@ -336,29 +338,16 @@ struct Match {
             if (mascot && !s.gutter && s.ball.z < s.layout.headPin() - 1)
                 s.ball.vx =
                     std::clamp((s.ball.vx + steering * 12 * dt) * std::exp(-1.2f * dt), -7.f, 7.f);
-            if (equipped == Power::Magnet && !s.gutter &&
-                s.ball.z > s.layout.at(.5f) &&
-                !s.pins.empty()) {
-                auto p = std::min_element(s.pins.begin(), s.pins.end(), [&](auto &a, auto &b) {
-                    return std::abs(a.x - s.ball.x) < std::abs(b.x - s.ball.x);
-                });
-                s.ball.vx += (p->x - s.ball.x) * 2 * dt;
-            }
-            if (equipped == Power::Bumpers) {
-                float edge = s.ball.r + .07f;
-                if (s.ball.x < edge) {
-                    s.ball.x = edge;
-                    s.ball.vx = std::abs(s.ball.vx) * .7f;
-                    s.gutter = false;
-                }
-                if (s.ball.x > geometry::width - edge) {
-                    s.ball.x = geometry::width - edge;
-                    s.ball.vx = -std::abs(s.ball.vx) * .7f;
-                    s.gutter = false;
-                }
+            if (equipped == Power::Magnet && !s.gutter && s.ball.z > s.layout.at(.5f)) {
+                const Body *target = nullptr;
+                for (const auto &pin : s.pins)
+                    if (!pin.down && (!target || std::abs(pin.x - s.ball.x) < std::abs(target->x - s.ball.x)))
+                        target = &pin;
+                if (target)
+                    s.ball.vx += (target->x - s.ball.x) * 2 * dt;
             }
         }
-        return s.step(dt);
+        return s.step(dt, equipped == Power::Bumpers);
     }
     RollResult outcome() const {
         const auto &sim = lanes[player];

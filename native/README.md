@@ -23,7 +23,7 @@ Use the arrows beside Player One in Ballpark Showdown to choose one of six portr
 - Exactly 64 named unlocks: 30 MLB logo balls, 30 individually illustrated club designs, and four Rays specials (Sunburst, Devil Ray, Touch Tank, Tropicana Finale). Use left/right arrows in the locker to inspect the reverse artwork. The first ball is unlocked. Each slot has an 80 XP spacing and all 64 are available at 5,040 XP. Challenges unlock their individual ball early.
 - Completed matches award 120 + score XP, plus 150 for a win. Abandoned matches award nothing.
 - Ten stadium-themed layouts open by winning at the previous stop: Wrigley, Fenway, Oracle, PNC, Coors, Kauffman, Chase, T-Mobile, Yankee, and **Tropicana Field last**.
-- Local profile with XP, wins, stadium unlocks and best score. Saved under APPDATA, XDG_DATA_HOME or HOME as big-league-bowling-profile.txt, with .bak recovery. Failed persistence is reported on screen.
+- Local profile with XP, wins, stadium unlocks, best score and the equipped ball. Saved under APPDATA, XDG_DATA_HOME or HOME as big-league-bowling-profile.txt, with .bak recovery. Failed persistence is reported on screen.
 
 ### Medal odds by difficulty
 

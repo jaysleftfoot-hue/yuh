@@ -208,7 +208,7 @@ struct Simulation {
         b.x += nx * (r - d + .001f);
         b.z += nz * (r - d + .001f);
     }
-    bool step(float dt) {
+    bool step(float dt, bool bumpers = false) {
         for (auto &p : pins)
             p.advancePose(dt);
         if (!active)
@@ -220,9 +220,14 @@ struct Simulation {
             ball.x += ball.vx * dt;
             ball.z += ball.vz * dt;
             if (ball.x < ball.r || ball.x > geometry::width - ball.r) {
-                gutter = true;
-                ball.x = std::clamp(ball.x, .1f, geometry::width - .1f);
-                ball.vx = 0;
+                if (bumpers) {
+                    ball.x = std::clamp(ball.x, ball.r, geometry::width - ball.r);
+                    ball.vx = ball.x == ball.r ? std::abs(ball.vx) * .7f : -std::abs(ball.vx) * .7f;
+                } else {
+                    gutter = true;
+                    ball.x = std::clamp(ball.x, .1f, geometry::width - .1f);
+                    ball.vx = 0;
+                }
             }
         }
         for (auto &p : pins) {

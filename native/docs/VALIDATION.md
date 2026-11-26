@@ -1,3 +1,10 @@
+# Gameplay regression pass
+
+- Full native Linux matches completed in Stadium, Power Ride and Straight Ride. A simulation stress pass completed 240 additional matches and 8,624 deliveries across all ten parks, both physics modes, four difficulties and three rival styles. It checked that every shot settled, each spare rack matched the scorekeeper, and scores stayed in bounds.
+- Rules and campaign tests passed with AddressSanitizer and UndefinedBehaviorSanitizer. Targeted regressions verify bumper rebounds, magnet targeting after pins fall, and profile recovery that preserves a valid backup. Older saves load with the default ball and the newer format remembers the equipped ball.
+- Used X11 input to test Stadium spot, curve and power, Mascot sling controls and locker navigation. In a normal launch, equipping an unlocked ball from a recovered career kept the older backup intact. Linux audio initialization worked with an ALSA null device. Physical audio and Windows runtime remain unverified.
+- Rebuilt the Windows x64 installer and portable ZIP and checked ZIP integrity and package hashes.
+
 # Ballpark tour, pro shop and pin reactions
 
 - The native geometry suite checks the opening projection in both modes and 3–4 seconds of full-power Stadium travel. Controlled contact tests cover a graze that recovers upright, a shoulder hit past horizontal, and a wobbling corner pin that holds the score open until it falls.
