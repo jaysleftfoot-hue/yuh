@@ -1,1 +1,1 @@
-Arcade lighting and presentation build from 58392f17b8d78650582b8bb33a10b42cc1617283. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. Join any numbered parts of an archive in numerical order before opening it. Windows execution is unverified.
+Ballpark landmarks and career celebrations build from c6fd84b06f0f3135f889cd9ef0d7df096e4c72ce. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. Join any numbered parts of an archive in numerical order before opening it. Windows execution is unverified.
