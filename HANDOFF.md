@@ -1,5 +1,9 @@
 # Current milestone
 
+The native scene now renders at the size of the playable window area. Painted interface art and type are drawn at display resolution. Wrigley’s manual board tallies each delivery, and Mascot Ride uses turquoise pin lamps and a brass pressure gauge for the sling. The opening camera eases into the chase, and the pinsetter reset reveals the next shot. The aquarium light pattern follows the ray and tube. The captured deliveries include the next ready view.
+
+[Wrigley strike](native/docs/wrigley-delivery.mp4) · [Wrigley miss](native/docs/wrigley-miss-delivery.mp4) · [Aquarium strike](native/docs/aquarium-delivery.mp4) · [Aquarium miss](native/docs/aquarium-miss-delivery.mp4)
+
 The stadium sidelines now have recessed dugouts, warning tracks, padded walls and four tiers of seating. Wrigley has a local-time scoreboard clock and a modeled wall faced with its painted ivy. Tropicana has suspended catwalk rings and floodlights. On the Rays course, limestone shelves flank the launch, kelp fills the middle stretch, and exposed timbers and schooling fish mark the wreck. [Aquarium delivery](native/docs/aquarium-delivery.mp4)
 
 The ballpark tour now has ten individually painted outfields and ten lighting setups. At the pro shop, all 64 balls are on display, with the six Tampa Bay designs together on the right. A spare brings the equipped ball back along a physical return during the pinsetter reset. In Mascot Ride, the touch tank gives way to a kelp gallery and then a sunlit wreck. Shoulder hits, grazes and corner-pin wobbles use the contact direction in live play and replays.

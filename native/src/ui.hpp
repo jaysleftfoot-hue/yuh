@@ -86,7 +86,7 @@ inline void scoreboardLights(const std::string &value, float cx, float top, floa
         left += 6 * pitch;
     }
 }
-inline void baseballHud(Texture2D portraits, Texture2D pinGauge, int player, int rival, const bowling::Simulation &lane) {
+inline void baseballHud(Texture2D portraits, Texture2D pinGauge, int player, int rival, const bowling::Simulation &lane, bool aquarium) {
     const auto standing = lane.standingPins();
     std::array<float, 10> afterglow{};
     for (const auto &p : lane.pins)
@@ -94,7 +94,7 @@ inline void baseballHud(Texture2D portraits, Texture2D pinGauge, int player, int
     // Painted turf/rock cornice connects the shallow slate scoreboards.
     DrawTexturePro(uiFrame, {0, 0, float(uiFrame.width), uiFrame.height * .135f}, {0, 58, 1280, 55},
                    {0, 0}, 0, WHITE);
-    sprite(pinGauge, {543, 61, 194, 103});
+    sprite(pinGauge, {543, 61, 194, 103}, aquarium ? Color{164,228,239,255} : Color{211,226,178,255});
     // The back row is at the top of the display, viewed from the approach.
     int pin = 0;
     for (int row = 0; row < 4; ++row)
@@ -104,7 +104,7 @@ inline void baseballHud(Texture2D portraits, Texture2D pinGauge, int player, int
             float glow = standing[pin] ? 1.f : afterglow[pin] * afterglow[pin];
             ++pin;
             DrawCircleV({x, y}, 6.5f, {41, 31, 17, 255});
-            DrawCircleV({x, y - .5f}, 5.f, ColorLerp({65, 70, 55, 255}, {154, 225, 74, 255}, glow));
+            DrawCircleV({x, y - .5f}, 5.f, ColorLerp({65, 70, 55, 255}, aquarium ? Color{75,222,239,255} : Color{175,227,101,255}, glow));
             if (glow > .01f)
                 DrawCircleV({x - 1, y - 1.5f}, 2.f, Fade({233, 255, 173, 255}, glow));
         }
@@ -119,7 +119,18 @@ inline void baseballHud(Texture2D portraits, Texture2D pinGauge, int player, int
         arcadeCenter(bowling::roster[who].name, x, 244, size, cream);
     }
 }
-inline void arcadeMeter(float x, float y, float power, Color c) {
+inline void arcadeMeter(float x, float y, float power, Color c, bool sling = false) {
+    if (sling) {
+        // Brass collars on a glass pressure column echo the launch posts.
+        DrawRectangleGradientH(x-19,y-134,38,159,{56,99,104,255},{14,45,61,255});
+        float height = 143*std::clamp(power,0.f,1.f);
+        DrawRectangleGradientH(x-12,y+17-height,24,height,{31,140,161,255},c);
+        for (int i=0;i<=10;++i)
+            DrawLineEx({x+3,y+17-i*14.f},{x+14,y+17-i*14.f},2,cream);
+        for (float edge : {y-139,y+17})
+            DrawRectangleGradientV(x-23,edge,46,10,cream,{152,100,43,255});
+        return;
+    }
     panel({x - 24, y - 140, 48, 174}, {57, 58, 48, 255});
     DrawRectangle(x - 14, y - 128, 28, 145, {12, 17, 19, 255});
     for (int i = 0; i < 12; ++i) {

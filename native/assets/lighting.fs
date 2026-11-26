@@ -15,6 +15,8 @@ uniform vec2 boardLight;
 uniform float laneRun;
 uniform vec3 keyDirection, keyTint;
 uniform float roofLight;
+uniform int aquarium;
+uniform vec3 finLoad;
 out vec4 finalColor;
 // GLSL pow(x,n) is undefined for x<0, even for integer-valued n.
 // Signed floor reflections previously produced NaNs on some Windows drivers.
@@ -37,10 +39,21 @@ void main() {
         if (b.z<0.) {
             vec2 p=vec2(-b.x,-b.y);
             float hole=min(length(p-vec2(.46,-.32)),min(length(p-vec2(.65,-.19)),length(p-vec2(.44,.01))));
-            holeLight=mix(.10,1.,smoothstep(.065,.09,hole));
+            float bevel=smoothstep(.048,.084,hole);
+            holeLight=mix(.038,1.,bevel)+.22*exp(-square((hole-.084)/.009));
         }
     }
+    if (woodMode==6 && uv.x<.48 && uv.y>.65) {
+        // Move the painted irises within the eye islands and close the upper lids on a blink.
+        float socket=1.-smoothstep(.7,1.,length((uv-vec2(.246,.81))/vec2(.19,.18)));
+        sampleUV.x+=socket*(.021*finLoad.y+.018*finLoad.x*sign(localPos.x));
+    }
     vec3 tex=texture(texture0,sampleUV).rgb*colDiffuse.rgb*color.rgb;
+    if (woodMode==6 && uv.x<.48 && uv.y>.65) {
+        float blink=pow(max(0.,cos(sceneTime*1.49)),180.);
+        float lid=.736+.181*blink+.019*finLoad.x;
+        tex=mix(tex,vec3(.09,.35,.43),1.-smoothstep(lid-.005,lid+.005,uv.y));
+    }
     vec3 key=normalize(keyDirection);
     float diffuse=max(dot(n,key),0.0);
     float rim=pow(1.0-clamp(dot(n,v),0.0,1.0),3.0);
@@ -63,6 +76,16 @@ void main() {
         float strip=1.-smoothstep(.78,1.15,max(abs(r.x-.61)/.085,abs(r.y-.48)/.30));
         lit+=max(-r.z,0.)*(boxLight*vec3(.77,.73,.65)+strip*vec3(.30,.37,.46));
     }
+    if(woodMode==7 || woodMode==9 || woodMode==12) {
+        vec3 reflected=reflect(-v,n);
+        float horizon=exp(-square((reflected.y-.15)/.12));
+        lit+=keyTint*horizon*(.05+.14*rim);
+        if(woodMode==12) lit+=vec3(.56,.87,.94)*(.44*gloss+.19*rim);
+        if(woodMode==9) {
+            float rub=1.-smoothstep(.0,.15,abs(localPos.y-.64+.027*sin(localPos.x*24.)));
+            lit*=1.-.10*rub*noise(localPos*41.);
+        }
+    }
     if(woodMode==1) {
         // Broad catwalk reflections at the Trop and raking sunlight in the open parks.
         float roofBand=exp(-square(sin(world.z*.21+world.x*.13)*3.8));
@@ -79,7 +102,8 @@ void main() {
         lit+=vec3(.024,.016,.009)*varnish;
         float seam=fract((world.x+30.0)*3.4);
         float lineWidth=max(.012,fwidth(world.x*3.4));
-        lit*=mix(.88,1.0,smoothstep(0.0,lineWidth,seam)*smoothstep(0.0,lineWidth,1.0-seam));
+        float boardLine=smoothstep(0.0,lineWidth,seam)*smoothstep(0.0,lineWidth,1.0-seam);
+        lit*=mix(.88+.12*boardLine,.98,smoothstep(.18,.7,lineWidth));
         float end=fract((world.z+hash(plank)*7.0)/4.5);
         lit*=mix(.93,1.0,smoothstep(0.0,max(.004,fwidth(world.z/4.5)),end));
     }
@@ -100,16 +124,23 @@ void main() {
     }
     if(floorMaterial) {
         float shadow=0.0;
+        // The soft cast shadow follows the park lights. A tighter core anchors each foot.
+        vec2 castDirection=-key.xz/max(.42,key.y);
         for(int i=0;i<10;++i) {
             vec2 axis=pinShadows[i].zw;
             vec2 offset=world.xz-pinShadows[i].xy;
             float along=clamp(dot(offset,axis)/max(.001,dot(axis,axis)),0.,1.);
             vec2 d=(offset-axis*along)/vec2(.50,.85);
-            shadow+=exp(-dot(d,d)*2.0)*mix(.52,.32,along);
+            shadow+=exp(-dot(d,d)*2.0)*mix(.58,.36,along);
+            vec2 penumbra=offset-axis*along-castDirection*.47;
+            shadow+=.17*exp(-dot(penumbra,penumbra)*1.46);
         }
         vec2 footprint=woodMode==5 ? vec2(1.46,1.63) : ballShadow.y*vec2(.90,1.13);
         vec2 d=(world.xz-ballShadow.xz)/footprint;
         shadow+=exp(-dot(d,d)*1.8)*.58;
+        vec2 castOffset=(world.xz-ballShadow.xz-castDirection*.52)/footprint;
+        shadow+=.20*exp(-dot(castOffset,castOffset)*1.3);
+        shadow+=.15*exp(-square((abs(world.x)-4.94)/.16));
         if(woodMode==1) shadow+=exp(-dot(d,d)*9.)*.24;
         lit*=1.0-min(shadow,.75);
         // Soft elongated ceiling-light glints in the varnish, not scene reflections.
@@ -134,6 +165,7 @@ void main() {
     }
     if(woodMode==8) {
         float blades=noise(vec3(world.x*12.0,0.,world.z*8.0));
+        blades=mix(blades,.5,smoothstep(.25,1.3,length(fwidth(world.xz)*vec2(12.,8.))));
         lit*=.80+.24*broad+.18*blades;
         lit+=vec3(.04,.025,.003)*smoothstep(.55,.88,blades);
     }
@@ -173,6 +205,18 @@ void main() {
         lit+=daylight*vec3(.105,.073,.024)*shafts;
     }
     if(woodMode==11) lit=mix(lit,vec3(1.,.47,.049),.56)+vec3(.085,.041,.004)*broad;
+    if(aquarium==1 && world.y<8.) {
+        vec2 water=world.xz*vec2(1.32,.43)+world.y*vec2(.71,-.49);
+        float ridge=abs(sin(water.x+sceneTime*.88+sin(water.y))+
+                        .69*sin(water.y*1.67-sceneTime*.72+water.x*.41));
+        float shaft=(1.-smoothstep(.025,.20,ridge))*(.28+.72*max(n.y,0.));
+        lit+=vec3(.065,.19,.17)*shaft;
+    } else if(aquarium==0) {
+        float pool=exp(-square((world.z-boardLight.y)/25.)-square(world.x/17.));
+        lit+=vec3(.06,.15,.32)*pool*boardLight.x*(.34+.66*abs(n.z));
+        float grassBounce=max(0.,-n.y)*exp(-abs(world.y)*.31);
+        lit+=tex*vec3(.027,.072,.034)*grassBounce;
+    }
     float fog=1.0-exp(-length(eye-world)*.0035);
     lit=mix(lit,vec3(.09,.17,.24),fog);
     finalColor=vec4(lit*holeLight,colDiffuse.a*color.a);

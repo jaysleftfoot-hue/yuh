@@ -25,9 +25,9 @@ struct RailTile {
     }
 };
 // Each stitched rail carries a complete ten-frame scorebook.
-void scoreRail(const Game &game, std::array<RailTile, 10> &tiles, float dt, Texture2D rail, bool rivalSide, const char *name, bool atBat, Color inkColor) {
+void scoreRail(const Game &game, std::array<RailTile, 10> &tiles, float dt, Texture2D rail, bool rivalSide, const char *name, bool atBat, Color inkColor, bool aquarium) {
     const float x = rivalSide ? 652 : 4;
-    sprite(rail, {x, 0, 624, 77});
+    sprite(rail, {x, 0, 624, 77}, aquarium ? Color{157,220,232,255} : Color{194,213,167,255});
     const auto scores = game.scores();
     int total = 0;
     for (int frame = 0; frame < 10; ++frame) {
@@ -52,7 +52,7 @@ void scoreRail(const Game &game, std::array<RailTile, 10> &tiles, float dt, Text
             DrawRectangle(-21, -17, 42, 38, Fade({74, 61, 46, 255}, .85f*(1-hinge)));
         if (!face.marks.empty()) arcadeCenter(face.marks, 0, -17, 18, cream);
         else DrawLineEx({-4, -6}, {4, -7}, 2, {106, 112, 102, 235});
-        if (!face.score.empty()) arcadeCenter(face.score, 0, 0, 23, inkColor);
+        if (!face.score.empty()) scoreboardLights(face.score, 0, 3, 1.9f, inkColor);
         rlPopMatrix();
         // Short scorekeeper's ticks leave the face a single continuous surface.
         DrawLineEx({cx + 25, 25}, {cx + 23, 54}, 1.5f, {142, 137, 116, 128});
@@ -140,11 +140,11 @@ int main(int argc, char **argv) {
     GenTextureMipmaps(&uiFont.texture);
     SetTextureFilter(uiFont.texture, TEXTURE_FILTER_TRILINEAR);
     RenderTexture2D scene = LoadRenderTexture(W, H);
+    int requestedSceneWidth = W, requestedSceneHeight = H;
     Shader antialias =
         LoadShader(nullptr, (std::string(GetApplicationDirectory()) + "assets/antialias.fs").c_str());
     RenderTexture2D replayFeed = LoadRenderTexture(512, 288);
-    RenderTexture2D target = LoadRenderTexture(W, H);
-    SetTextureFilter(target.texture, TEXTURE_FILTER_BILINEAR);
+    SetTextureFilter(scene.texture, TEXTURE_FILTER_BILINEAR);
     Art art;
     art.init();
     art.loadBallSkins();
@@ -196,6 +196,7 @@ int main(int argc, char **argv) {
     std::array<std::array<RailTile, 10>, 2> railTiles{};
     float strikeSeconds = 0;
     bool spareNext = false;
+    float reveal = 0;
     MascotTokens tokens;
     RidePickups ridePickups;
     std::mt19937 rideRng(smoke || captureRequested ? 628u : std::random_device{}());
@@ -250,6 +251,7 @@ int main(int argc, char **argv) {
     };
     auto restart = [&]() {
         railTiles = {};
+        reveal = 0;
         match = Match(match.mascot);
         match.stage = arena;
         match.rival = roster[opponent].style;
@@ -575,6 +577,7 @@ int main(int argc, char **argv) {
                         turn = Turn::Complete;
                     } else {
                         match.settle();
+                        reveal = .19f;
                         turn = match.complete() ? Turn::Complete : Turn::Ready;
                         aiWait = smoke ? 0 : .9f;
                         resetShot();
@@ -644,6 +647,7 @@ int main(int argc, char **argv) {
                            !profile.completed(Challenge::MascotPickups) ? &tokens : nullptr;
         art.cue = screen == Screen::Lane ? stadiumCue : StadiumCue::None;
         art.cueSeconds = cueSeconds;
+        art.pickupBurst = std::clamp((pickupSeconds-1.2f)/.4f,0.f,1.f);
         const bool replaying = screen == Screen::Lane && turn == Turn::Replay;
         const auto &view = replaying ? replay.view() : match.lanes[match.player];
         const bool strike = screen == Screen::Lane && turn != Turn::Ready && turn != Turn::Complete &&
@@ -654,7 +658,7 @@ int main(int argc, char **argv) {
             ? std::clamp(1.f - reaction / (smoke ? .1f : PinsetterCycle::duration), 0.f, 1.f) : 0;
         art.returningBall = spareNext && art.setter.progress >= .63f;
         art.strikeSalute = strike ? art.setter.progress : 0;
-        art.crowdCheer = PinsetterCycle::ease(strikeSeconds, 0, .26f);
+        art.crowdCheer = strikeSeconds;
         art.mascotPose = replaying ? replay.frame().rider : mascotMotion.pose;
         art.wave = ridePickups.wave;
         if (replaying) {
@@ -683,6 +687,11 @@ int main(int argc, char **argv) {
             look = {std::clamp(geometry::renderX(view.ball.x) * .3f, -1.5f, 1.5f),
                     match.mascot ? 1.5f : .9f, z + 12};
         }
+        if (screen == Screen::Lane && turn == Turn::Rolling && view.elapsed < .36f) {
+            float blend = PinsetterCycle::ease(view.elapsed,0,.36f);
+            desired = Vector3Lerp({geometry::renderX(shot.position)*.25f,cameraStyle.height,cameraStyle.back},desired,blend);
+            look = Vector3Lerp({0,cameraStyle.targetHeight,rack},look,blend);
+        }
         if (replaying) {
             desired = {-9, 5.4f, rack - 13};
             look = {1.f, 3.f, rack + 7};
@@ -699,22 +708,44 @@ int main(int argc, char **argv) {
             Vector3Lerp(camera.position, desired, std::min(1.f, dt * (turn == Turn::Rolling ? 18 : 5)));
         camera.target =
             Vector3Lerp(camera.target, look, std::min(1.f, dt * (turn == Turn::Rolling ? 18 : 5)));
+        const int sceneWidth = std::max(1,int(std::round(W*scale)));
+        const int sceneHeight = std::max(1,int(std::round(H*scale)));
+        if (sceneWidth != requestedSceneWidth || sceneHeight != requestedSceneHeight) {
+            requestedSceneWidth = sceneWidth;
+            requestedSceneHeight = sceneHeight;
+            auto resized = LoadRenderTexture(sceneWidth,sceneHeight);
+            if (IsRenderTextureValid(resized)) {
+                SetTextureFilter(resized.texture,TEXTURE_FILTER_BILINEAR);
+                UnloadRenderTexture(scene);
+                scene = resized;
+            } else if (resized.id) UnloadRenderTexture(resized);
+        }
+        const Rectangle sceneSource{0,0,float(scene.texture.width),-float(scene.texture.height)};
         BeginTextureMode(scene);
         ClearBackground({45, 92, 129, 255});
-        DrawRectangleGradientV(0, 0, W, 550, {17, 39, 75, 255}, {140, 182, 193, 255});
+        DrawRectangleGradientV(0, 0, scene.texture.width, scene.texture.height*550/H, {17, 39, 75, 255}, {140, 182, 193, 255});
         if (replaying && match.mascot)
             DrawTexturePro(art.tank, {0, 0, float(art.tank.width), float(art.tank.height)},
-                           {0, 0, float(W), float(H)}, {}, 0, {72, 122, 145, 255});
+                           {0, 0, sceneSource.width, -sceneSource.height}, {}, 0, {72, 122, 145, 255});
         if (screen == Screen::Lane || screen == Screen::Setup)
             art.world(view, shot, turn == Turn::Ready && screen == Screen::Lane, arenas[arena].team,
                       camera, replaying ? replay.seconds : time);
         EndTextureMode();
-        BeginTextureMode(target);
+        BeginDrawing();
         ClearBackground(BLACK);
+        BeginScissorMode(int(offset.x),int(offset.y),int(W*scale),int(H*scale));
+        rlPushMatrix();
+        rlTranslatef(offset.x,offset.y,0);
+        rlScalef(scale,scale,1);
         BeginShaderMode(antialias);
-        DrawTexturePro(scene.texture, {0, 0, float(W), -float(H)}, {0, 0, float(W), float(H)}, {0, 0}, 0,
+        DrawTexturePro(scene.texture, sceneSource, {0, 0, float(W), float(H)}, {0, 0}, 0,
                        WHITE);
         EndShaderMode();
+        if (screen == Screen::Lane && !smoke) {
+            if (!paused) reveal = std::max(0.f,reveal-dt);
+            float fade = turn == Turn::Reaction ? PinsetterCycle::ease(art.setter.progress,.87f,1.f) : reveal/.19f;
+            if (fade>0) DrawRectangle(0,0,W,H,Fade(match.mascot ? Color{12,48,61,255} : Color{35,33,28,255},fade*.81f));
+        }
         if (screen != Screen::Lane) {
             DrawTexturePro(titleArt, {0, 0, float(titleArt.width), float(titleArt.height)},
                            {0, 0, float(W), float(H)}, {0, 0}, 0, WHITE);
@@ -786,7 +817,7 @@ int main(int argc, char **argv) {
             modal({180, 24, 920, 752}, "BALLPARK SHOWDOWN");
             // Compact versus composition: park preview above two portrait plaques.
             panel({486, 154, 308, 180});
-            DrawTexturePro(scene.texture, {0, 0, float(W), -float(H)}, {502, 172, 276, 143}, {0, 0}, 0,
+            DrawTexturePro(scene.texture, sceneSource, {502, 172, 276, 143}, {0, 0}, 0,
                            WHITE);
             int parkStep = 0;
             if (button({425, 211, 54, 58}, "<")) parkStep = -1;
@@ -912,10 +943,10 @@ int main(int argc, char **argv) {
             if (plaqueButton({1028, 722, 164, 55}, "BACK"))
                 screen = lockerReturn;
         } else {
-            baseballHud(portraits, art.pinGauge, profile.avatar, opponent, view);
-            scoreRail(match.games[0], railTiles[0], paused ? 0.f : dt, art.scoreRails[0], false, "YOU", match.player == 0, gold);
+            baseballHud(portraits, art.pinGauge, profile.avatar, opponent, view, match.mascot);
+            scoreRail(match.games[0], railTiles[0], paused ? 0.f : dt, art.scoreRails[0], false, "YOU", match.player == 0, match.mascot ? aqua : gold, match.mascot);
             scoreRail(match.games[1], railTiles[1], paused ? 0.f : dt, art.scoreRails[1], true, roster[opponent].name, match.player == 1,
-                      {142, 232, 220, 255});
+                      {142, 232, 220, 255}, match.mascot);
             title(splitDrill ? "FENWAY 7-10 DRILL" : match.mascot ? (powerRide ? "POWER RIDE" : "STRAIGHT RIDE") : arenas[arena].name,
                   184, 122, 20, cream);
             if (match.mascot && powerRide) {
@@ -940,10 +971,10 @@ int main(int argc, char **argv) {
                               - 85.f * PinsetterCycle::ease(t, 1.48f, 1.8f);
                 float y = 108.f - 88.f*(1-PinsetterCycle::ease(t, 0, .24f))
                                 - 88.f*PinsetterCycle::ease(t, 1.48f, 1.8f);
-                BeginScissorMode(322, 99, 215, 132);
+                BeginScissorMode(int(offset.x+322*scale),int(offset.y+99*scale),int(215*scale),int(132*scale));
                 DrawTexturePro(art.strikePennant, {0, 0, float(art.strikePennant.width), float(art.strikePennant.height)},
                                {343, y, 182, 62}, {9, 7}, angle, WHITE);
-                EndScissorMode();
+                BeginScissorMode(int(offset.x),int(offset.y),int(W*scale),int(H*scale));
             }
             if (turn == Turn::Replay) {
                 if (!match.outcome().strike) arcadeCenter(result, 640, 204, 41, gold);
@@ -1009,7 +1040,7 @@ int main(int argc, char **argv) {
                 text(charge ? "Release to ride. Backspace cancels."
                             : "Drag back to load the sling, or hold Space.", 180, 225, 16, cream);
                 if (charge)
-                    arcadeMeter(1045, 500, shot.power, aqua);
+                    arcadeMeter(1045, 500, shot.power, aqua, true);
             }
             if (!match.mascot && turn == Turn::Ready && human) {
                 float x = 240 + (shot.position - geometry::launchMin) /
@@ -1100,11 +1131,8 @@ int main(int argc, char **argv) {
                 paused = false;
             }
         }
-        EndTextureMode();
-        BeginDrawing();
-        ClearBackground(BLACK);
-        DrawTexturePro(target.texture, {0, 0, float(W), -float(H)},
-                       {offset.x, offset.y, W * scale, H * scale}, {0, 0}, 0, WHITE);
+        rlPopMatrix();
+        EndScissorMode();
         EndDrawing();
         if (smoke && previewTick)
             capture();
@@ -1138,7 +1166,7 @@ int main(int argc, char **argv) {
     art.close();
     UnloadShader(antialias);
     UnloadRenderTexture(scene);
-    UnloadRenderTexture(target);
+
     UnloadRenderTexture(replayFeed);
     CloseWindow();
     return smoke && !ok ? 1 : 0;

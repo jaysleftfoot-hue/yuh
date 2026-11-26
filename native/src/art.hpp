@@ -12,7 +12,7 @@ struct Art {
     Shader shader{};
     bowling::PinsetterCycle setter;
     float strikeSalute = 0; // 0..1 during the live post-strike sweep
-    float crowdCheer = 0;
+    float crowdCheer = 0, deckRattle = 0, pickupBurst = 0;
     Texture2D strikePennant{}, shop{};
     bool returningBall = false;
     Texture2D gearCase{}, tank{}, kelp{}, reef{}, spray{}, sunburst{}, tokenMedal{};
@@ -275,6 +275,10 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
             visibleTiles = nextTiles;
             tileSeconds = .42f;
         }
+        const auto &lane = match.lanes[match.player];
+        const bool gutterBall = lane.hasBall && lane.gutter && lane.ball.z >= lane.layout.headPin();
+        const int tally = lane.hasBall ? lane.knocked() : 0;
+        key += ":" + std::to_string(tally) + ":" + std::to_string(gutterBall);
         const bool animating = tileSeconds > 0;
         tileSeconds = std::max(0.f, tileSeconds - dt);
         key += ":" + std::to_string(int(cue)) + ":" + std::to_string(bool(replayFeed));
@@ -297,6 +301,15 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                 };
                 logo(parkLogos[park], 512, 68, 360, 65);
                 logo(teamLogos[park], 512, 142, 155, 124);
+            }
+            if (manual) {
+                arcadeCenter(gutterBall ? "FOUL TERRITORY" : "THIS BALL",512,117,24,cream);
+                scoreboardLights(std::to_string(tally),512,153,9,gutterBall ? visitorInk : homeInk);
+                for (int lamp=0;lamp<10;++lamp) {
+                    Vector2 p{429.f+18*lamp,236.f};
+                    DrawCircleV(p,6.6f,{21,37,32,255});
+                    DrawCircleV(p,4.7f,lamp<tally ? gold : Color{64,79,62,255});
+                }
             }
             for (int side = 0; side < 2; ++side) {
                 const float cx = side ? 810 : 214;
@@ -382,7 +395,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
     void floatingMedal(Texture2D face, Vector3 pos, float size, float time) {
         rlPushMatrix();
         rlTranslatef(pos.x, pos.y, pos.z);
-        rlRotatef(time * 75 + pos.z, 0, 1, 0);
+        rlRotatef(52.f * std::sin(time * 2.f + pos.z), 0, 1, 0);
         const float r = size * .5f;
         DrawCylinderEx({0,0,-.11f}, {0,0,.11f}, r, r, 32, {164,108,44,255});
         for (int i = 0; i < 28; ++i) {
@@ -458,7 +471,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
             for (int segment = 1; segment <= 8; ++segment) {
                 const float t = segment / 8.f;
                 Vector3 next = Vector3Lerp(start, end, t);
-                next.y -= .16f * (1 - pull) * std::sin(t * PI);
+                next.y += (.12f*(1-contact)*std::sin(t*2*PI) - .16f*(1-pull)*std::sin(t*PI));
                 const float r = .086f - pull * .018f;
                 beam(previous, next, r, leather);
                 beam({previous.x, previous.y + r * .70f, previous.z - .022f},
@@ -640,11 +653,14 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         rlRotatef(-pose.pull * 3.f + pose.recoil * 10.f, 1, 0, 0);
         rlPushMatrix();
         rlScalef(1 + pose.pull * .035f, 1 - pose.pull * .13f, 1 + pose.pull * .025f);
+        material(12);
         DrawModel(tube, {0, 0, 0}, 1, WHITE);
         rlPopMatrix();
         rlTranslatef(0, .12f - pose.pull * .10f, -.09f * pose.pull);
         float glance = bowling::PinsetterCycle::ease(pose.pull, .68f, 1.f);
-        float turn = ready ? 180.f + std::sin(time * 1.5f) * 4.f + glance * 30.f : pose.bank * 10;
+        float edge = ready || gutter ? 0.f : bowling::PinsetterCycle::ease(std::abs(p.x),2.9f,4.1f);
+        rlRotatef(edge * (p.x>0 ? 13.f : -13.f),0,0,1);
+        float turn = ready ? 180.f + std::sin(time * 1.5f) * 4.f + glance * 30.f : pose.bank * 10 + edge*(p.x>0 ? -24.f : 24.f);
         turn += 155.f * bowling::PinsetterCycle::ease(strikeSalute, 0, .28f);
         rlRotatef(turn, 0, 1, 0);
         const float tip = std::sin(PI * bowling::PinsetterCycle::ease(strikeSalute, .16f, .89f));
@@ -988,7 +1004,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         box({0, -.91f, end + 1.55f}, {10.9f, .28f, 3.25f}, rubber);
         for (int i = -6; i <= 6; ++i) {
             float x = i * .82f;
-            box({x, .48f, end + 2.78f}, {.79f, 1.83f, .22f}, i % 2 ? rubber : Color{40, 44, 45, 255});
+            box({x, .48f, end + 2.78f + deckRattle*std::cos(i*.6f)}, {.79f, 1.83f, .22f}, i % 2 ? rubber : Color{40, 44, 45, 255});
             beam({x - .21f, 1.28f, end + 2.64f}, {x + .21f, 1.28f, end + 2.64f}, .038f, metal);
         }
         for (int side : {-1, 1}) {
@@ -1027,7 +1043,8 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         box({x, .37f, z}, {8.3f, .85f, 1.6f}, rail);
         for (int i = 0; i < 7; ++i) {
             float sx = x + (i-3)*1.07f;
-            float rise = crowdCheer * (.8f + .2f * std::sin(time*6.f + i));
+            float arrival = bowling::PinsetterCycle::ease(crowdCheer, i*.045f, i*.045f+.24f);
+            float rise = arrival * (.58f + .42f*std::cos(time*5.4f-i*.68f));
             float y = 1.37f + rise*.72f + (i%3)*.066f;
             Color jersey = i%3 == 0 ? cream : (i%3 == 1 ? team : Color{156, 67, 50, 255});
             Color skinTone = i%2 ? Color{173, 116, 76, 255} : Color{220, 166, 125, 255};
@@ -1297,7 +1314,13 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         const float glow = cue == bowling::StadiumCue::Turkey
                                ? std::min(1.f, cueSeconds) * (.65f + .35f * std::sin(time * 6))
                                : 0.f;
-        const Vector2 boardLight{glow, sim.layout.headPin()};
+        const Vector2 boardLight{glow + (arena==9 && !mascot ? .54f : .08f), sim.layout.headPin()};
+        const int water = mascot;
+        SetShaderValue(shader, GetShaderLocation(shader, "aquarium"), &water, SHADER_UNIFORM_INT);
+        deckRattle=0;
+        for (const auto &p : sim.pins)
+            if (p.down && p.fall<1.f)
+                deckRattle+=.044f*std::sin(p.fall*17.f)*(1.f-p.fall);
         SetShaderValue(shader, GetShaderLocation(shader, "boardLight"), &boardLight, SHADER_UNIFORM_VEC2);
         // The replay rig looks in from outside the left exhibit wall. Open that
         // side like a stage cutaway and carry the surrounding water to the horizon.
@@ -1349,6 +1372,15 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                 const float x = geo::renderX(item.position.x);
                 const float y = 1.04f + .13f * std::sin(time * 3.2f + item.position.z);
                 floatingMedal(badges[int(item.power) - 1], {x, y, item.position.z}, 1.35f, time);
+            }
+            if (powerPickup && powerPickup->claimed && pickupBurst>0) {
+                float age=1.f-pickupBurst;
+                for (int i=0;i<8;++i) {
+                    float a=i*PI/4.f, spread=.36f+1.24f*age;
+                    float x=geo::renderX(powerPickup->position.x)+spread*std::cos(a);
+                    float y=1.2f+spread*std::sin(a)+age*.54f;
+                    orb({x,y,powerPickup->position.z},{.10f*pickupBurst,.14f*pickupBurst,.09f},gold);
+                }
             }
             if (ridePickups && ridePickups->route)
                 for (const auto &item : *ridePickups->route) {

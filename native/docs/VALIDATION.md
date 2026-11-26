@@ -1,3 +1,9 @@
+# Arcade lighting and delivery transitions
+
+The Linux build completed ten-frame Stadium, Power Ride and Straight Ride matches. Native rules and campaign tests covered lane projection, launch speed, pin scoring, power-ups and progression. X11 input checks exercised Stadium keyboard controls and a Mascot sling draw from near the bottom of the window. Resizing the running game produced 1920×1080 and 3840×2160 screenshots with the game area centered.
+
+The four silent gameplay clips in the handoff use scripted input and the native renderer. They run from setup through the next ready view. Windows installer and portable ZIP checks cover package contents and hashes. Playback on Windows hardware still needs a playtest.
+
 # Gameplay regression pass
 
 - Full native Linux matches completed in Stadium, Power Ride and Straight Ride. A simulation stress pass completed 240 additional matches and 8,624 deliveries across all ten parks, both physics modes, four difficulties and three rival styles. It checked that every shot settled, each spare rack matched the scorekeeper, and scores stayed in bounds.
