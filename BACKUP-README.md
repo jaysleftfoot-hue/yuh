@@ -1,1 +1,1 @@
-Stadium and aquarium scenery build from e8e32689b3f7d696092d9fe5466d4df5b1a1aa99. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. Join any numbered parts of an archive in numerical order before opening it. Windows execution is unverified.
+Arcade lighting and presentation build from 58392f17b8d78650582b8bb33a10b42cc1617283. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. Join any numbered parts of an archive in numerical order before opening it. Windows execution is unverified.
