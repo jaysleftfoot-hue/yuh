@@ -5,9 +5,9 @@ The current C++ desktop implementation is in [native/](native/README.md), includ
 
 ## Download the C++ game for Windows
 
-[Windows x64 installer](https://github.com/jaysleftfoot-hue/yuh/raw/refs/heads/backups/native-park-milestones/Big-League-Bowling-Setup.exe) · [Portable ZIP](https://github.com/jaysleftfoot-hue/yuh/raw/refs/heads/backups/native-park-milestones/Big-League-Bowling-Native-Windows-x64.zip) · [Release and checksums](https://github.com/jaysleftfoot-hue/yuh/releases/latest)
+[Windows x64 installer ZIP](https://github.com/jaysleftfoot-hue/yuh/archive/refs/heads/downloads/windows-installer.zip) · [Portable ZIP](https://github.com/jaysleftfoot-hue/yuh/raw/refs/heads/backups/native-park-milestones/Big-League-Bowling-Native-Windows-x64.zip) · [Release and checksums](https://github.com/jaysleftfoot-hue/yuh/releases/latest)
 
-If the EXE download fails, [download the installer inside a ZIP](https://github.com/jaysleftfoot-hue/yuh/raw/refs/heads/backups/native-park-milestones/Big-League-Bowling-Setup.zip), extract it, and open the EXE. Run the installer, or extract the portable ZIP and launch **Big League Bowling.exe** with the assets folder beside it.
+Extract the installer ZIP, open the folder, and run **Big-League-Bowling-Setup.exe**. For the portable ZIP, extract it and launch **Big League Bowling.exe** with the assets folder beside it.
 
 ## Earlier browser prototype
 
