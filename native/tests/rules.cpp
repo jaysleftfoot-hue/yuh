@@ -90,6 +90,26 @@ int main() {
     check(rackPixels > 38 && rackPixels < 46, "reference rack remains small in the distance");
     check(geometry::renderX(geometry::launchMin) > geometry::renderX(geometry::launchMax),
           "mouse right maps to camera right looking down positive Z");
+    Body graze;
+    graze.react(.8f, .6f, .45f);
+    graze.advancePose(.05f);
+    check(!graze.down && graze.tiltDegrees() > 0, "grazed pin rocks on its foot");
+    graze.advancePose(.65f);
+    check(!graze.down && graze.tiltDegrees() == 0, "grazed pin recovers upright");
+    Body shoulder;
+    shoulder.react(.8f, .6f, 12.f);
+    shoulder.advancePose(.24f);
+    check(shoulder.down && shoulder.tiltDegrees() > 90, "hard shoulder hit tumbles beyond horizontal");
+    Simulation corner;
+    corner.pins.front().id = 9;
+    corner.pins.resize(1);
+    corner.pins[0].react(0, 1, 3);
+    corner.active = true;
+    corner.elapsed = geometry::shotTimeout;
+    corner.step(.25f);
+    check(corner.active && corner.knocked() == 0, "wobbling corner stays lit through the scoring timeout");
+    corner.step(.26f);
+    check(!corner.active && corner.knocked() == 1, "corner drop settles before scoring");
     Simulation dimensions;
     for (const auto &pin : dimensions.pins)
         check(pin.x - pin.r >= 0 && pin.x + pin.r <= 10 && pin.z < geometry::deckEnd,

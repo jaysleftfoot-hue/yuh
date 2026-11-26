@@ -155,7 +155,8 @@ struct RidePickups {
                 continue;
             pin.vx += dx * 4;
             pin.vz += dz * 4;
-            pin.down = true;
+            const float length = distance > .001f ? distance : 1.f;
+            pin.react(dx / length, distance > .001f ? dz / length : 1.f, 5.f, false);
             ++lane.impacts;
         }
         return true;

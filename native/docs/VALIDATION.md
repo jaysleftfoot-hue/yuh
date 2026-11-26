@@ -1,3 +1,11 @@
+# Ballpark tour, pro shop and pin reactions
+
+- The native geometry suite checks the opening projection in both modes and 3–4 seconds of full-power Stadium travel. Controlled contact tests cover a graze that recovers upright, a shoulder hit past horizontal, and a wobbling corner pin that holds the score open until it falls.
+- Captured the ten park launch views from the same camera, the touch tank, kelp gallery, wreck, and both sample deliveries in the native Linux renderer. The two silent clips run from setup through impact at 20 fps. The locker capture uses the title menu and mouse input.
+- The Windows installer adds two playable practice shortcuts that pass `--play --arena 0` and `--play --arena 9`. Verified portable ZIP integrity, the shipped outfield and locker textures against source, and SHA-256 for both Windows packages. Windows execution and physical audio still need a target-machine check.
+
+[Ten ballparks](ballpark-tour.jpg) · [Shop and ride](pro-shop-and-ride.jpg) · [Wrigley delivery](wrigley-delivery.mp4) · [Tropicana delivery](tropicana-delivery.mp4)
+
 # Pinsetter and score rail animations
 
 - Ran the native scoring, geometry and campaign suites. The new presentation checks exercise both lane layouts and verify clearance above the sweep, fallen-pin travel, and the standing pins’ positions at reset.

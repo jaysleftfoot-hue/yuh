@@ -12,8 +12,10 @@ struct Art {
     bowling::PinsetterCycle setter;
     float strikeSalute = 0; // 0..1 during the live post-strike sweep
     float crowdCheer = 0;
-    Texture2D strikePennant{};
-    Texture2D gearCase{}, wrigley{}, tank{}, reef{}, spray{}, trop{}, sunburst{}, tokenMedal{};
+    Texture2D strikePennant{}, shop{};
+    bool returningBall = false;
+    Texture2D gearCase{}, tank{}, kelp{}, reef{}, spray{}, sunburst{}, tokenMedal{};
+    std::array<Texture2D, 10> outfield{};
     Texture2D manualBoard{}, electricBoard{}, scorePlates{}, enamelLettering{}, pinGauge{};
     std::array<Texture2D, 2> scoreRails{};
     std::array<Texture2D, 3> reactions{};
@@ -29,6 +31,7 @@ struct Art {
             SetTextureFilter(texture, TEXTURE_FILTER_TRILINEAR);
             return texture;
         };
+        shop = load("pro-shop.jpg");
         strikePennant = load("strike-pennant.png");
         manualBoard = load("manual-board.jpg");
         electricBoard = load("electric-board.jpg");
@@ -37,9 +40,12 @@ struct Art {
         pinGauge = load("pin-gauge.png");
         scoreRails = {load("score-rail-home.png"), load("score-rail-away.png")};
         gearCase = load("equipment-case.jpg");
-        wrigley = load("wrigley.jpg");
-        trop = load("trop.jpg");
+        constexpr const char *murals[]{"wrigley", "fenway", "oracle", "pnc", "coors", "kauffman",
+                                       "chase", "seattle", "yankee", "trop"};
+        for (size_t i = 0; i < outfield.size(); ++i)
+            outfield[i] = load(std::string(murals[i]) + ".jpg");
         tank = load("tank.jpg");
+        kelp = load("kelp-gallery.jpg");
         reef = load("sunken-ballpark.jpg");
         spray = load("wave-spray.png");
         SetTextureWrap(tank, TEXTURE_WRAP_MIRROR_REPEAT);
@@ -587,7 +593,13 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         sphere.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = original;
         rlPopMatrix();
     }
-    void drawPin(const bowling::Body &p, float time, geo::LaneLayout lane) {
+    Vector2 pinLean(const bowling::Body &p) const {
+        // World X runs opposite to simulation X. A wobbly corner circles its foot once.
+        float angle = p.motion == bowling::PinMotion::Teeter ? p.motionTime * 4.f * PI : 0.f;
+        return {-p.hitX * std::cos(angle) - p.hitZ * std::sin(angle),
+                 p.hitZ * std::cos(angle) - p.hitX * std::sin(angle)};
+    }
+    void drawPin(const bowling::Body &p, geo::LaneLayout lane) {
         if (!p.down && setter.progress > 0) {
             float grip = bowling::PinsetterCycle::ease(setter.progress, .03f, .17f)
                        - bowling::PinsetterCycle::ease(setter.progress, .92f, 1.f);
@@ -600,15 +612,16 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
             }
         }
         rlPushMatrix();
-        const float tilt = p.down ? p.fall * 86.f : std::sin(time * 3 + p.id) * 2.f;
-        const float tip = std::sin(std::abs(tilt) * DEG2RAD);
-        // As the pin tips over, its contact point moves from the foot to the belly.
-        const float lift =
-            p.down ? std::max(.30f * tip, geo::pinRadius * tip - .9f * std::cos(tilt * DEG2RAD)) : 0.f;
+        const float tilt = p.tiltDegrees(), cosine = std::cos(tilt * DEG2RAD);
+        const float tip = std::abs(std::sin(tilt * DEG2RAD));
+        const Vector2 lean = pinLean(p);
+        // Support the belly and then the crown through an inverted shoulder tumble.
+        const float lift = std::max({.30f * tip, geo::pinRadius * tip - .9f * cosine,
+                                     -geo::pinHeight * cosine});
         float z = setter.pinZ(p, lane);
         float pitDrop = bowling::PinsetterCycle::ease(z, lane.surfaceEnd() - .4f, lane.surfaceEnd() + 1.f);
         rlTranslatef(geo::renderX(p.x), .06f + lift + (p.down ? -1.3f * pitDrop : setter.lift()), z);
-        rlRotatef(tilt, p.id % 2 ? 1.f : -1.f, 0, .4f);
+        rlRotatef(tilt, lean.y, 0, -lean.x);
         rlScalef(geo::pinRadius / .40f, geo::pinHeight / 2.05f, geo::pinRadius / .40f);
         material(9);
         DrawModel(pin, {0, 0, 0}, 1, WHITE);
@@ -669,11 +682,6 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                 for (int i = -4; i <= 4; ++i)
                     beam({i * 2.f, 10, z}, {i * 2.f, 7, z}, .04f, gold);
             }
-        if (arena == 4)
-            for (int i = 0; i < 7; ++i) {
-                DrawCylinder({-21.f + i * 7, 0, 43}, 0, 7, 14 + (i % 3) * 4, 7, {95, 108, 143, 255});
-                DrawCylinder({-21.f + i * 7, 11.f + (i % 3) * 4, 43}, 0, 2.5f, 4, 7, cream);
-            }
         if (arena == 5)
             for (int side : {-1, 1})
                 for (float z : {7.f, 17.f, 28.f}) {
@@ -687,11 +695,6 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                     }
                 }
         if (arena == 6) {
-            for (int side : {-1, 1})
-                for (float z : {5.f, 15.f, 27.f}) {
-                    cyl({side * 9.f, 0, z}, .5f, 5, {42, 126, 66, 255});
-                    box({side * 9.f, 3, z}, {2, .5f, .5f}, {42, 126, 66, 255});
-                }
             box({11, .1f, 24}, {7, .2f, 12}, {37, 172, 197, 255});
         }
         if (arena == 7) {
@@ -750,18 +753,17 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         // Recessed exhibit windows follow the outer walls, leaving the course clear.
         for (int side : {-1, 1}) {
             if (side == openSide) continue;
-            int bay = side < 0 ? 0 : 2;
-            for (float z = 1; z < 34 + extra; z += 11.f, ++bay) {
+            for (float z = 1; z < 34 + extra; z += 11.f) {
                 rlPushMatrix();
                 rlTranslatef(side * 7.05f, 4.2f, z);
                 rlRotatef(side * 90.f, 0, 1, 0);
-                if (bay % 3 == 0) {
-                    for (int half : {-1, 1})
-                        sign(half == side ? reef : tank, {half * 2.73f, 0, 0}, 5.43f, 7.6f, true);
-                    beam({0, -3.82f, -.025f}, {0, 3.82f, -.025f}, .075f, {58, 107, 111, 255});
-                } else {
-                    sign(tank, {0, 0, 0}, 10.8f, 7.6f, true);
+                for (int half : {-1, 1}) {
+                    float worldZ = 2.f + (z-2.f - side*half*2.73f)*sceneryDepthScale;
+                    auto exhibit = worldZ < geo::mascotLane.at(.32f) ? tank :
+                                   worldZ < geo::mascotLane.at(.71f) ? kelp : reef;
+                    sign(exhibit, {half*2.73f, 0, 0}, 5.45f, 7.6f, true);
                 }
+                beam({0, -3.82f, -.025f}, {0, 3.82f, -.025f}, .067f, {58, 107, 111, 255});
                 for (float y : {-3.85f, 3.85f})
                     beam({-5.5f, y, 0}, {5.5f, y, 0}, .12f, {73, 157, 161, 255});
                 rlPopMatrix();
@@ -805,13 +807,15 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                     const float seed = float(bed * 13 + j * 7 + side);
                     const float x = side * (6.53f + .39f * std::sin(seed * 1.26f));
                     const float depth = z + std::sin(seed * .75f) * 1.47f;
-                    const float height = .8f + .92f * (1 + std::sin(seed * .82f));
+                    float worldZ = 2.f + (z-2.f)*sceneryDepthScale;
+                    bool forest = worldZ >= geo::mascotLane.at(.32f) && worldZ <= geo::mascotLane.at(.71f);
+                    const float height = (.8f + .92f*(1+std::sin(seed*.82f))) * (forest ? 2.6f : 1.f);
                     Vector3 leaf[12];
                     for (int joint = 0; joint < 6; ++joint) {
                         const float t = joint / 5.f;
                         const float drift = (.34f * std::sin(3.6f*t + seed + time*.72f)
                                              + .27f * std::cos(seed)) * t;
-                        const float width = (.035f + .14f * std::sin(t*PI)) * (1 - t);
+                        const float width = (.035f + (forest ? .37f : .14f) * std::sin(t*PI)) * (1 - t);
                         Vector3 knot{x + drift, .13f + height*t, depth + .19f*t*t};
                         leaf[joint*2] = {knot.x - width, knot.y, knot.z};
                         leaf[joint*2+1] = {knot.x + width, knot.y, knot.z + width*.45f};
@@ -917,6 +921,39 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         // sign() expects render textures (inverted Y); loaded PNGs use opposite UVs.
         sign(texture, position, w, h, true);
     }
+    void ballReturn(Color paint) {
+        // Twin rubber rails lead out of an open, enamelled sheet-metal hood.
+        constexpr float x = -7.65f, mouth = 9.3f;
+        Color chrome{164, 174, 171, 255}, rubber{36, 40, 44, 255};
+        box({x, .18f, 7.5f}, {2.57f, .36f, 6.85f}, paint);
+        for (int side : {-1, 1}) {
+            for (float z : {4.5f, 7.2f, 10.3f})
+                cyl({x + side*.55f, .32f, z}, .10f, .46f, chrome);
+            beam({x + side*.55f, .79f, 4.29f}, {x + side*.55f, .86f, 10.45f}, .125f, rubber);
+        }
+        beam({x-.93f,.94f,4.23f}, {x+.93f,.94f,4.23f}, .17f, rubber);
+        box({x, 1.15f, 11.3f}, {2.3f, 1.85f, .22f}, rubber);
+        constexpr int segments = 18;
+        auto rim = [&](int i, float z) {
+            float a = PI*i/segments;
+            return Vector3{x+1.25f*std::cos(a), .42f+2.08f*std::sin(a), z};
+        };
+        for (int i=0; i<segments; ++i) {
+            auto a=rim(i,mouth), b=rim(i+1,mouth);
+            auto c=rim(i,11.5f), d=rim(i+1,11.5f);
+            Color enamel=ColorBrightness(paint, .24f*std::sin(PI*i/segments));
+            DrawTriangle3D(a,b,c,enamel); DrawTriangle3D(b,d,c,enamel);
+            DrawTriangle3D(a,c,b,rubber); DrawTriangle3D(b,c,d,rubber);
+            beam(a,b,.061f,chrome);
+        }
+        if (returningBall) {
+            const float t = bowling::PinsetterCycle::ease(setter.progress, .63f, .96f);
+            float z = 10.6f - 5.45f*t;
+            const float radius = geo::ballRadius;
+            bowlingBall({x, 1.57f-.07f*t, z}, (z-5.15f)*RAD2DEG/radius, radius, 0);
+        }
+    }
+
     void pinsetter(geo::LaneLayout lane, Color paint) {
         const float end = lane.surfaceEnd(), z = setter.bladeZ(lane);
         const float y = 4.32f - 3.83f * setter.lowered();
@@ -1018,70 +1055,23 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         }
         box({0, .03f, -8}, {.8f, .08f, .8f}, cream);
         box({0, .03f, 30}, {.8f, .08f, .8f}, cream);
-        const bool paintedPark = arena == 0 || arena == 9;
-        if (paintedPark) {
-            Texture2D backdrop = arena == 0 ? wrigley : trop;
-            // Continuous outfield panorama curves into the sidelines behind the live board.
-            rlSetTexture(backdrop.id);
-            rlBegin(RL_QUADS);
-            rlColor4ub(255, 255, 255, 255);
-            constexpr int sections = 56;
-            for (int section = 0; section < sections; ++section) {
-                for (int corner : {0, 1, 2, 3}) {
-                    float u = (section + (corner >= 2 ? 1.f : 0.f)) / sections;
-                    float angle = (u - .5f) * PI * 1.45f;
-                    bool top = corner == 1 || corner == 2;
-                    rlTexCoord2f(1.f-u, top ? 0.f : 1.f);
-                    rlVertex3f(118.f * std::sin(angle), top ? 109.f : -18.f,
-                               extra * .5f + 4.f + (extra * .5f + 48.f) * std::cos(angle));
-                }
+        // Continuous outfield panorama curves into the sidelines behind the live board.
+        rlSetTexture(outfield[arena].id);
+        rlBegin(RL_QUADS);
+        rlColor4ub(255, 255, 255, 255);
+        constexpr int sections = 56;
+        for (int section = 0; section < sections; ++section) {
+            for (int corner : {0, 1, 2, 3}) {
+                float u = (section + (corner >= 2 ? 1.f : 0.f)) / sections;
+                float angle = (u - .5f) * PI * 1.45f;
+                bool top = corner == 1 || corner == 2;
+                rlTexCoord2f(1.f-u, top ? 0.f : 1.f);
+                rlVertex3f(118.f * std::sin(angle), top ? 109.f : -18.f,
+                           extra * .5f + 4.f + (extra * .5f + 48.f) * std::cos(angle));
             }
-            rlEnd();
-            rlSetTexture(0);
         }
-        // Continue the seating down both sidelines as lane length increases.
-        for (int side : {-1, 1})
-            for (float z = -8; !paintedPark && z < extra + 28; z += 7.8f) {
-                for (int row = 0; row < 8; ++row) {
-                    float x = side * (43 + row * .7f), y = 4 + row * .8f;
-                    box({x, y / 2, z}, {1, y, 8}, {91, 103, 111, 255});
-                    for (int seat = 0; seat < 8; ++seat) {
-                        DrawCubeV({x, y, z - 3.4f + seat * .9f}, {.5f, .5f, .3f}, team);
-                        if (seat % 3) {
-                            DrawCubeV({x, y + .45f, z - 3.4f + seat * .9f}, {.35f, .5f, .25f},
-                                      {172, 180, 177, 255});
-                            DrawSphereEx({x, y + .83f, z - 3.4f + seat * .9f}, .15f, 4, 6,
-                                         {178, 138, 108, 255});
-                        }
-                    }
-                }
-            }
-        for (int section = 0; !paintedPark && section < 19; ++section) {
-            float a = (-85 + section * 10) * DEG2RAD;
-            float x = std::sin(a) * 43, z = 13 + extra + std::cos(a) * 30;
-            rlPushMatrix();
-            rlTranslatef(x, 0, z);
-            rlRotatef(a * RAD2DEG, 0, 1, 0);
-            box({0, 2, 0}, {8.2f, 4, 1.0f}, arena == 1 ? Color{29, 95, 66, 255} : team);
-            box({0, 4.15f, 0}, {8.3f, .18f, 1.3f}, {226, 199, 139, 255});
-            for (int tier = 0; tier < 2; ++tier) {
-                for (int row = 0; row < 5; ++row) {
-                    float y = 4.6f + tier * 4.4f + row * .61f, depth = 1 + row * .8f + tier * 4;
-                    box({0, y * .5f, depth}, {8.2f, y, 1.0f}, {99, 112, 119, 255});
-                    for (int seat = 0; seat < 9; ++seat) {
-                        float sx = -3.3f + seat * .82f;
-                        DrawCubeV({sx, y, depth}, {.56f, .55f, .175f}, team);
-                        if ((seat + row + section) % 3) {
-                            DrawCubeV({sx, y + .45f, depth}, {.38f, .52f, .16f},
-                                      (seat + row) % 2 ? Color{145, 172, 184, 255} : team);
-                            DrawSphereEx({sx, y + .8f, depth}, .15f, 4, 6, {178, 138, 108, 255});
-                        }
-                    }
-                }
-                box({0, 8.1f + tier * 4.4f, 5 + tier * 4.f}, {8.3f, .3f, 1.4f}, cream);
-            }
-            rlPopMatrix();
-        }
+        rlEnd();
+        rlSetTexture(0);
         for (int side : {-1, 1})
             for (float z : {7.f, 37.f + extra}) {
                 cyl({side * 36.f, 0, z}, .18f, 22, {113, 133, 144, 255});
@@ -1172,7 +1162,9 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                 beam({-43, y, 40 + extra}, {43, y, 40 + extra}, .12f, {48, 59, 67, 255});
             for (int x = -42; x <= 42; x += 3)
                 beam({float(x), 27, 40 + extra}, {float(x), 28, 40 + extra}, .07f, cream);
+            material(11);
             orb({28, 17, 41 + extra}, {3.2f, 3.2f, 1.5f}, {255, 170, 16, 255});
+            material(0);
             beam({29, 19, 41 + extra}, {31, 23, 41 + extra}, .17f, {245, 233, 198, 255});
             for (int side : {-1, 1}) {
                 box({side * 25.f, 13, 42 + extra}, {5, 16, .7f}, {181, 197, 202, 255});
@@ -1183,17 +1175,37 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
     void world(const bowling::Simulation &sim, const bowling::Shot &shot, bool aim, int selected,
                Camera3D cam, float time, bool deckOnly = false) {
         Color team = mascot ? Color{16, 52, 94, 255} : GetColor(teams[selected].color);
+        struct ParkLight { Vector3 direction, tint; float overhead; };
+        static constexpr ParkLight lighting[] = {
+            {{-.91f,.44f,-.34f}, {1.20f,.84f,.60f}, .10f}, // Wrigley sunset
+            {{.69f,.61f,-.52f}, {1.10f,.91f,.68f}, .16f},  // Fenway copper afternoon
+            {{-.46f,.91f,-.25f}, {.91f,1.02f,1.12f}, .08f}, // McCovey Cove
+            {{.72f,.49f,-.55f}, {1.10f,.81f,.95f}, .14f},  // Pittsburgh river sunset
+            {{-.65f,.83f,.13f}, {1.06f,.99f,1.12f}, .08f},  // Denver clear sky
+            {{.34f,.78f,-.66f}, {.85f,.96f,1.18f}, .37f},   // Kauffman twilight
+            {{-.83f,.64f,-.14f}, {1.20f,.89f,.67f}, .65f},  // Chase roof windows
+            {{-.38f,.98f,.22f}, {.87f,1.05f,1.04f}, .46f},   // Seattle cloud cover
+            {{.63f,.76f,-.52f}, {1.08f,1.00f,.88f}, .73f},   // Bronx floodlights
+            {{.14f,.99f,-.24f}, {.79f,.98f,1.21f}, 1.f}    // Tropicana catwalks
+        };
+        const ParkLight aquarium{{-.35f,.85f,-.4f}, {1.f,.96f,.87f}, 0};
+        const auto &light = mascot ? aquarium : lighting[arena];
+        SetShaderValue(shader, GetShaderLocation(shader, "keyDirection"), &light.direction, SHADER_UNIFORM_VEC3);
+        SetShaderValue(shader, GetShaderLocation(shader, "keyTint"), &light.tint, SHADER_UNIFORM_VEC3);
+        SetShaderValue(shader, GetShaderLocation(shader, "roofLight"), &light.overhead, SHADER_UNIFORM_FLOAT);
+        float run = sim.layout.run;
+        SetShaderValue(shader, GetShaderLocation(shader, "laneRun"), &run, SHADER_UNIFORM_FLOAT);
         SetShaderValue(shader, GetShaderLocation(shader, "eye"), &cam.position, SHADER_UNIFORM_VEC3);
-        Vector3 shadow[10];
-        for (int i = 0; i < 10; ++i)
-            shadow[i] = {1000, 0, 1000};
+        Vector4 shadow[10];
+        for (auto &entry : shadow) entry = {1000, 1000, 0, 0};
         for (size_t i = 0; i < sim.pins.size(); ++i) {
-            const auto &pinBody = sim.pins[i];
-            float lean = std::sin(pinBody.fall * 86.f * DEG2RAD);
-            shadow[i] = {geo::renderX(pinBody.x), pinBody.id % 2 ? lean : -lean, setter.pinZ(pinBody, sim.layout)};
+            const auto &p = sim.pins[i];
+            const Vector2 direction = pinLean(p);
+            const float length = std::sin(p.tiltDegrees() * DEG2RAD) * 2.28f;
+            shadow[i] = {geo::renderX(p.x), setter.pinZ(p, sim.layout),
+                         direction.x * length, direction.y * length};
         }
-        SetShaderValueV(shader, GetShaderLocation(shader, "pinShadows"), shadow, SHADER_UNIFORM_VEC3,
-                        10);
+        SetShaderValueV(shader, GetShaderLocation(shader, "pinShadows"), shadow, SHADER_UNIFORM_VEC4, 10);
         Vector3 ballPos{geo::renderX(sim.hasBall ? sim.ball.x : shot.position), 0,
                         sim.hasBall ? sim.ball.z : geo::foulLine};
         const float slingDraw = mascot && aim ? mascotPose.pull * 2.7f : 0.f;
@@ -1284,9 +1296,10 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                                   1.5f, time);
                 }
         }
+        if (!mascot && !deckOnly) ballReturn(team);
         pinsetter(sim.layout, team);
         for (const auto &p : sim.pins)
-            drawPin(p, time, sim.layout);
+            drawPin(p, sim.layout);
         if (mascot && sim.active && ballPos.z < sim.layout.headPin() && !sim.gutter)
             rideWake(ballPos, sim.ball, sim.elapsed);
         if (ballPos.z < surfaceEnd + .95f) {
@@ -1331,7 +1344,8 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
     void close() {
         for (auto texture : reactions)
             UnloadTexture(texture);
-        for (auto texture : {strikePennant, gearCase, wrigley, tank, reef, spray, trop, sunburst, tokenMedal, manualBoard, electricBoard,
+        for (auto mural : outfield) UnloadTexture(mural);
+        for (auto texture : {shop, strikePennant, gearCase, tank, kelp, reef, spray, sunburst, tokenMedal, manualBoard, electricBoard,
                              scorePlates, enamelLettering, pinGauge, scoreRails[0], scoreRails[1]})
             UnloadTexture(texture);
         for (auto texture : badges)

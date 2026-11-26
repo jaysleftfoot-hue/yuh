@@ -2,6 +2,10 @@
 
 C++17 + raylib 5.5 desktop prototype. The native work lost in the cloud refresh was reconstructed from the development conversation on November 17, 2026. This is a tested reconstruction, not a byte-for-byte recovery of the missing filesystem. The earlier browser/Electron game remains in the repository.
 
+## Ballpark practice
+
+The Windows Start menu includes Wrigley Field Practice and Tropicana Field Practice. Each opens a playable Stadium match at that park. Practice keeps the career save intact. For the portable build, launch the executable with `--play --arena 0` for Wrigley or `--play --arena 9` for Tropicana.
+
 ## Playable systems
 
 Use the arrows beside Player One in Ballpark Showdown to choose one of six portraits. Your career saves the selection. Choosing a stadium draws a home opponent from its current MLB player and club legend. Tropicana also fields Raymond. [Home roster and MLB sources](docs/HOME_RIVALS.md)

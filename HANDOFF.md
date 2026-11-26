@@ -1,6 +1,12 @@
 # Current milestone
 
-**Current milestone.** Both native modes now have an animated pinsetter, impact flaps and a recessed pit. The ball has lacquer reflections and lateral roll, Wrigley has exposed brick and scoreboard bracing, stadium fans celebrate, and the ray glances back and tips its cap. The score rails flip and the pin lamps dim as pins fall. [Gameplay clip](native/docs/pinsetter-in-play.mp4) · [Earlier aquarium artwork](native/docs/ASTRA_HANDOFF.md)
+The ballpark tour now has ten individually painted outfields and ten lighting setups. At the pro shop, all 64 balls are on display, with the six Tampa Bay designs together on the right. A spare brings the equipped ball back along a physical return during the pinsetter reset. In Mascot Ride, the touch tank gives way to a kelp gallery and then a sunlit wreck. Shoulder hits, grazes and corner-pin wobbles use the contact direction in live play and replays.
+
+The installer includes Wrigley Field Practice and Tropicana Field Practice in the Start menu. Launch either to play immediately. The normal tour still ends at Tropicana. [Tour gallery](native/docs/ballpark-tour.jpg) · [Shop and aquarium](native/docs/pro-shop-and-ride.jpg) · [Wrigley delivery](native/docs/wrigley-delivery.mp4) · [Tropicana delivery](native/docs/tropicana-delivery.mp4)
+
+## Earlier milestone
+
+Both native modes now have an animated pinsetter, impact flaps and a recessed pit. The ball has lacquer reflections and lateral roll, Wrigley has exposed brick and scoreboard bracing, stadium fans celebrate, and the ray glances back and tips its cap. The score rails flip and the pin lamps dim as pins fall. [Gameplay clip](native/docs/pinsetter-in-play.mp4) · [Earlier aquarium artwork](native/docs/ASTRA_HANDOFF.md)
 
 The 64-ball locker now ships separate club logo, illustrated club, and Rays special wraps. The supplied MLB reference kit guides marks and themes. Left/right arrows rotate the selected locker preview. The existing unlock slots and XP thresholds still apply.
 

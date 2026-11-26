@@ -8,10 +8,13 @@ uniform sampler2D texture0;
 uniform vec4 colDiffuse;
 uniform int woodMode;
 uniform vec3 eye;
-uniform vec3 pinShadows[10];
+uniform vec4 pinShadows[10];
 uniform vec3 ballShadow;
 uniform float sceneTime;
 uniform vec2 boardLight;
+uniform float laneRun;
+uniform vec3 keyDirection, keyTint;
+uniform float roofLight;
 out vec4 finalColor;
 // GLSL pow(x,n) is undefined for x<0, even for integer-valued n.
 // Signed floor reflections previously produced NaNs on some Windows drivers.
@@ -38,7 +41,7 @@ void main() {
         }
     }
     vec3 tex=texture(texture0,sampleUV).rgb*colDiffuse.rgb*color.rgb;
-    vec3 key=normalize(vec3(-.35,.85,-.4));
+    vec3 key=normalize(keyDirection);
     float diffuse=max(dot(n,key),0.0);
     float rim=pow(1.0-clamp(dot(n,v),0.0,1.0),3.0);
     bool floorMaterial=woodMode==1 || woodMode==5;
@@ -49,7 +52,7 @@ void main() {
         float vein=pow(1.0-abs(sin(world.y*.85+world.z*.38+broad*5.0)),8.0);
         tex=mix(tex,vec3(.27,.69,.73),vein*.24);
     }
-    vec3 lit=tex*(vec3(.29,.33,.39)+diffuse*vec3(.95,.85,.72));
+    vec3 lit=tex*(vec3(.29,.33,.39)+diffuse*.91*keyTint);
     lit+=tex*max(dot(n,normalize(vec3(.7,.2,.6))),0.0)*vec3(.09,.20,.30);
     float gloss=pow(max(dot(n,normalize(key+v)),0.0),floorMaterial?100.0:62.0);
     lit+=vec3(.85,.91,1.0)*gloss*(floorMaterial?.48:.46)+rim*vec3(.035,.07,.09);
@@ -61,6 +64,11 @@ void main() {
         lit+=max(-r.z,0.)*(boxLight*vec3(.77,.73,.65)+strip*vec3(.30,.37,.46));
     }
     if(woodMode==1) {
+        // Broad catwalk reflections at the Trop and raking sunlight in the open parks.
+        float roofBand=exp(-square(sin(world.z*.21+world.x*.13)*3.8));
+        float beamEdge=exp(-square((abs(world.x)-2.7)/1.65));
+        lit+=keyTint*roofBand*beamEdge*roofLight*.17;
+        lit*=mix(vec3(1.),keyTint,.19);
         float plank=floor((world.x+30.0)*3.4);
         float grain=sin(world.x*165.0+noise(vec3(world.x*8.0,0,world.z*.7))*3.0);
         float aa=1.0-smoothstep(.4,2.5,fwidth(world.x*165.0));
@@ -93,9 +101,8 @@ void main() {
     if(floorMaterial) {
         float shadow=0.0;
         for(int i=0;i<10;++i) {
-            float lean=pinShadows[i].y;
-            vec2 axis=vec2(-.3714*abs(lean),.9285*lean)*2.28;
-            vec2 offset=world.xz-pinShadows[i].xz;
+            vec2 axis=pinShadows[i].zw;
+            vec2 offset=world.xz-pinShadows[i].xy;
             float along=clamp(dot(offset,axis)/max(.001,dot(axis,axis)),0.,1.);
             vec2 d=(offset-axis*along)/vec2(.50,.85);
             shadow+=exp(-dot(d,d)*2.0)*mix(.52,.32,along);
@@ -157,6 +164,15 @@ void main() {
         lit+=caustic*vec3(.06,.19,.17);
         lit=mix(tex*.68,lit,smoothstep(4.2,8.0,world.y));
     }
+    if(woodMode==5 || woodMode==10 || woodMode==4) {
+        float course=(world.z-2.)/laneRun;
+        float forest=smoothstep(.26,.38,course)*(1.-smoothstep(.64,.76,course));
+        lit*=mix(vec3(1.),vec3(.35,.52,.63),forest);
+        float daylight=smoothstep(.68,.87,course);
+        float shafts=.5+.5*sin(world.x*1.35+world.z*.31+sceneTime*.19);
+        lit+=daylight*vec3(.105,.073,.024)*shafts;
+    }
+    if(woodMode==11) lit=mix(lit,vec3(1.,.47,.049),.56)+vec3(.085,.041,.004)*broad;
     float fog=1.0-exp(-length(eye-world)*.0035);
     lit=mix(lit,vec3(.09,.17,.24),fog);
     finalColor=vec4(lit*holeLight,colDiffuse.a*color.a);

@@ -195,6 +195,7 @@ int main(int argc, char **argv) {
     MascotMotion mascotMotion;
     std::array<std::array<RailTile, 10>, 2> railTiles{};
     float strikeSeconds = 0;
+    bool spareNext = false;
     MascotTokens tokens;
     RidePickups ridePickups;
     std::mt19937 rideRng(smoke || captureRequested ? 628u : std::random_device{}());
@@ -221,6 +222,7 @@ int main(int argc, char **argv) {
     Camera3D camera{{0, 3.0f, -6.2f}, {0, 1.7f, 23}, {0, 1, 0}, 43, CAMERA_PERSPECTIVE};
     auto resetShot = [&]() {
         strikeSeconds = 0;
+        spareNext = false;
         shot = Shot{};
         stadiumSetup.reset();
         ridePickups = {};
@@ -513,6 +515,11 @@ int main(int argc, char **argv) {
                     continue;
 
                 const auto roll = match.outcome();
+                if (!match.mascot && !splitDrill) {
+                    Game next = match.games[match.player];
+                    next.roll(roll.knocked);
+                    spareNext = !next.complete && next.frame == match.games[match.player].frame && !next.freshRack();
+                }
                 const int bonus = ridePickups.bonus(roll.knocked);
                 match.rideBonus[match.player] += bonus;
                 if (bonus > 0) {
@@ -642,6 +649,7 @@ int main(int argc, char **argv) {
         else if (!paused) strikeSeconds += dt;
         art.setter.progress = turn == Turn::Reaction
             ? std::clamp(1.f - reaction / (smoke ? .1f : PinsetterCycle::duration), 0.f, 1.f) : 0;
+        art.returningBall = spareNext && art.setter.progress >= .63f;
         art.strikeSalute = strike ? art.setter.progress : 0;
         art.crowdCheer = PinsetterCycle::ease(strikeSeconds, 0, .26f);
         art.mascotPose = replaying ? replay.frame().rider : mascotMotion.pose;
@@ -676,7 +684,11 @@ int main(int argc, char **argv) {
             desired = {-9, 5.4f, rack - 13};
             look = {1.f, 3.f, rack + 7};
         }
-        if (screen == Screen::Lane && (turn == Turn::Ready || replaying)) {
+        if (art.returningBall) {
+            desired = {-4.7f, 2.62f, 3.20f};
+            look = {-7.65f, 1.40f, 7.65f};
+        }
+        if (screen == Screen::Lane && (turn == Turn::Ready || replaying || art.returningBall)) {
             camera.position = desired;
             camera.target = look;
         }
@@ -836,12 +848,13 @@ int main(int argc, char **argv) {
             } else
                 arcadeCenter("PARK " + std::to_string(arena + 1) + " / 10", 900, 598, 20, gold);
         } else if (screen == Screen::Locker) {
-            modal({74, 12, 1132, 778}, "THE BALL LOCKER");
-            arcadeCenter("30 CLUBS. 30 FUN DESIGNS. 4 RAYS SPECIALS.", 640, 134, 23);
-            // Display balls on a single stone cabinet, without individual dashboard cards.
+            sprite(art.shop, {0, 0, W, H});
+            arcadeCenter("THE BALL LOCKER", 446, 103, 52, cream);
+            arcadeCenter("30 CLUBS  /  30 FUN DESIGNS  /  4 RAYS SPECIALS", 446, 158, 22);
+            // Keep the career slot order on the felt sample board.
             for (int id = 0; id < 64; ++id) {
                 int col = id % 8, row = id / 8;
-                Rectangle cell{139 + col * 84.f, 193 + row * 58.f, 78, 55};
+                Rectangle cell{119 + col * 84.f, 193 + row * 58.f, 78, 55};
                 bool unlocked = profile.ballUnlocked(id);
                 if (id == selectedSkin)
                     DrawRing({cell.x + 39, cell.y + 23}, 24, 27, 0, 360, 40, gold);
@@ -854,34 +867,43 @@ int main(int argc, char **argv) {
                     previewAngle = 0;
                 }
             }
-            panel({855, 208, 278, 403});
-            arcadeCenter("BALL " + std::to_string(selectedSkin + 1), 994, 237, 31, gold);
-            arcadeCenter("ARROW KEYS TO TURN", 994, 271, 15);
-            previewAngle = std::fmod(previewAngle + (float(IsKeyDown(KEY_RIGHT)) -
+            arcadeCenter("BALL " + std::to_string(selectedSkin + 1), 1014, 123, 31, gold);
+            arcadeCenter("ARROW KEYS TO TURN", 1014, 163, 15);
+            previewAngle = std::fmod(previewAngle + .034f*dt + (float(IsKeyDown(KEY_RIGHT)) -
                                                       float(IsKeyDown(KEY_LEFT))) * dt * .32f, 1.f);
             SetShaderValue(uiBallShader, lockerLongitude, &previewAngle, SHADER_UNIFORM_FLOAT);
-            ballIcon(art.skins[selectedSkin], 926, 290, 136);
+            ballIcon(art.skins[selectedSkin], 924, 210, 180);
             const float front = 0;
             SetShaderValue(uiBallShader, lockerLongitude, &front, SHADER_UNIFORM_FLOAT);
             std::string name = ballName(selectedSkin);
-            float size = std::min(
-                24.f, 230.f / std::max(1.f, MeasureTextEx(arcadeFont, name.c_str(), 24, 1).x) * 24);
-            arcadeCenter(name, 994, 439, size);
-            arcadeCenter(profile.ballUnlocked(selectedSkin)
+            center(name, 1014, 471, std::min(24.f, 278.f * 24 / tw(name,24)), {53, 36, 19, 255});
+            center(profile.ballUnlocked(selectedSkin)
                              ? "UNLOCKED"
                              : std::to_string(selectedSkin * 80) + " CAREER XP",
-                         994, 484, 22, gold);
+                         1014, 506, 17, ink);
             if (const auto *challenge = ballChallenge(selectedSkin); challenge && !profile.ballUnlocked(selectedSkin)) {
                 const std::string hint = std::string("OR ") + challenge->instruction;
-                center(hint, 994, 515, std::min(13.f, 235.f * 13 / tw(hint, 13)), cream);
+                center(hint, 1014, 546, std::min(13.f, 235.f * 13 / tw(hint, 13)), cream);
             }
-            if (plaqueButton({892, 533, 204, 57}, skin == selectedSkin ? "EQUIPPED" : "EQUIP",
+            if (plaqueButton({829, 722, 187, 55}, skin == selectedSkin ? "EQUIPPED" : "EQUIP",
                              profile.ballUnlocked(selectedSkin))) {
                 skin = selectedSkin;
                 audio.play(audio.click);
             }
-            arcadeCenter("EQUIPPED: " + ballName(skin), 475, 676, 22, gold);
-            if (plaqueButton({891, 657, 216, 64}, "BACK"))
+            constexpr std::array<int, 6> raysShelf{26, 56, 60, 61, 62, 63};
+            arcadeCenter("TAMPA BAY COLLECTION", 1014, 579, 22, gold);
+            for (size_t slot = 0; slot < raysShelf.size(); ++slot) {
+                float x = 847.f + slot * 57;
+                int id = raysShelf[slot];
+                ballIcon(art.skins[id], x, 625, 47, profile.ballUnlocked(id));
+                if (CheckCollisionPointRec(GetMousePosition(), {x-4, 619, 53, 60}) &&
+                    IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+                    selectedSkin = id;
+                    previewAngle = 0;
+                }
+            }
+            arcadeCenter("EQUIPPED: " + ballName(skin), 445, 704, 22, gold);
+            if (plaqueButton({1028, 722, 164, 55}, "BACK"))
                 screen = lockerReturn;
         } else {
             baseballHud(portraits, art.pinGauge, profile.avatar, opponent, view);

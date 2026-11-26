@@ -34,7 +34,7 @@ inline void sprite(Texture2D t, Rectangle r, Color tint = WHITE) {
 inline void ballIcon(Texture2D skin, float x, float y, float size, bool unlocked = true) {
     DrawEllipse(x + size / 2 + 2, y + size * .91f, size * .46f, size * .13f, {0, 0, 0, 140});
     BeginShaderMode(uiBallShader);
-    sprite(skin, {x, y, size, size}, unlocked ? WHITE : Color{105, 105, 105, 255});
+    sprite(skin, {x, y, size, size}, unlocked ? WHITE : Color{160, 160, 160, 255});
     EndShaderMode();
 }
 // Authored stone texture with fixed-size bevels, even on shallow score strips.

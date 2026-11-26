@@ -100,11 +100,54 @@ struct Game {
         return out;
     }
 };
+enum class PinMotion { Still, Rock, Tip, Tumble, Teeter };
 struct Body {
     float x = 0, z = 0, vx = 0, vz = 0, r = geometry::pinRadius;
     bool down = false;
     int id = 0;
     float fall = 0;
+    PinMotion motion = PinMotion::Still;
+    float hitX = 0, hitZ = 1, motionTime = 0, initialTilt = 0;
+
+    // The solver supplies a unit contact normal. Replay samples copy this pose with the body.
+    void react(float nx, float nz, float impulse, bool allowTeeter = true) {
+        if (down || (motion == PinMotion::Teeter && impulse < 4.8f))
+            return;
+        if (impulse <= .65f) {
+            if (motion == PinMotion::Rock) return;
+            motion = PinMotion::Rock;
+        } else if (allowTeeter && (id == 6 || id == 9) && impulse < 4.8f) {
+            motion = PinMotion::Teeter;
+        } else {
+            down = true;
+            motion = impulse > 8.f && std::abs(nx) > .38f ? PinMotion::Tumble : PinMotion::Tip;
+        }
+        hitX = nx;
+        hitZ = nz;
+        motionTime = 0;
+        initialTilt = 0;
+    }
+    void advancePose(float dt) {
+        if (motion == PinMotion::Still) return;
+        motionTime += dt;
+        if (motion == PinMotion::Rock && motionTime >= .65f) motion = PinMotion::Still;
+        if (motion == PinMotion::Teeter && motionTime >= .50f) {
+            motion = PinMotion::Tip;
+            initialTilt = 19.f;
+            down = true;
+        }
+        if (down) fall = std::min(1.f, fall + dt * (motion == PinMotion::Tumble ? 2.2f : 4.f));
+    }
+    float tiltDegrees() const {
+        switch (motion) {
+        case PinMotion::Rock:
+            return 16.f * std::sin(motionTime * 26.f) * std::exp(-motionTime * 6.f);
+        case PinMotion::Teeter: return 19.f * std::min(1.f, motionTime * 9.f);
+        case PinMotion::Tumble: return 270.f * fall;
+        case PinMotion::Tip: return initialTilt + (86.f - initialTilt) * fall;
+        default: return 0;
+        }
+    }
 };
 struct Shot {
     float position = 5, aim = 0, power = .72f, curve = 0;
@@ -156,21 +199,18 @@ struct Simulation {
             b.vz += nz * impulse;
             a.vx -= nx * impulse * (isBall ? .12f : 1.f);
             a.vz -= nz * impulse * (isBall ? .12f : 1.f);
-            if (impulse > .65f) {
-                if (!b.down)
-                    ++impacts;
-                b.down = true;
-                if (!isBall)
-                    a.down = true;
-            }
+            if (impulse > .65f && !b.down && b.motion != PinMotion::Teeter)
+                ++impacts;
+            b.react(nx, nz, impulse);
+            if (!isBall)
+                a.react(-nx, -nz, impulse);
         }
         b.x += nx * (r - d + .001f);
         b.z += nz * (r - d + .001f);
     }
     bool step(float dt) {
         for (auto &p : pins)
-            if (p.down)
-                p.fall = std::min(1.f, p.fall + dt * 4);
+            p.advancePose(dt);
         if (!active)
             return false;
         elapsed += dt;
@@ -219,7 +259,10 @@ struct Simulation {
         for (const auto &p : pins)
             if (std::hypot(p.vx, p.vz) > .08f)
                 moving = true;
-        if (elapsed > geometry::shotTimeout || (ball.z > layout.deckEnd() - 1 && !moving)) {
+        bool pendingFall = std::any_of(pins.begin(), pins.end(), [](const Body &p) {
+            return p.motion == PinMotion::Teeter;
+        });
+        if (!pendingFall && (elapsed > geometry::shotTimeout || (ball.z > layout.deckEnd() - 1 && !moving))) {
             active = false;
             return true;
         }
