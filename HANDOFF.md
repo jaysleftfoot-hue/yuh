@@ -1,5 +1,7 @@
 # Current milestone
 
+The stadium sidelines now have recessed dugouts, warning tracks, padded walls and four tiers of seating. Wrigley has a local-time scoreboard clock and a modeled wall faced with its painted ivy. Tropicana has suspended catwalk rings and floodlights. On the Rays course, limestone shelves flank the launch, kelp fills the middle stretch, and exposed timbers and schooling fish mark the wreck. [Aquarium delivery](native/docs/aquarium-delivery.mp4)
+
 The ballpark tour now has ten individually painted outfields and ten lighting setups. At the pro shop, all 64 balls are on display, with the six Tampa Bay designs together on the right. A spare brings the equipped ball back along a physical return during the pinsetter reset. In Mascot Ride, the touch tank gives way to a kelp gallery and then a sunlit wreck. Shoulder hits, grazes and corner-pin wobbles use the contact direction in live play and replays.
 
 The installer includes Wrigley Field Practice and Tropicana Field Practice in the Start menu. Launch either to play immediately. The normal tour still ends at Tropicana. [Tour gallery](native/docs/ballpark-tour.jpg) · [Shop and aquarium](native/docs/pro-shop-and-ride.jpg) · [Wrigley delivery](native/docs/wrigley-delivery.mp4) · [Tropicana delivery](native/docs/tropicana-delivery.mp4)

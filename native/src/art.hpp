@@ -1,4 +1,5 @@
 #pragma once
+#include <ctime>
 #include "presentation.hpp"
 #include "raylib.h"
 #include "raymath.h"
@@ -16,7 +17,7 @@ struct Art {
     bool returningBall = false;
     Texture2D gearCase{}, tank{}, kelp{}, reef{}, spray{}, sunburst{}, tokenMedal{};
     std::array<Texture2D, 10> outfield{};
-    Texture2D manualBoard{}, electricBoard{}, scorePlates{}, enamelLettering{}, pinGauge{};
+    Texture2D ivyWall{}, manualBoard{}, electricBoard{}, scorePlates{}, enamelLettering{}, pinGauge{};
     std::array<Texture2D, 2> scoreRails{};
     std::array<Texture2D, 3> reactions{};
     std::array<Texture2D, bowling::powerCount> badges{};
@@ -33,6 +34,7 @@ struct Art {
         };
         shop = load("pro-shop.jpg");
         strikePennant = load("strike-pennant.png");
+        ivyWall = load("ivy-wall.jpg");
         manualBoard = load("manual-board.jpg");
         electricBoard = load("electric-board.jpg");
         enamelLettering = load("enamel-lettering.png");
@@ -797,6 +799,28 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                 }
             }
         }
+        // Low limestone shelves give way to exposed hull frames near the deck.
+        for (int side : {-1, 1}) {
+            if (side == openSide) continue;
+            for (int i = 0; i < 8; ++i) {
+                float z = 2.f + i * 2.7f;
+                float x = side * (7.1f + .35f * std::sin(i * 2.f));
+                orb({x, .29f, z}, {1.14f,.54f,1.83f}, {117,146,134,255});
+                orb({x + side*.48f,.72f,z+.34f}, {.73f,.43f,1.08f}, {161,174,145,255});
+                float wreckZ = 55.f + i * 2.65f;
+                Vector3 foot{side*6.45f,.15f,wreckZ}, bend{side*6.82f,1.8f,wreckZ+.24f};
+                Vector3 tip{side*7.85f,3.7f+.75f*std::cos(i*2.f),wreckZ+.64f};
+                beam(foot,bend,.19f,{87,72,52,255});
+                beam(bend,tip,.17f,{110,88,61,255});
+                if (i < 7) beam(bend,{bend.x,bend.y,wreckZ+2.89f},.14f,{103,78,51,255});
+                float phase = time*.66f+i*1.3f;
+                Vector3 fish{side*(7.1f+.42f*std::sin(phase)),2.8f+.57f*std::cos(phase),
+                             wreckZ+std::sin(phase)*1.6f};
+                orb(fish,{.13f,.18f,.48f},{174,207,174,255});
+                orb({fish.x+.07f*std::sin(phase*5),fish.y,fish.z-.37f},
+                    {.055f,.22f,.13f},{221,173,81,255});
+            }
+        }
         // Foreground ribbons break the straight window sill. Different clusters
         // pass at different depths, giving the exhibit parallax during the ride.
         for (int side : {-1, 1}) {
@@ -1049,12 +1073,42 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
             fieldPath({0, .01f, -8}, {side * 48.f, .01f, 34}, .10f, cream);
             box({side * 21.f, .03f, 10}, {.8f, .08f, .8f}, cream);
             // Field-level dugouts with padded rails.
-            box({side * 16.f, .6f, 0}, {5, 1.2f, 7}, {16, 51, 54, 255});
+            // Recessed bench and painted contact shadow under the overhang.
+            box({side*16.f,.05f,0},{5.4f,.13f,7.5f},{57,65,56,255});
+            box({side*18.4f,1.42f,0},{.24f,2.8f,7.3f},{37,53,52,255});
+            box({side*17.8f,.85f,0},{1.16f,.18f,6.9f},{165,118,77,255});
+            for (float z : {-3.52f,3.52f}) {
+                box({side*16.f,1.42f,z},{5.1f,2.8f,.18f},{63,77,72,255});
+                beam({side*13.52f,0,z},{side*13.52f,2.8f,z},.10f,cream);
+            }
             box({side * 16.f, 2.8f, 0}, {5.5f, .25f, 7.5f}, team);
             beam({side * 13.5f, 1.3f, -3.5f}, {side * 13.5f, 1.3f, 3.5f}, .10f, team);
         }
         box({0, .03f, -8}, {.8f, .08f, .8f}, cream);
         box({0, .03f, 30}, {.8f, .08f, .8f}, cream);
+        // Field-level warning track, seating terraces and access aisles.
+        for (int side : {-1, 1}) {
+            for (int bay = 0; bay < 9; ++bay) {
+                float z = 6.f + bay * 10.f;
+                float x = side * (21.f + 3.f*std::sin(bay*.46f));
+                box({x-side*2.1f,-.08f,z},{3.9f,.13f,10.f},{160,111,77,255});
+                box({x,1.02f,z},{.52f,2.1f,9.96f},{48,79,68,255});
+                box({x,2.12f,z},{.62f,.14f,9.96f},{188,163,93,255});
+                for (int row = 0; row < 4; ++row) {
+                    float seatX = x + side*(1.35f + row*1.44f);
+                    float y = 1.45f + row*.68f;
+                    box({seatX,y,z},{1.48f,.45f,9.1f},{106,110,105,255});
+                    for (int seat = 0; seat < 8; ++seat) {
+                        float seatZ = z - 3.9f + seat*1.1f;
+                        Color paint = ColorLerp({70,82,77,255},team,.25f);
+                        if (arena == 9) paint = ColorLerp(paint,SKYBLUE,.16f + .08f*row);
+                        DrawCubeV({seatX,y+.31f,seatZ},{.67f,.16f,.88f},paint);
+                        DrawCubeV({seatX+side*.33f,y+.62f,seatZ},{.12f,.62f,.88f},paint);
+                    }
+                }
+                beam({x+side,2.16f,z+4.72f},{x+side*7,5.05f,z+4.72f},.067f,cream);
+            }
+        }
         // Continuous outfield panorama curves into the sidelines behind the live board.
         rlSetTexture(outfield[arena].id);
         rlBegin(RL_QUADS);
@@ -1084,6 +1138,8 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         for (int side : {-1, 1})
             fieldBox(side * 11.7f, 34 + extra, time, team);
         if (arena == 0) {
+            for (int panel = -4; panel <= 4; ++panel)
+                sign(ivyWall,{panel*11.f,2.52f,43.3f+extra},11.02f,3.12f,true);
             // Exposed brick at the base of the ivy; the painted outfield wraps behind it.
             material(2);
             box({0, .66f, 43.8f+extra}, {103, 1.48f, .85f}, {145, 79, 55, 255});
@@ -1135,8 +1191,16 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
                 orb({-15 + std::sin(a) * 1.65f, 19 + std::cos(a) * 1.65f, 41.45f + extra},
                     {.075f, .075f, .03f}, cream);
             }
-            beam({-15, 19, 41.4f + extra}, {-16.1f, 20, 41.4f + extra}, .085f, cream);
-            beam({-15, 19, 41.4f + extra}, {-15.1f, 20.5f, 41.4f + extra}, .06f, cream);
+            const auto now = std::time(nullptr);
+            if (const auto *clock = std::localtime(&now)) {
+                const float minute = clock->tm_min + clock->tm_sec/60.f;
+                auto hand = [&](float angle, float length, float width) {
+                    beam({-15,19,41.4f+extra},{-15-std::sin(angle)*length,19+std::cos(angle)*length,
+                         41.4f+extra},width,cream);
+                };
+                hand((clock->tm_hour+minute/60.f)*PI/6,1.06f,.085f);
+                hand(minute*PI/30,1.51f,.06f);
+            }
             for (float x : {-23.f, -7.f}) {
                 beam({x, 16.8f, 42 + extra}, {x, 21, 42 + extra}, .05f, cream);
                 DrawTriangle3D({x, 21, 42 + extra}, {x, 19.8f, 42 + extra},
@@ -1157,6 +1221,18 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
             for (float z : {-2.f, 14.f + extra / 3, 30.f + extra * .66f, 46.f + extra})
                 arch(z, 49, 31, {155, 184, 200, 255}, .15f);
 
+            // Suspended concentric catwalks carry service railings and floodlights.
+            for (float radius : {22.f,38.f}) {
+                for (int i=0; i<40; ++i) {
+                    float a=i*2*PI/40, b=(i+1)*2*PI/40;
+                    Vector3 foot{radius*std::cos(a),23.f+radius*.09f,43.f+radius*.55f*std::sin(a)};
+                    Vector3 next{radius*std::cos(b),foot.y,43.f+radius*.55f*std::sin(b)};
+                    beam(foot,next,.21f,{85,91,96,255});
+                    beam({foot.x,foot.y+1,foot.z},{next.x,next.y+1,next.z},.06f,cream);
+                    beam(foot,{foot.x,foot.y+1,foot.z},.06f,cream);
+                    if (i%5==0) orb(foot,{.51f,.25f,.38f},{233,240,208,255});
+                }
+            }
             // Tropicana's roof catwalk, orange landmark and flanking display pylons.
             for (float y : {27.f, 28.f})
                 beam({-43, y, 40 + extra}, {43, y, 40 + extra}, .12f, {48, 59, 67, 255});
@@ -1345,7 +1421,7 @@ uv=vertexTexCoord;normal=normalize(mat3(matNormal)*norm);world=vec3(matModel*vec
         for (auto texture : reactions)
             UnloadTexture(texture);
         for (auto mural : outfield) UnloadTexture(mural);
-        for (auto texture : {shop, strikePennant, gearCase, tank, kelp, reef, spray, sunburst, tokenMedal, manualBoard, electricBoard,
+        for (auto texture : {shop, strikePennant, gearCase, tank, kelp, reef, spray, sunburst, tokenMedal, ivyWall, manualBoard, electricBoard,
                              scorePlates, enamelLettering, pinGauge, scoreRails[0], scoreRails[1]})
             UnloadTexture(texture);
         for (auto texture : badges)
