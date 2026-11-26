@@ -1,1 +1,1 @@
-Gameplay fixes build from 655799c63927b6859225cf79fff76b1c391ebba3. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. Join any numbered parts of an archive in numerical order before opening it. Windows execution is unverified.
+Stadium and aquarium scenery build from e8e32689b3f7d696092d9fe5466d4df5b1a1aa99. Includes installer, portable Windows ZIP, editable artwork sources and full Git history. Join any numbered parts of an archive in numerical order before opening it. Windows execution is unverified.
